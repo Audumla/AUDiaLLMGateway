@@ -36,12 +36,55 @@ project:
     gateway_python_deps:
       required: true
       default_enabled: true
+    llama_cpp:
+      required: true
+      default_enabled: true
     llama_swap:
       required: true
       default_enabled: true
     nginx:
       required: false
       default_enabled: false
+  component_settings:
+    llama_cpp:
+      provider: github_release
+      repo_owner: ggml-org
+      repo_name: llama.cpp
+      version: latest
+      backend: vulkan
+      install_root: tools/llama.cpp
+      binary_subdir: bin
+      executable_names:
+        windows: llama-server.exe
+        linux: llama-server
+        macos: llama-server
+      asset_match:
+        windows:
+          vulkan:
+            - win
+            - vulkan
+            - x64
+          cpu:
+            - win
+            - x64
+        linux:
+          vulkan:
+            - linux
+            - vulkan
+            - x64
+          cpu:
+            - linux
+            - x64
+        macos:
+          metal:
+            - macos
+            - metal
+          cpu:
+            - macos
+    llama_swap:
+      provider: package_manager
+    nginx:
+      provider: package_manager
 
 install:
   venv_path: .venv

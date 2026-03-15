@@ -117,5 +117,22 @@
       "Restructured config into project, local, and generated layers so updates preserve machine-local overrides while validation warns on conflicts.",
       "Added component and platform specs, installer manifest/state handling, and verified pytest, py_compile, config generation, config validation, installer help, and separation checks."
     ]
+  },
+  {
+    "id": "CHG-c772da77",
+    "agent": "codex",
+    "change_group": "audiallmgateway-llamacpp-component-manag",
+    "plugin_version": "unreleased",
+    "date": "2026-03-15",
+    "recorded_at": "2026-03-15T04:32:25.811060Z",
+    "summary_tags": [
+      "New Feature"
+    ],
+    "summary": "Added versioned llama.cpp component management with backend selection to the Gateway installer model.",
+    "details": [
+      "Extended layered config and the release installer to treat llama.cpp as a managed component with backend/version settings and install-state tracking.",
+      "Made generated llama-swap config capable of using the installed llama-server path from install state when local overrides do not replace it.",
+      "Updated docs and specs for Windows Vulkan defaults and added installer tests for release asset selection."
+    ]
   }
 ]

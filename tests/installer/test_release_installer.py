@@ -2,7 +2,7 @@ from pathlib import Path
 
 import yaml
 
-from src.installer.release_installer import resolve_component_selection
+from src.installer.release_installer import find_release_asset, resolve_component_selection
 from src.launcher.config_loader import validate_layered_configs
 
 
@@ -11,11 +11,23 @@ def test_resolve_component_selection_includes_required_and_defaults() -> None:
         "components": {
             "python_runtime": {"required": True, "default_enabled": True},
             "gateway_python_deps": {"required": True, "default_enabled": True},
+            "llama_cpp": {"required": True, "default_enabled": True},
             "nginx": {"required": False, "default_enabled": False},
         }
     }
     selected = resolve_component_selection(manifest, ["nginx"])
-    assert selected == ["python_runtime", "gateway_python_deps", "nginx"]
+    assert selected == ["python_runtime", "gateway_python_deps", "llama_cpp", "nginx"]
+
+
+def test_find_release_asset_matches_all_tokens() -> None:
+    metadata = {
+        "assets": [
+            {"name": "llama-b9999-bin-win-vulkan-x64.zip", "browser_download_url": "https://example.invalid/vulkan.zip"},
+            {"name": "llama-b9999-bin-win-cpu-x64.zip", "browser_download_url": "https://example.invalid/cpu.zip"},
+        ]
+    }
+    asset = find_release_asset(metadata, ["win", "vulkan", "x64"])
+    assert asset["browser_download_url"] == "https://example.invalid/vulkan.zip"
 
 
 def test_validate_layered_configs_reports_type_conflicts(tmp_path: Path) -> None:

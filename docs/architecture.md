@@ -6,7 +6,7 @@ Client or tool
 -> optional nginx
 -> LiteLLM
 -> llama-swap
--> local llama-server profiles
+-> local llama-server profiles from an installed llama.cpp runtime
 
 Optional MCP path later:
 
@@ -51,5 +51,6 @@ Bootstrap script
 - installed version
 - selected components
 - install locations
+- installed llama.cpp version/backend metadata
 - validation warnings
 - last successful update time

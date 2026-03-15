@@ -84,6 +84,7 @@ class StackConfig:
     mcp: MCPConfig
     routing: dict[str, Any]
     reverse_proxy: dict[str, Any]
+    component_settings: dict[str, Any]
 
 
 def _substitute_env(value: str) -> str:
@@ -162,6 +163,7 @@ def load_stack_config(root: str | Path) -> StackConfig:
     mcp_raw = raw.get("mcp", {})
     routing = raw.get("routing", {})
     reverse_proxy = raw.get("reverse_proxy", {})
+    component_settings = raw.get("component_settings", {})
 
     if not published_raw:
         raise ValueError("stack config does not define any published_models")
@@ -233,6 +235,7 @@ def load_stack_config(root: str | Path) -> StackConfig:
         mcp=mcp,
         routing=routing,
         reverse_proxy=reverse_proxy,
+        component_settings=component_settings,
     )
 
 
@@ -255,7 +258,18 @@ def load_mcp_registry(root: str | Path) -> tuple[dict[str, Any], dict[str, Any],
 
 
 def build_llama_swap_config(stack: StackConfig) -> dict[str, Any]:
-    _, _, merged = load_llama_swap_source_config(stack.root)
+    _, llama_local, merged = load_llama_swap_source_config(stack.root)
+    local_macros = llama_local.get("macros", {}) if isinstance(llama_local, dict) else {}
+    state_path = stack.root / stack.project.state_path
+    install_state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else {}
+    llama_cpp_state = install_state.get("component_results", {}).get("llama_cpp", {})
+    macros = merged.setdefault("macros", {})
+    executable_path = llama_cpp_state.get("executable_path")
+    if executable_path and "llama-server" not in local_macros:
+        macros["llama-server"] = str(executable_path).replace("/", "\\")
+    rocm_executable_path = llama_cpp_state.get("rocm_executable_path")
+    if rocm_executable_path and "llama-server-rocm" not in local_macros:
+        macros["llama-server-rocm"] = str(rocm_executable_path).replace("/", "\\")
     return merged
 
 
