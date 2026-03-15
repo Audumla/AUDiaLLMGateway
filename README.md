@@ -4,6 +4,7 @@ Local-first LLM gateway for a home lab.
 
 Runtime shape:
 
+- `llama.cpp` as an installable/versioned runtime dependency
 - `llama-swap` as the local model router and profile catalog
 - native `llama-server` processes behind `llama-swap`
 - LiteLLM as the OpenAI-compatible gateway
@@ -21,6 +22,7 @@ Key properties:
 - project-managed files are replaced on update
 - `config/local/*` and `state/*` are preserved on update
 - local override configs are validated during updates and warnings are recorded in install state
+- `llama.cpp` can be installed in a selected backend/version variant, with Windows Vulkan as the default baseline
 
 ## Config layering
 
@@ -113,8 +115,32 @@ The release installer tracks installed components and can install newly added on
 
 - `python_runtime`
 - `gateway_python_deps`
+- `llama_cpp`
 - `llama_swap`
 - `nginx` optional
+
+## llama.cpp component
+
+`llama.cpp` is now treated as a managed component.
+
+The project defaults live in `config/project/stack.base.yaml` under `project.component_settings.llama_cpp`.
+
+Machine-specific overrides can go in `config/local/stack.override.yaml`, for example:
+
+```yaml
+component_settings:
+  llama_cpp:
+    version: b9999
+    backend: vulkan
+```
+
+Current design:
+
+- Windows default backend: `vulkan`
+- macOS default backend: `metal`
+- Linux default backend: `cpu` unless you override it
+
+Installer state records the installed `llama.cpp` version, backend, asset, install path, and resolved `llama-server` executable path.
 
 ## Reverse proxy
 

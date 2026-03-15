@@ -10,6 +10,7 @@ The installer is responsible for:
 - syncing managed files into the target install directory
 - preserving protected local paths
 - installing required and selected components
+- resolving versioned runtime assets such as `llama.cpp`
 - validating config layering
 - recording install state
 
@@ -33,4 +34,3 @@ The installer is responsible for:
 - `.venv/`
 - `.runtime/`
 - `.agent_runner/`
-

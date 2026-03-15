@@ -54,6 +54,15 @@ def get_release_metadata(owner: str, repo: str, version: str) -> dict[str, Any]:
     return github_api_request(url)
 
 
+def find_release_asset(metadata: dict[str, Any], required_tokens: list[str]) -> dict[str, Any]:
+    tokens = [token.lower() for token in required_tokens]
+    for asset in metadata.get("assets", []):
+        name = str(asset.get("name", "")).lower()
+        if all(token in name for token in tokens):
+            return asset
+    raise RuntimeError(f"No release asset matched tokens: {required_tokens}")
+
+
 def choose_archive_url(metadata: dict[str, Any], archive_kind: str) -> tuple[str, str]:
     if archive_kind == "zipball":
         return str(metadata["zipball_url"]), ".zip"
@@ -86,6 +95,20 @@ def extract_archive(archive_path: Path, destination: Path) -> Path:
     if len(children) != 1:
         raise RuntimeError(f"Expected one top-level extracted directory in {destination}")
     return children[0]
+
+
+def extract_component_archive(archive_path: Path, destination: Path) -> Path:
+    destination.mkdir(parents=True, exist_ok=True)
+    if archive_path.suffix == ".zip":
+        with zipfile.ZipFile(archive_path) as zf:
+            zf.extractall(destination)
+    else:
+        with tarfile.open(archive_path, "r:*") as tf:
+            tf.extractall(destination)
+    children = [child for child in destination.iterdir()]
+    if len(children) == 1 and children[0].is_dir():
+        return children[0]
+    return destination
 
 
 def copy_tree(source: Path, destination: Path) -> None:
@@ -163,6 +186,67 @@ def ensure_llama_swap(root: Path) -> dict[str, Any]:
     return {"mode": "manual", "path": ""}
 
 
+def ensure_llama_cpp(root: Path) -> dict[str, Any]:
+    from src.launcher.config_loader import load_stack_config
+
+    stack = load_stack_config(root)
+    settings = stack.component_settings.get("llama_cpp", {})
+    provider = str(settings.get("provider", "github_release"))
+    if provider != "github_release":
+        raise RuntimeError(f"Unsupported llama.cpp provider: {provider}")
+
+    system = detect_platform()
+    backend_default = "vulkan" if system == "windows" else ("metal" if system == "macos" else "cpu")
+    backend = str(settings.get("backend", backend_default))
+    version = str(settings.get("version", "latest"))
+    owner = str(settings.get("repo_owner", "ggml-org"))
+    repo = str(settings.get("repo_name", "llama.cpp"))
+    install_root = root / str(settings.get("install_root", "tools/llama.cpp"))
+    binary_subdir = str(settings.get("binary_subdir", "bin"))
+    executable_names = settings.get("executable_names", {})
+    executable_name = str(executable_names.get(system, "llama-server.exe" if system == "windows" else "llama-server"))
+    asset_tokens = [str(item) for item in settings.get("asset_match", {}).get(system, {}).get(backend, [])]
+    if not asset_tokens:
+        raise RuntimeError(f"No asset-match tokens configured for llama.cpp backend '{backend}' on {system}")
+
+    metadata = get_release_metadata(owner, repo, version)
+    tag = str(metadata.get("tag_name", version))
+    asset = find_release_asset(metadata, asset_tokens)
+    asset_name = str(asset.get("name", "llama.cpp-asset"))
+    browser_url = str(asset.get("browser_download_url", ""))
+    if not browser_url:
+        raise RuntimeError(f"llama.cpp asset '{asset_name}' does not expose browser_download_url")
+
+    install_dir = install_root / f"{tag}-{backend}"
+    with tempfile.TemporaryDirectory(prefix="audia-llamacpp-") as tmp_dir:
+        tmp_root = Path(tmp_dir)
+        archive_path = download_file(browser_url, tmp_root / asset_name)
+        extracted_root = extract_component_archive(archive_path, tmp_root / "extract")
+        if install_dir.exists():
+            shutil.rmtree(install_dir)
+        install_dir.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(extracted_root, install_dir)
+
+    executable_path = install_dir / binary_subdir / executable_name
+    if not executable_path.exists():
+        fallback = next(install_dir.rglob(executable_name), None)
+        if fallback is None:
+            raise RuntimeError(f"Installed llama.cpp asset did not contain {executable_name}")
+        executable_path = fallback
+
+    result = {
+        "provider": provider,
+        "version": tag,
+        "backend": backend,
+        "install_dir": str(install_dir),
+        "asset_name": asset_name,
+        "executable_path": str(executable_path),
+    }
+    if backend == "rocm":
+        result["rocm_executable_path"] = str(executable_path)
+    return result
+
+
 def ensure_nginx(root: Path) -> dict[str, Any]:
     if shutil.which("nginx"):
         return {"mode": "path", "path": shutil.which("nginx")}
@@ -187,6 +271,7 @@ def ensure_nginx(root: Path) -> dict[str, Any]:
 COMPONENT_INSTALLERS = {
     "python_runtime": ensure_python_runtime,
     "gateway_python_deps": ensure_gateway_python_deps,
+    "llama_cpp": ensure_llama_cpp,
     "llama_swap": ensure_llama_swap,
     "nginx": ensure_nginx,
 }

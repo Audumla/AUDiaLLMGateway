@@ -31,6 +31,7 @@ This spec now treats Windows as the first implemented platform while also reserv
 7. Scaffold MCP integration without making it a phase 1 dependency.
 8. Support release-archive installation and update without requiring Git on the target machine.
 9. Preserve machine-local config during updates while still allowing project-managed defaults to evolve.
+10. Treat `llama.cpp` as an installable, versioned runtime dependency with backend-specific variants.
 
 ## Non-Goals
 
@@ -200,6 +201,7 @@ The system must support:
 - update from newer GitHub releases without Git operations
 - preserving machine-local overrides during update
 - automatic dependency installation for required components where supported
+- automatic installation of a selected `llama.cpp` version/backend variant where supported
 - optional component selection for non-mandatory components
 - installation of newly added components on update when selected or required
 - conflict validation between project defaults and local overrides

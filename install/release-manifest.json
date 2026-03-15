@@ -48,6 +48,10 @@
         "python_runtime"
       ]
     },
+    "llama_cpp": {
+      "required": true,
+      "default_enabled": true
+    },
     "llama_swap": {
       "required": true,
       "default_enabled": true

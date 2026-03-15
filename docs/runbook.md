@@ -10,6 +10,25 @@ Generated files are written under `config/generated/`.
 
 The updater replaces project-managed files from a release archive but preserves `config/local/`, `.venv/`, `.runtime/`, `.agent_runner/`, and `state/`.
 
+## llama.cpp version/backend selection
+
+The installer can manage a specific `llama.cpp` build.
+
+Project default:
+
+- `config/project/stack.base.yaml`
+
+Local override example:
+
+```yaml
+component_settings:
+  llama_cpp:
+    version: latest
+    backend: vulkan
+```
+
+For your current Windows setup, `vulkan` should remain the default backend.
+
 ## First install from release
 
 ### Windows
@@ -91,6 +110,7 @@ This file tracks:
 - installed release version
 - selected components
 - component install results
+- installed `llama.cpp` version/backend/path details
 - config validation output
 - install root
 - last update time

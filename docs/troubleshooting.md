@@ -18,8 +18,16 @@
 ## llama-swap does not start after update
 
 - Confirm `LLAMA_SWAP_EXE` still points to the correct executable.
+- Confirm the installed `llama.cpp` build in `state/install-state.json` matches the backend you expect.
 - Confirm your local overrides did not introduce a type mismatch in `config/local/llama-swap.override.yaml`.
 - Inspect `.runtime/logs/llama-swap.log`.
+
+## The wrong llama.cpp build was installed
+
+- Check `component_settings.llama_cpp` in `config/project/stack.base.yaml`.
+- Override the version/backend in `config/local/stack.override.yaml`.
+- Re-run the update flow.
+- Inspect `state/install-state.json` for the resolved asset and executable path.
 
 ## LiteLLM route aliases changed unexpectedly
 
