@@ -1,7 +1,8 @@
 published_models: []
 
 component_settings:
-  llama_cpp: {}
+  llama_cpp:
+    sidecar_files: []
 
 routing:
   notes: []

@@ -29,6 +29,12 @@
 - Re-run the update flow.
 - Inspect `state/install-state.json` for the resolved asset and executable path.
 
+## The Windows HIP/ROCm build needs extra DLLs
+
+- Add those DLLs to `component_settings.llama_cpp.sidecar_files` in `config/local/stack.override.yaml`.
+- Re-run the update flow so the installer copies them next to the selected `llama-server` binary.
+- Inspect `state/install-state.json` to confirm which sidecars were copied.
+
 ## LiteLLM route aliases changed unexpectedly
 
 - Check `config/project/stack.base.yaml` for project defaults from the new release.

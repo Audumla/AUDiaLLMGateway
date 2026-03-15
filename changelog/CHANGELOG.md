@@ -42,4 +42,14 @@
 - Made generated llama-swap config capable of using the installed llama-server path from install state when local overrides do not replace it.
 - Updated docs and specs for Windows Vulkan defaults and added installer tests for release asset selection.
 
+### Added Windows HIP llama.cpp variant support and online release checking for managed components. (New Feature)
+- Extended llama.cpp component settings to support Windows HIP asset selection and optional sidecar DLL copying for builds that need extra runtime files.
+- Added check-updates commands and state reporting so gateway updates can query upstream release metadata for the gateway and llama.cpp.
+- Updated docs/specs and re-verified pytest, py_compile, config generation, and installer CLI help.
+
+### Updated AUDiaLLMGateway defaults to use the Audumla/AUDiaLLMGateway GitHub repository. (Configuration Cleanup)
+- Changed the release installer defaults and release manifest owner to Audumla.
+- Updated bootstrap and documentation examples to point at the real GitHub repo.
+- Re-ran pytest, py_compile, and config validation after the change.
+
 ---

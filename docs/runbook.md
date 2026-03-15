@@ -29,12 +29,23 @@ component_settings:
 
 For your current Windows setup, `vulkan` should remain the default backend.
 
+If you want the AMD/HIP build instead:
+
+```yaml
+component_settings:
+  llama_cpp:
+    backend: hip
+    sidecar_files:
+      - R:\tools\llama-bin-amd\libssl-3-x64.dll
+      - R:\tools\llama-bin-amd\libcrypto-3-x64.dll
+```
+
 ## First install from release
 
 ### Windows
 
 ```powershell
-.\bootstrap\install-release.ps1 -Owner AUDia -Repo AUDiaLLMGateway -InstallDir "$HOME\AUDiaLLMGateway"
+.\bootstrap\install-release.ps1 -Owner Audumla -Repo AUDiaLLMGateway -InstallDir "$HOME\AUDiaLLMGateway"
 ```
 
 ### Linux
@@ -61,6 +72,20 @@ For your current Windows setup, `vulkan` should remain the default backend.
 
 ```bash
 ./scripts/update-release.sh
+```
+
+## Check online release availability
+
+### Windows
+
+```powershell
+.\scripts\check-updates.ps1
+```
+
+### Linux/macOS
+
+```bash
+./scripts/check-updates.sh
 ```
 
 ## Local developer setup
