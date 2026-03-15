@@ -62,4 +62,9 @@
 - Removed the per-action AUDiaLLMGateway-* wrapper files from scripts/ and updated README and runbook examples to use subcommands.
 - Verified the unified command with validate-configs and help output, and re-ran the test suite and strict separation check.
 
+### The Gateway repo now tracks origin/main correctly instead of the stale origin/master branch. (Configuration Cleanup)
+- Set the local main branch upstream to origin/main so git pull uses the correct remote branch.
+- Reset origin/HEAD to main and pruned the stale origin/master remote-tracking ref.
+- Verified the remote default branch and local pull/push configuration both point to main.
+
 ---
