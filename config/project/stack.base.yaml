@@ -1,0 +1,112 @@
+version: 3
+
+project:
+  github:
+    owner: AUDia
+    repo: AUDiaLLMGateway
+    release_asset_strategy: source_archive
+  installer:
+    state_path: state/install-state.json
+    protected_paths:
+      - config/local
+      - state
+      - .runtime
+      - .venv
+      - .agent_runner
+    managed_paths:
+      - README.md
+      - requirements.txt
+      - bootstrap
+      - changelog
+      - config/env.example
+      - config/nginx
+      - config/project
+      - docs
+      - install
+      - scripts
+      - specifications
+      - src
+      - tests
+    seed_paths:
+      - config/local
+  components:
+    python_runtime:
+      required: true
+      default_enabled: true
+    gateway_python_deps:
+      required: true
+      default_enabled: true
+    llama_swap:
+      required: true
+      default_enabled: true
+    nginx:
+      required: false
+      default_enabled: false
+
+install:
+  venv_path: .venv
+  python_min_version: "3.11"
+
+llama_swap:
+  executable: ${LLAMA_SWAP_EXE}
+  host: 127.0.0.1
+  port: 41080
+  project_config_path: config/project/llama-swap.base.yaml
+  local_override_path: config/local/llama-swap.override.yaml
+  generated_config_path: config/generated/llama-swap.generated.yaml
+  health_paths:
+    - /health
+    - /v1/models
+  extra_args: []
+
+litellm:
+  host: 127.0.0.1
+  port: 4000
+  executable: litellm
+  generated_config_path: config/generated/litellm.config.yaml
+  master_key_env: LITELLM_MASTER_KEY
+  health_paths:
+    - /health/liveliness
+    - /health
+    - /v1/models
+  extra_args:
+    - --detailed_debug
+
+published_models:
+  - stable_name: local/qwen27_fast
+    llama_swap_model: qwen3.5-27b-(96k-Q6)
+    backend_model_name: qwen3.5-27b-(96k-Q6)
+    purpose: Fast coding, repo work, and tool-heavy local workflows
+    mode: chat
+
+  - stable_name: local/qwen122_smart
+    llama_swap_model: qwen3.5-122b
+    backend_model_name: qwen3.5-122b
+    purpose: Harder reasoning and larger-context local work
+    mode: chat
+
+  - stable_name: local/qwen4b_vision
+    llama_swap_model: qwen3-5-4b-ud-q5-k-xl-vision
+    backend_model_name: qwen3-5-4b-ud-q5-k-xl-vision
+    purpose: Small vision-capable model exposed through llama-swap
+    mode: chat
+
+routing:
+  future_fallbacks:
+    local/qwen122_smart:
+      - local/qwen27_fast
+  notes:
+    - llama-swap is the local model backend router.
+    - LiteLLM stays in front as the OpenAI-compatible gateway and MCP-facing layer.
+
+mcp:
+  enabled: false
+  project_config_path: config/project/mcp.base.yaml
+  local_override_path: config/local/mcp.override.yaml
+  generated_client_path: config/generated/litellm.mcp.client.json
+  gateway_server_name: litellm-gateway
+
+reverse_proxy:
+  nginx:
+    enabled: false
+    config_path: config/nginx/nginx.conf

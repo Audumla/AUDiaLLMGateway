@@ -1,0 +1,606 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "[agent] Open Dashboard",
+            "type": "shell",
+            "command": "C:\\Users\\mgs\\.agent-system\\runtime\\.venv\\Scripts\\python.exe",
+            "args": [
+                "C:\\Users\\mgs\\.agent-system\\runtime\\agent_system\\install.py",
+                "start",
+                "--workspace",
+                "${workspaceFolder}"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": true
+            },
+            "problemMatcher": [],
+            "detail": "Launch the agent monitoring dashboard __agent-system__"
+        },
+        {
+            "label": "[agent] Open Dashboard (Window)",
+            "type": "shell",
+            "command": "start",
+            "args": [
+                "powershell",
+                "{",
+                "C:\\Users\\mgs\\.agent-system\\runtime\\.venv\\Scripts\\python.exe",
+                "C:\\Users\\mgs\\.agent-system\\runtime\\agent_system\\install.py",
+                "start",
+                "--workspace",
+                "${workspaceFolder}",
+                "}"
+            ],
+            "presentation": {
+                "reveal": "never",
+                "panel": "shared"
+            },
+            "problemMatcher": [],
+            "detail": "Launch the agent dashboard in a separate terminal window __agent-system__"
+        },
+        {
+            "label": "[agent] Maintenance Audit",
+            "type": "shell",
+            "command": "C:\\Users\\mgs\\.agent-system\\runtime\\.venv\\Scripts\\python.exe",
+            "args": [
+                "C:\\Users\\mgs\\.agent-system\\runtime\\agent_system\\core\\agents\\agent_maintenance.py"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": true
+            },
+            "problemMatcher": [],
+            "detail": "Identify and purge orphaned agent branches and report folders __agent-system__"
+        },
+        {
+            "label": "[agent] Merge Latest Changes",
+            "type": "shell",
+            "command": "git",
+            "args": [
+                "merge",
+                "$(C:\\Users\\mgs\\.agent-system\\runtime\\.venv\\Scripts\\python.exe C:\\Users\\mgs\\.agent-system\\runtime\\agent_system\\core\\agents\\get_latest_run_info.py --agent ${input:agentChoice} --run-id \"${input:runIdOverride}\")"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": true
+            },
+            "problemMatcher": [],
+            "detail": "Merge the latest agent run branch into current branch __agent-system__"
+        },
+        {
+            "label": "[agent] Update Agent System",
+            "type": "shell",
+            "command": "C:\\Users\\mgs\\.agent-system\\runtime\\.venv\\Scripts\\python.exe",
+            "args": [
+                "C:\\Users\\mgs\\.agent-system\\runtime\\agent_system\\install.py",
+                "update",
+                "--workspace",
+                "${workspaceFolder}",
+                "--autostash"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": true
+            },
+            "problemMatcher": [],
+            "detail": "Pull the latest agent-system code and update dependencies __agent-system__"
+        },
+        {
+            "label": "[agent] Workspace: Install Targets",
+            "type": "shell",
+            "command": "C:\\Users\\mgs\\.agent-system\\runtime\\.venv\\Scripts\\python.exe",
+            "args": [
+                "C:\\Users\\mgs\\.agent-system\\runtime\\agent_system\\core\\tools\\workspace_install_selector.py",
+                "--workspace",
+                "${workspaceFolder}",
+                "--runtime-dir",
+                "C:\\Users\\mgs\\.agent-system\\runtime",
+                "--installer",
+                "C:\\Users\\mgs\\.agent-system\\runtime\\agent_system\\install.py",
+                "--command",
+                "install"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": true
+            },
+            "problemMatcher": [],
+            "detail": "Interactive install into workspace tasks and/or direct child projects __agent-system__"
+        },
+        {
+            "label": "[agent] Workspace: Update Projects",
+            "type": "shell",
+            "command": "C:\\Users\\mgs\\.agent-system\\runtime\\.venv\\Scripts\\python.exe",
+            "args": [
+                "C:\\Users\\mgs\\.agent-system\\runtime\\agent_system\\core\\tools\\workspace_install_selector.py",
+                "--workspace",
+                "${workspaceFolder}",
+                "--runtime-dir",
+                "C:\\Users\\mgs\\.agent-system\\runtime",
+                "--installer",
+                "C:\\Users\\mgs\\.agent-system\\runtime\\agent_system\\install.py",
+                "--command",
+                "update",
+                "--mode",
+                "all",
+                "--workspace-tasks",
+                "always",
+                "--",
+                "--autostash"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": true
+            },
+            "problemMatcher": [],
+            "detail": "Run update across all direct child projects and refresh workspace tasks __agent-system__"
+        },
+        {
+            "label": "[agent] Workspace: Detect Providers",
+            "type": "shell",
+            "command": "C:\\Users\\mgs\\.agent-system\\runtime\\.venv\\Scripts\\python.exe",
+            "args": [
+                "C:\\Users\\mgs\\.agent-system\\runtime\\agent_system\\core\\tools\\workspace_install_selector.py",
+                "--workspace",
+                "${workspaceFolder}",
+                "--runtime-dir",
+                "C:\\Users\\mgs\\.agent-system\\runtime",
+                "--installer",
+                "C:\\Users\\mgs\\.agent-system\\runtime\\agent_system\\install.py",
+                "--command",
+                "detect",
+                "--mode",
+                "all"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": true
+            },
+            "problemMatcher": [],
+            "detail": "Run provider detection across all direct child projects __agent-system__"
+        },
+        {
+            "label": "[agent] Workspace: Auth Check/Fix",
+            "type": "shell",
+            "command": "C:\\Users\\mgs\\.agent-system\\runtime\\.venv\\Scripts\\python.exe",
+            "args": [
+                "C:\\Users\\mgs\\.agent-system\\runtime\\agent_system\\core\\tools\\workspace_install_selector.py",
+                "--workspace",
+                "${workspaceFolder}",
+                "--runtime-dir",
+                "C:\\Users\\mgs\\.agent-system\\runtime",
+                "--installer",
+                "C:\\Users\\mgs\\.agent-system\\runtime\\agent_system\\install.py",
+                "--command",
+                "auth",
+                "--mode",
+                "all",
+                "--",
+                "--fix"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": true
+            },
+            "problemMatcher": [],
+            "detail": "Run auth check/fix across all direct child projects __agent-system__"
+        },
+        {
+            "label": "[agent] Workspace: Permissions",
+            "type": "shell",
+            "command": "C:\\Users\\mgs\\.agent-system\\runtime\\.venv\\Scripts\\python.exe",
+            "args": [
+                "C:\\Users\\mgs\\.agent-system\\runtime\\agent_system\\core\\tools\\workspace_install_selector.py",
+                "--workspace",
+                "${workspaceFolder}",
+                "--runtime-dir",
+                "C:\\Users\\mgs\\.agent-system\\runtime",
+                "--installer",
+                "C:\\Users\\mgs\\.agent-system\\runtime\\agent_system\\install.py",
+                "--command",
+                "permissions",
+                "--mode",
+                "all",
+                "--",
+                "--mode",
+                "prompt"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": true
+            },
+            "problemMatcher": [],
+            "detail": "Run permissions prompt across all direct child projects __agent-system__"
+        },
+        {
+            "label": "[agent] Log Change",
+            "type": "shell",
+            "command": "C:\\Users\\mgs\\.agent-system\\runtime\\.venv\\Scripts\\python.exe",
+            "args": [
+                "C:\\Users\\mgs\\.agent-system\\runtime\\agent_system\\reporting\\log_change.py",
+                "--agent",
+                "${input:agentChoice}",
+                "--group",
+                "${input:changeGroup}",
+                "--tags",
+                "${input:changeTags}",
+                "--summary",
+                "${input:changeSummary}",
+                "--details",
+                "${input:changeDetails}"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": true
+            },
+            "problemMatcher": [],
+            "detail": "Record a change entry in the project changelog __agent-system__"
+        },
+        {
+            "label": "[agent] Rebuild Changelog",
+            "type": "shell",
+            "command": "C:\\Users\\mgs\\.agent-system\\runtime\\.venv\\Scripts\\python.exe",
+            "args": [
+                "C:\\Users\\mgs\\.agent-system\\runtime\\agent_system\\reporting\\build_changelog.py"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": true
+            },
+            "problemMatcher": [],
+            "detail": "Regenerate CHANGELOG.md from JSON changelog data __agent-system__"
+        },
+        {
+            "label": "[agent] Check Project Separation",
+            "type": "shell",
+            "command": "C:\\Users\\mgs\\.agent-system\\runtime\\.venv\\Scripts\\python.exe",
+            "args": [
+                "C:\\Users\\mgs\\.agent-system\\runtime\\agent_system\\core\\tools\\check_separation.py",
+                "--workspace",
+                "${workspaceFolder}"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": true
+            },
+            "problemMatcher": [],
+            "detail": "Scan project source files for AgentRunner coupling violations __agent-system__"
+        },
+        {
+            "label": "[agent] Process Status",
+            "type": "shell",
+            "command": "C:\\Users\\mgs\\.agent-system\\runtime\\.venv\\Scripts\\python.exe",
+            "args": [
+                "C:\\Users\\mgs\\.agent-system\\runtime\\agent_system\\core\\tools\\manage.py",
+                "--workspace",
+                "${workspaceFolder}",
+                "status"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": true
+            },
+            "problemMatcher": [],
+            "detail": "Show all running agent processes and LLM servers __agent-system__"
+        },
+        {
+            "label": "[agent] Kill All: Agents & LLMs",
+            "type": "shell",
+            "command": "C:\\Users\\mgs\\.agent-system\\runtime\\.venv\\Scripts\\python.exe",
+            "args": [
+                "C:\\Users\\mgs\\.agent-system\\runtime\\agent_system\\core\\tools\\manage.py",
+                "--workspace",
+                "${workspaceFolder}",
+                "kill",
+                "all"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": true
+            },
+            "problemMatcher": [],
+            "detail": "Kill all running agent processes and stop all LLM servers __agent-system__"
+        },
+        {
+            "label": "[agent] Provider Permissions",
+            "type": "shell",
+            "command": "C:\\Users\\mgs\\.agent-system\\runtime\\.venv\\Scripts\\python.exe",
+            "args": [
+                "C:\\Users\\mgs\\.agent-system\\runtime\\agent_system\\install.py",
+                "permissions",
+                "--workspace",
+                "${workspaceFolder}",
+                "--mode",
+                "prompt"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": true
+            },
+            "problemMatcher": [],
+            "detail": "Configure provider-specific approval/permission behavior __agent-system__"
+        },
+        {
+            "label": "[agent] Detect Providers",
+            "type": "shell",
+            "command": "C:\\Users\\mgs\\.agent-system\\runtime\\.venv\\Scripts\\python.exe",
+            "args": [
+                "C:\\Users\\mgs\\.agent-system\\runtime\\agent_system\\install.py",
+                "detect",
+                "--workspace",
+                "${workspaceFolder}"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": true
+            },
+            "problemMatcher": [],
+            "detail": "Detect installed AI providers and update provider config __agent-system__"
+        },
+        {
+            "label": "[agent] Provider Auth Check/Fix",
+            "type": "shell",
+            "command": "C:\\Users\\mgs\\.agent-system\\runtime\\.venv\\Scripts\\python.exe",
+            "args": [
+                "C:\\Users\\mgs\\.agent-system\\runtime\\agent_system\\install.py",
+                "auth",
+                "--workspace",
+                "${workspaceFolder}",
+                "--fix"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": true
+            },
+            "problemMatcher": [],
+            "detail": "Check provider authentication and guide credential fixes __agent-system__"
+        },
+        {
+            "label": "[agent] LLM Lifecycle Log",
+            "type": "shell",
+            "command": "C:\\Users\\mgs\\.agent-system\\runtime\\.venv\\Scripts\\python.exe",
+            "args": [
+                "C:\\Users\\mgs\\.agent-system\\runtime\\agent_system\\core\\llm\\local_llm_manager.py",
+                "log",
+                "--lines",
+                "60"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": true
+            },
+            "problemMatcher": [],
+            "detail": "View recent LLM start/stop/error lifecycle events __agent-system__"
+        },
+        {
+            "label": "[agent] LLM Lifecycle Log: Follow",
+            "type": "shell",
+            "command": "C:\\Users\\mgs\\.agent-system\\runtime\\.venv\\Scripts\\python.exe",
+            "args": [
+                "C:\\Users\\mgs\\.agent-system\\runtime\\agent_system\\core\\llm\\local_llm_manager.py",
+                "log",
+                "--follow"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": true,
+                "clear": true
+            },
+            "problemMatcher": [],
+            "detail": "Tail the LLM lifecycle log continuously (Ctrl-C to stop) __agent-system__"
+        },
+        {
+            "label": "[agent] Local LLM: Status",
+            "type": "shell",
+            "command": "C:\\Users\\mgs\\.agent-system\\runtime\\.venv\\Scripts\\python.exe",
+            "args": [
+                "C:\\Users\\mgs\\.agent-system\\runtime\\agent_system\\core\\llm\\local_llm_manager.py",
+                "status"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": true
+            },
+            "problemMatcher": [],
+            "detail": "Show status of all local LLM runners __agent-system__"
+        },
+        {
+            "label": "[agent] Local LLM: Start",
+            "type": "shell",
+            "command": "C:\\Users\\mgs\\.agent-system\\runtime\\.venv\\Scripts\\python.exe",
+            "args": [
+                "C:\\Users\\mgs\\.agent-system\\runtime\\agent_system\\core\\llm\\local_llm_manager.py",
+                "start"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": true
+            },
+            "problemMatcher": [],
+            "detail": "Start the configured local LLM server __agent-system__"
+        },
+        {
+            "label": "[agent] Local LLM: Stop",
+            "type": "shell",
+            "command": "C:\\Users\\mgs\\.agent-system\\runtime\\.venv\\Scripts\\python.exe",
+            "args": [
+                "C:\\Users\\mgs\\.agent-system\\runtime\\agent_system\\core\\llm\\local_llm_manager.py",
+                "stop"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": true
+            },
+            "problemMatcher": [],
+            "detail": "Stop the managed local LLM server __agent-system__"
+        },
+        {
+            "label": "[agent] Local LLM: Configure",
+            "type": "shell",
+            "command": "C:\\Users\\mgs\\.agent-system\\runtime\\.venv\\Scripts\\python.exe",
+            "args": [
+                "C:\\Users\\mgs\\.agent-system\\runtime\\agent_system\\core\\llm\\local_llm_manager.py",
+                "configure"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": true
+            },
+            "problemMatcher": [],
+            "detail": "Interactive setup wizard for the local LLM runner __agent-system__"
+        },
+        {
+            "label": "[agent] Local LLM: Configure (Project)",
+            "type": "shell",
+            "command": "C:\\Users\\mgs\\.agent-system\\runtime\\.venv\\Scripts\\python.exe",
+            "args": [
+                "C:\\Users\\mgs\\.agent-system\\runtime\\agent_system\\install.py",
+                "local-llm",
+                "--workspace",
+                "${workspaceFolder}",
+                "configure",
+                "--project-only"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": true
+            },
+            "problemMatcher": [],
+            "detail": "Set this project's local LLM endpoint/model preferences __agent-system__"
+        },
+        {
+            "label": "[agent] Models: List",
+            "type": "shell",
+            "command": "C:\\Users\\mgs\\.agent-system\\runtime\\.venv\\Scripts\\python.exe",
+            "args": [
+                "C:\\Users\\mgs\\.agent-system\\runtime\\agent_system\\core\\llm\\local_llm_model_manager.py",
+                "list"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": true
+            },
+            "problemMatcher": [],
+            "detail": "List all models in the catalog with status __agent-system__"
+        },
+        {
+            "label": "[agent] Models: Add",
+            "type": "shell",
+            "command": "C:\\Users\\mgs\\.agent-system\\runtime\\.venv\\Scripts\\python.exe",
+            "args": [
+                "C:\\Users\\mgs\\.agent-system\\runtime\\agent_system\\core\\llm\\local_llm_model_manager.py",
+                "add"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": true
+            },
+            "problemMatcher": [],
+            "detail": "Add a model definition to the catalog __agent-system__"
+        },
+        {
+            "label": "[agent] Models: Configure Binary",
+            "type": "shell",
+            "command": "C:\\Users\\mgs\\.agent-system\\runtime\\.venv\\Scripts\\python.exe",
+            "args": [
+                "C:\\Users\\mgs\\.agent-system\\runtime\\agent_system\\core\\llm\\local_llm_model_manager.py",
+                "binary"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": true
+            },
+            "problemMatcher": [],
+            "detail": "Set the path to the llama-server binary __agent-system__"
+        },
+        {
+            "label": "[agent] Models: Stop All",
+            "type": "shell",
+            "command": "C:\\Users\\mgs\\.agent-system\\runtime\\.venv\\Scripts\\python.exe",
+            "args": [
+                "C:\\Users\\mgs\\.agent-system\\runtime\\agent_system\\core\\llm\\local_llm_model_manager.py",
+                "stop-all"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": true
+            },
+            "problemMatcher": [],
+            "detail": "Stop all running model server processes __agent-system__"
+        }
+    ],
+    "inputs": [
+        {
+            "id": "agentChoice",
+            "type": "pickString",
+            "description": "Select the agent whose work you want to review/merge",
+            "default": "gemini",
+            "options": [
+                "gemini",
+                "claude",
+                "codex",
+                "opencode",
+                "copilot"
+            ]
+        },
+        {
+            "id": "runIdOverride",
+            "type": "promptString",
+            "description": "Optional: Enter a specific Run ID (leave blank for latest)",
+            "default": ""
+        },
+        {
+            "id": "changeGroup",
+            "type": "promptString",
+            "description": "Workstream/group slug for the changelog entry",
+            "default": ""
+        },
+        {
+            "id": "changeTags",
+            "type": "promptString",
+            "description": "Tag(s) for the changelog entry (e.g. 'New Feature')",
+            "default": "New Feature"
+        },
+        {
+            "id": "changeSummary",
+            "type": "promptString",
+            "description": "One-sentence summary of the change",
+            "default": ""
+        },
+        {
+            "id": "changeDetails",
+            "type": "promptString",
+            "description": "Bullet-point details (separate with semicolons)",
+            "default": ""
+        }
+    ]
+}

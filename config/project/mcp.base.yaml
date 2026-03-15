@@ -1,0 +1,20 @@
+enabled: false
+
+servers:
+  - name: filesystem_example
+    enabled: false
+    transport: stdio
+    command: uvx
+    args:
+      - mcp-server-filesystem
+      - H:\development\projects
+    env: {}
+    notes: Placeholder registry entry for later LiteLLM MCP server registration.
+
+  - name: github_example
+    enabled: false
+    transport: http
+    url: http://127.0.0.1:8801/mcp
+    headers: {}
+    notes: Placeholder registry entry for later LiteLLM MCP server registration.
+
