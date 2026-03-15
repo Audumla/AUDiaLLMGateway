@@ -1,0 +1,121 @@
+[
+  {
+    "id": "CHG-20260315",
+    "agent": "codex",
+    "change_group": "audiallmenvironment-local-llm-gateway",
+    "plugin_version": "unreleased",
+    "date": "2026-03-15",
+    "recorded_at": "2026-03-15T02:50:33.955649Z",
+    "summary_tags": [
+      "New Feature"
+    ],
+    "summary": "Scaffolded a native Windows local LLM gateway workspace in AUDiaLLMGateway.",
+    "details": [
+      "Created a Git-backed repo scaffold with config, docs, PowerShell wrappers, and Python orchestration for llama-server plus LiteLLM.",
+      "Added health checks, routing tests, and config generation for local model profiles and future MCP registration.",
+      "Ran py_compile, generated LiteLLM config, exercised the stop-stack wrapper, and passed pytest."
+    ]
+  },
+  {
+    "id": "CHG-20260315-1",
+    "agent": "codex",
+    "change_group": "audiallmgateway-rename",
+    "plugin_version": "unreleased",
+    "date": "2026-03-15",
+    "recorded_at": "2026-03-15T02:57:23.110664Z",
+    "summary_tags": [
+      "Documentation Update"
+    ],
+    "summary": "Renamed the local LLM gateway workspace from AUDiaLLMEnvironment to AUDiaLLMGateway.",
+    "details": [
+      "Renamed the repo directory to AUDiaLLMGateway.",
+      "Updated README and changelog references to the new project name.",
+      "Re-ran tests and config generation from the renamed path."
+    ]
+  },
+  {
+    "id": "CHG-20260315-2",
+    "agent": "codex",
+    "change_group": "audiallmgateway-spec-001",
+    "plugin_version": "unreleased",
+    "date": "2026-03-15",
+    "recorded_at": "2026-03-15T03:02:19.450299Z",
+    "summary_tags": [
+      "Documentation Update"
+    ],
+    "summary": "Added the first mid-level project spec for AUDiaLLMGateway.",
+    "details": [
+      "Created a specifications folder with a mid-level phase 1 gateway spec.",
+      "Mapped the original plan to the current scaffold, config model, operational flows, and acceptance criteria.",
+      "Kept the spec intentionally mid-level so follow-on low-level specs can expand backend, LiteLLM, and MCP details."
+    ]
+  },
+  {
+    "id": "CHG-20260315-3",
+    "agent": "codex",
+    "change_group": "audiallmgateway-spec-001-platform-scope",
+    "plugin_version": "unreleased",
+    "date": "2026-03-15",
+    "recorded_at": "2026-03-15T03:05:31.170694Z",
+    "summary_tags": [
+      "Documentation Update"
+    ],
+    "summary": "Expanded spec-001 to define Windows-first scope and planned Linux options.",
+    "details": [
+      "Updated the mid-level spec to make Windows the active phase 1 target.",
+      "Added Linux as a planned parallel platform with different launch and deployment options.",
+      "Clarified that platform-specific differences should not change the external gateway contract."
+    ]
+  },
+  {
+    "id": "CHG-20260315-4",
+    "agent": "codex",
+    "change_group": "audiallmgateway-llamaswap-refactor",
+    "plugin_version": "unreleased",
+    "date": "2026-03-15",
+    "recorded_at": "2026-03-15T03:16:20.788371Z",
+    "summary_tags": [
+      "New Feature"
+    ],
+    "summary": "Refactored AUDiaLLMGateway to use llama-swap as the managed local backend behind LiteLLM.",
+    "details": [
+      "Replaced direct llama-server orchestration with a llama-swap runtime, generated config workflow, and LiteLLM alias publishing.",
+      "Added a stack config, imported the provided llama-swap catalog as the repo baseline, and generated MCP client-facing config scaffolding.",
+      "Added Windows install/update/generate scripts and updated docs/specs/tests for the new architecture."
+    ]
+  },
+  {
+    "id": "CHG-20260315-5",
+    "agent": "codex",
+    "change_group": "audiallmgateway-artifact-migration",
+    "plugin_version": "unreleased",
+    "date": "2026-03-15",
+    "recorded_at": "2026-03-15T03:51:16.795158Z",
+    "summary_tags": [
+      "Configuration Cleanup"
+    ],
+    "summary": "Moved AUDiaLLMGateway run artifacts into the Gateway workspace artifact root.",
+    "details": [
+      "Migrated the Gateway-related codex plan-run directories out of AUDiaLLMOverseer artifact storage.",
+      "Created the Gateway-local artifact root and confirmed no AUDiaLLMGateway run artifacts remain in the Overseer workspace.",
+      "Re-ran pytest in AUDiaLLMGateway after the cleanup."
+    ]
+  },
+  {
+    "id": "CHG-20260315-6",
+    "agent": "codex",
+    "change_group": "audiallmgateway-release-installer-and-la",
+    "plugin_version": "unreleased",
+    "date": "2026-03-15",
+    "recorded_at": "2026-03-15T04:09:33.061238Z",
+    "summary_tags": [
+      "New Feature"
+    ],
+    "summary": "Added release-based install/update, layered config preservation, install-state tracking, and component specs to AUDiaLLMGateway.",
+    "details": [
+      "Implemented a GitHub release installer/update path with bootstrap scripts for Windows, Linux, and macOS plus state tracking in state/install-state.json.",
+      "Restructured config into project, local, and generated layers so updates preserve machine-local overrides while validation warns on conflicts.",
+      "Added component and platform specs, installer manifest/state handling, and verified pytest, py_compile, config generation, config validation, installer help, and separation checks."
+    ]
+  }
+]

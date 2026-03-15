@@ -1,0 +1,60 @@
+{
+  "manifest_version": 1,
+  "github": {
+    "owner": "AUDia",
+    "repo": "AUDiaLLMGateway",
+    "archive_strategy": {
+      "windows": "zipball",
+      "linux": "tarball",
+      "macos": "tarball"
+    }
+  },
+  "paths": {
+    "managed": [
+      "README.md",
+      "bootstrap",
+      "changelog",
+      "config/env.example",
+      "config/nginx",
+      "config/project",
+      "docs",
+      "install",
+      "requirements.txt",
+      "scripts",
+      "specifications",
+      "src",
+      "tests"
+    ],
+    "protected": [
+      ".agent_runner",
+      ".runtime",
+      ".venv",
+      "config/local",
+      "state"
+    ],
+    "seed_if_missing": [
+      "config/local"
+    ]
+  },
+  "components": {
+    "python_runtime": {
+      "required": true,
+      "default_enabled": true
+    },
+    "gateway_python_deps": {
+      "required": true,
+      "default_enabled": true,
+      "depends_on": [
+        "python_runtime"
+      ]
+    },
+    "llama_swap": {
+      "required": true,
+      "default_enabled": true
+    },
+    "nginx": {
+      "required": false,
+      "default_enabled": false
+    }
+  }
+}

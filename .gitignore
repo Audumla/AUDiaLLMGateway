@@ -1,0 +1,49 @@
+﻿.pytest_cache/
+__pycache__/
+*.pyc
+.venv/
+.runtime/
+state/install-state.json
+config/generated/
+
+# --- agent-system --- DO NOT EDIT THIS BLOCK MANUALLY ---
+# AgentRunner workspace files (code, artifacts, and generated metadata)
+# Machine-local state (new v2 structure)
+.agent_runner/local/
+.agent_runner/config/
+# Legacy paths (preserved for backwards compatibility)
+agent_runner/
+# Agent CLI local config directories
+.claude/
+.codex/
+.gemini/
+# Agent-system machine-local config (not portable between machines)
+.vscode/agent-system.json
+.agent-secrets.env
+# Optional workspace-local state overrides (not committed)
+.agent-state/
+# Temporary agent-generated scratch files
+*_agent_report.md
+*_agent_analysis.txt
+*_agent_summary.md
+*_ai_analysis.txt
+agent_*.txt
+agent_*.md
+debug_*.txt
+debug_*.md
+# Python bytecode and cache directories
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+# Agent instruction files generated/managed by installer
+AGENT.md
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+.clinerules
+.github/copilot-instructions.md
+# --- end agent-system ---
