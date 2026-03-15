@@ -2,10 +2,10 @@
 
 ## Update preserved my local config but something broke
 
-- Run `.\scripts\validate-configs.ps1`
+- Run `.\scripts\AUDiaLLMGateway.ps1 validate-configs`
 - Inspect `state/install-state.json`
 - Review type conflict warnings for `config/local/*.yaml`
-- Regenerate config outputs with `.\scripts\generate-configs.ps1`
+- Regenerate config outputs with `.\scripts\AUDiaLLMGateway.ps1 generate-configs`
 
 ## Release installer failed to install a dependency
 
