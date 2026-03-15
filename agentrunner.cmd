@@ -100,12 +100,36 @@ goto help
 call :refresh_launchers
 call :update_runtime_core
 if %ERRORLEVEL% neq 0 exit /b 1
-set "PROJ_NAME=%~2"
-if "%PROJ_NAME%" == "" (
-    %PY% "%WORKSPACE_SELECTOR%" --workspace . --runtime-dir "%RUNTIME_DIR%" --installer "%INSTALLER%"
-    set "SELECTOR_RC=%ERRORLEVEL%"
-    if "%SELECTOR_RC%" == "0" goto :eof
-    if not "%SELECTOR_RC%" == "2" exit /b %SELECTOR_RC%
+:: Parse: if %~2 starts with '-' it is a flag, not a project name
+set "PROJ_NAME="
+set "INSTALL_FLAGS="
+if not "%~2"=="" (
+    set "_TMP2=%~2"
+    if "!_TMP2:~0,1!"=="-" (
+        set "INSTALL_FLAGS=%~2"
+        if not "%~3"=="" set "INSTALL_FLAGS=!INSTALL_FLAGS! %~3"
+        if not "%~4"=="" set "INSTALL_FLAGS=!INSTALL_FLAGS! %~4"
+        if not "%~5"=="" set "INSTALL_FLAGS=!INSTALL_FLAGS! %~5"
+        if not "%~6"=="" set "INSTALL_FLAGS=!INSTALL_FLAGS! %~6"
+    ) else (
+        set "PROJ_NAME=%~2"
+        if not "%~3"=="" (
+            set "INSTALL_FLAGS=%~3"
+            if not "%~4"=="" set "INSTALL_FLAGS=!INSTALL_FLAGS! %~4"
+            if not "%~5"=="" set "INSTALL_FLAGS=!INSTALL_FLAGS! %~5"
+            if not "%~6"=="" set "INSTALL_FLAGS=!INSTALL_FLAGS! %~6"
+        )
+    )
+)
+if "!PROJ_NAME!"=="" (
+    if "!INSTALL_FLAGS!"=="" (
+        %PY% "%WORKSPACE_SELECTOR%" --workspace . --runtime-dir "%RUNTIME_DIR%" --installer "%INSTALLER%"
+    ) else (
+        %PY% "%WORKSPACE_SELECTOR%" --workspace . --runtime-dir "%RUNTIME_DIR%" --installer "%INSTALLER%" -- !INSTALL_FLAGS!
+    )
+    set "SELECTOR_RC=!ERRORLEVEL!"
+    if "!SELECTOR_RC!"=="0" goto :eof
+    if not "!SELECTOR_RC!"=="2" exit /b !SELECTOR_RC!
 
     call :get_repo_root "." "CURRENT_ROOT"
     for %%I in (".") do set "CURRENT_DIR=%%~fI"
@@ -124,13 +148,13 @@ if "%PROJ_NAME%" == "" (
         )
     )
 )
-if "%PROJ_NAME%" == "" set /p "PROJ_NAME=Enter name for your new project: "
-if not exist "%PROJ_NAME%" mkdir "%PROJ_NAME%"
-pushd "%PROJ_NAME%"
+if "!PROJ_NAME!"=="" set /p "PROJ_NAME=Enter name for your new project: "
+if not exist "!PROJ_NAME!" mkdir "!PROJ_NAME!"
+pushd "!PROJ_NAME!"
 if not exist ".git" (
     git init
     if %ERRORLEVEL% neq 0 (
-        echo ERROR: Failed to initialize git repository in %PROJ_NAME%.
+        echo ERROR: Failed to initialize git repository in !PROJ_NAME!.
         popd
         exit /b 1
     )
@@ -140,24 +164,29 @@ if %ERRORLEVEL% neq 0 (
     popd
     exit /b 1
 )
-%PY% "%INSTALLER%" install --workspace .
+if "!INSTALL_FLAGS!"=="" (
+    %PY% "%INSTALLER%" install --workspace .
+) else (
+    %PY% "%INSTALLER%" install --workspace . !INSTALL_FLAGS!
+)
 popd
 goto :eof
 
 :update
 call :refresh_launchers
-%PY% "%WORKSPACE_SELECTOR%" --workspace . --runtime-dir "%RUNTIME_DIR%" --installer "%INSTALLER%" --command update -- --autostash
+shift
+%PY% "%WORKSPACE_SELECTOR%" --workspace . --runtime-dir "%RUNTIME_DIR%" --installer "%INSTALLER%" --command update -- --autostash %*
 set "SELECTOR_RC=%ERRORLEVEL%"
 if "%SELECTOR_RC%" == "0" goto :eof
 if not "%SELECTOR_RC%" == "2" exit /b %SELECTOR_RC%
 call :ensure_project_root "." "update"
 if %ERRORLEVEL% neq 0 exit /b 1
-%PY% "%INSTALLER%" update --workspace . --autostash
+%PY% "%INSTALLER%" update --workspace . --autostash %*
 if %ERRORLEVEL% neq 0 (
     echo WARNING: [agentrunner] Workspace update failed; repairing runtime clone and retrying...
     call :repair_runtime
     if %ERRORLEVEL% neq 0 exit /b 1
-    %PY% "%INSTALLER%" update --workspace . --autostash
+    %PY% "%INSTALLER%" update --workspace . --autostash %*
     if %ERRORLEVEL% neq 0 exit /b 1
 )
 call :refresh_launchers
@@ -240,6 +269,16 @@ echo   detect          Detect installed AI providers and update config
 echo   permissions     Configure provider permission prompts
 echo   local-llm       Manage local LLM (^status^|start^|stop^|configure^|configure-project^)
 echo   help            Show this help message
+echo.
+echo Install flags (passed through to installer):
+echo   --setup-release-please   Set up release-please GitHub Actions workflow
+echo   --skip-release-please    Skip release-please setup
+echo   --no-interactive         Skip all interactive prompts
+echo   --skip-providers         Skip provider detection
+echo   --skip-permissions       Skip provider permissions prompt
+echo.
+echo Update flags (passed through to installer):
+echo   --setup-release-please   Set up release-please during this update
 goto :eof
 
 :refresh_launchers

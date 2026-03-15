@@ -45,19 +45,35 @@ component_settings:
 ### Windows
 
 ```powershell
-.\bootstrap\install-release.ps1 -Owner Audumla -Repo AUDiaLLMGateway -InstallDir "$HOME\AUDiaLLMGateway"
+.\bootstrap\AUDiaLLMGateway-install-release.ps1 -Owner Audumla -Repo AUDiaLLMGateway -InstallDir "$HOME\AUDiaLLMGateway"
 ```
 
 ### Linux
 
 ```bash
-./bootstrap/install-release.sh
+./bootstrap/AUDiaLLMGateway-install-release.sh
 ```
 
 ### macOS
 
 ```bash
-./bootstrap/install-release-macos.sh
+./bootstrap/AUDiaLLMGateway-install-release-macos.sh
+```
+
+## Unified command
+
+After install, use the single Gateway command:
+
+### Windows
+
+```powershell
+.\scripts\AUDiaLLMGateway.ps1 help
+```
+
+### Linux/macOS
+
+```bash
+./scripts/AUDiaLLMGateway.sh help
 ```
 
 ## Update from release
@@ -65,13 +81,13 @@ component_settings:
 ### Windows
 
 ```powershell
-.\scripts\update-release.ps1
+.\scripts\AUDiaLLMGateway.ps1 update-release
 ```
 
 ### Linux/macOS
 
 ```bash
-./scripts/update-release.sh
+./scripts/AUDiaLLMGateway.sh update-release
 ```
 
 ## Check online release availability
@@ -79,26 +95,26 @@ component_settings:
 ### Windows
 
 ```powershell
-.\scripts\check-updates.ps1
+.\scripts\AUDiaLLMGateway.ps1 check-updates
 ```
 
 ### Linux/macOS
 
 ```bash
-./scripts/check-updates.sh
+./scripts/AUDiaLLMGateway.sh check-updates
 ```
 
 ## Local developer setup
 
 ```powershell
-.\scripts\install-stack.ps1
-.\scripts\generate-configs.ps1
+.\scripts\AUDiaLLMGateway.ps1 install-stack
+.\scripts\AUDiaLLMGateway.ps1 generate-configs
 ```
 
 ## Validate layered config
 
 ```powershell
-.\scripts\validate-configs.ps1
+.\scripts\AUDiaLLMGateway.ps1 validate-configs
 ```
 
 Validation reports type conflicts between project defaults and local overrides. It does not overwrite local files.
@@ -108,20 +124,20 @@ Validation reports type conflicts between project defaults and local overrides. 
 ```powershell
 $env:LLAMA_SWAP_EXE = "C:\development\tools\llama-swap\llama-swap.exe"
 $env:LITELLM_MASTER_KEY = "sk-local-dev"
-.\scripts\start-stack.ps1
+.\scripts\AUDiaLLMGateway.ps1 start-stack
 ```
 
 ## Stop the stack
 
 ```powershell
-.\scripts\stop-stack.ps1
+.\scripts\AUDiaLLMGateway.ps1 stop-stack
 ```
 
 ## Health
 
 ```powershell
-.\scripts\healthcheck.ps1
-.\scripts\test-routing.ps1
+.\scripts\AUDiaLLMGateway.ps1 healthcheck
+.\scripts\AUDiaLLMGateway.ps1 test-routing
 ```
 
 ## Install state

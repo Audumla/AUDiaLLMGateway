@@ -53,19 +53,19 @@ Install/update state:
 Windows:
 
 ```powershell
-.\bootstrap\install-release.ps1 -Owner Audumla -Repo AUDiaLLMGateway -InstallDir "$HOME\AUDiaLLMGateway"
+.\bootstrap\AUDiaLLMGateway-install-release.ps1 -Owner Audumla -Repo AUDiaLLMGateway -InstallDir "$HOME\AUDiaLLMGateway"
 ```
 
 Linux:
 
 ```bash
-./bootstrap/install-release.sh
+./bootstrap/AUDiaLLMGateway-install-release.sh
 ```
 
 macOS:
 
 ```bash
-./bootstrap/install-release-macos.sh
+./bootstrap/AUDiaLLMGateway-install-release-macos.sh
 ```
 
 These install scripts:
@@ -76,35 +76,51 @@ These install scripts:
 4. install selected components and dependencies
 5. write install state
 
-## Updating an installed copy
+## Unified command
+
+Once the repo is installed locally, use a single command with subcommands:
 
 Windows:
 
 ```powershell
-.\scripts\update-release.ps1
+.\scripts\AUDiaLLMGateway.ps1 help
 ```
 
 Linux or macOS:
 
 ```bash
-./scripts/update-release.sh
+./scripts/AUDiaLLMGateway.sh help
+```
+
+## Updating an installed copy
+
+Windows:
+
+```powershell
+.\scripts\AUDiaLLMGateway.ps1 update-release
+```
+
+Linux or macOS:
+
+```bash
+./scripts/AUDiaLLMGateway.sh update-release
 ```
 
 Check upstream release availability without updating:
 
 ```powershell
-.\scripts\check-updates.ps1
+.\scripts\AUDiaLLMGateway.ps1 check-updates
 ```
 
 ## Local development flow
 
 ```powershell
-.\scripts\install-stack.ps1
-.\scripts\generate-configs.ps1
-.\scripts\validate-configs.ps1
-.\scripts\start-stack.ps1
-.\scripts\healthcheck.ps1
-.\scripts\test-routing.ps1
+.\scripts\AUDiaLLMGateway.ps1 install-stack
+.\scripts\AUDiaLLMGateway.ps1 generate-configs
+.\scripts\AUDiaLLMGateway.ps1 validate-configs
+.\scripts\AUDiaLLMGateway.ps1 start-stack
+.\scripts\AUDiaLLMGateway.ps1 healthcheck
+.\scripts\AUDiaLLMGateway.ps1 test-routing
 ```
 
 ## Published LiteLLM aliases

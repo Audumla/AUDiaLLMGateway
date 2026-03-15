@@ -52,4 +52,14 @@
 - Updated bootstrap and documentation examples to point at the real GitHub repo.
 - Re-ran pytest, py_compile, and config validation after the change.
 
+### Branded Gateway scripts are now exposed as the primary install and operations entrypoints. (Configuration Cleanup, Documentation Update)
+- Added AUDiaLLMGateway-prefixed script wrappers in scripts/ and bootstrap/ for the public install/update/operations flows.
+- Updated README and operational docs to use the branded script names as the default interface while preserving legacy aliases.
+- Verified config validation, test suite, and strict separation checks after the rename.
+
+### The Gateway repo now exposes a single AUDiaLLMGateway command with subcommands instead of multiple branded wrapper scripts. (Configuration Cleanup, Documentation Update)
+- Added scripts/AUDiaLLMGateway.ps1 and scripts/AUDiaLLMGateway.sh as the unified command surface for install, update, config, runtime, and test actions.
+- Removed the per-action AUDiaLLMGateway-* wrapper files from scripts/ and updated README and runbook examples to use subcommands.
+- Verified the unified command with validate-configs and help output, and re-ran the test suite and strict separation check.
+
 ---

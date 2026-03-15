@@ -168,5 +168,41 @@
       "Updated bootstrap and documentation examples to point at the real GitHub repo.",
       "Re-ran pytest, py_compile, and config validation after the change."
     ]
+  },
+  {
+    "id": "CHG-6dde159b",
+    "agent": "codex",
+    "change_group": "script-branding",
+    "plugin_version": "unreleased",
+    "date": "2026-03-15",
+    "recorded_at": "2026-03-15T06:19:57.614785Z",
+    "summary_tags": [
+      "Configuration Cleanup",
+      "Documentation Update"
+    ],
+    "summary": "Branded Gateway scripts are now exposed as the primary install and operations entrypoints.",
+    "details": [
+      "Added AUDiaLLMGateway-prefixed script wrappers in scripts/ and bootstrap/ for the public install/update/operations flows.",
+      "Updated README and operational docs to use the branded script names as the default interface while preserving legacy aliases.",
+      "Verified config validation, test suite, and strict separation checks after the rename."
+    ]
+  },
+  {
+    "id": "CHG-6dde159b-1",
+    "agent": "codex",
+    "change_group": "unified-gateway-script",
+    "plugin_version": "unreleased",
+    "date": "2026-03-15",
+    "recorded_at": "2026-03-15T06:32:39.421413Z",
+    "summary_tags": [
+      "Configuration Cleanup",
+      "Documentation Update"
+    ],
+    "summary": "The Gateway repo now exposes a single AUDiaLLMGateway command with subcommands instead of multiple branded wrapper scripts.",
+    "details": [
+      "Added scripts/AUDiaLLMGateway.ps1 and scripts/AUDiaLLMGateway.sh as the unified command surface for install, update, config, runtime, and test actions.",
+      "Removed the per-action AUDiaLLMGateway-* wrapper files from scripts/ and updated README and runbook examples to use subcommands.",
+      "Verified the unified command with validate-configs and help output, and re-ran the test suite and strict separation check."
+    ]
   }
 ]

@@ -27,6 +27,16 @@ function Show-Help {
     Write-Host "  permissions     Configure provider permission prompts"
     Write-Host "  local-llm       Manage local LLM (status|start|stop|configure|configure-project)"
     Write-Host "  help            Show this help message"
+    Write-Host ""
+    Write-Host "Install flags (passed through to installer):"
+    Write-Host "  --setup-release-please   Set up release-please GitHub Actions workflow"
+    Write-Host "  --skip-release-please    Skip release-please setup"
+    Write-Host "  --no-interactive         Skip all interactive prompts"
+    Write-Host "  --skip-providers         Skip provider detection"
+    Write-Host "  --skip-permissions       Skip provider permissions prompt"
+    Write-Host ""
+    Write-Host "Update flags (passed through to installer):"
+    Write-Host "  --setup-release-please   Set up release-please during this update"
 }
 
 function Ensure-Runtime {
@@ -225,15 +235,15 @@ switch ($Command) {
     "update" { 
         Ensure-Runtime
         Refresh-LocalLaunchers
-        $selectorRc = Invoke-WorkspaceSelector -SubCommand "update" -ForwardArgs @("--autostash")
+        $selectorRc = Invoke-WorkspaceSelector -SubCommand "update" -ForwardArgs (@("--autostash") + $CommandArgs)
         if ($selectorRc -eq 0) { break }
         if ($selectorRc -ne 2) { exit $selectorRc }
         Assert-ProjectRoot -Workspace "." -CommandName "update"
-        & $py $Installer update --workspace . --autostash
+        & $py $Installer update --workspace . --autostash @CommandArgs
         if ($LASTEXITCODE -ne 0) {
             Write-Warning "[agentrunner] Workspace update failed; repairing runtime clone and retrying..."
             if (-not (Repair-Runtime)) { exit 1 }
-            & $py $Installer update --workspace . --autostash
+            & $py $Installer update --workspace . --autostash @CommandArgs
             if ($LASTEXITCODE -ne 0) { exit 1 }
         }
         Refresh-LocalLaunchers

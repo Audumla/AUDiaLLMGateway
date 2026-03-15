@@ -20,6 +20,16 @@ show_help() {
     echo "  permissions     Configure provider permission prompts"
     echo "  local-llm       Manage local LLM (status|start|stop|configure|configure-project)"
     echo "  help            Show this help message"
+    echo ""
+    echo "Install flags (passed through to installer):"
+    echo "  --setup-release-please   Set up release-please GitHub Actions workflow"
+    echo "  --skip-release-please    Skip release-please setup"
+    echo "  --no-interactive         Skip all interactive prompts"
+    echo "  --skip-providers         Skip provider detection"
+    echo "  --skip-permissions       Skip provider permissions prompt"
+    echo ""
+    echo "Update flags (passed through to installer):"
+    echo "  --setup-release-please   Set up release-please during this update"
 }
 
 ensure_runtime() {
@@ -197,8 +207,9 @@ case "$COMMAND" in
     update)
         ensure_runtime
         refresh_local_launchers
+        shift || true
         selector_rc=0
-        invoke_workspace_selector update --autostash || selector_rc=$?
+        invoke_workspace_selector update --autostash "$@" || selector_rc=$?
         if [ "$selector_rc" -eq 0 ]; then
             exit 0
         fi
@@ -206,10 +217,10 @@ case "$COMMAND" in
             exit "$selector_rc"
         fi
         assert_project_root "." "update"
-        if ! "$PYTHON_BIN" "$INSTALLER" update --workspace . --autostash; then
+        if ! "$PYTHON_BIN" "$INSTALLER" update --workspace . --autostash "$@"; then
             echo "WARNING: [agentrunner] Workspace update failed; repairing runtime clone and retrying..." >&2
             repair_runtime
-            "$PYTHON_BIN" "$INSTALLER" update --workspace . --autostash
+            "$PYTHON_BIN" "$INSTALLER" update --workspace . --autostash "$@"
         fi
         refresh_local_launchers
         ;;
