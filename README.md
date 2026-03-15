@@ -53,7 +53,7 @@ Install/update state:
 Windows:
 
 ```powershell
-.\bootstrap\install-release.ps1 -Owner AUDia -Repo AUDiaLLMGateway -InstallDir "$HOME\AUDiaLLMGateway"
+.\bootstrap\install-release.ps1 -Owner ExampleOrg -Repo AUDiaLLMGateway -InstallDir "$HOME\AUDiaLLMGateway"
 ```
 
 Linux:
@@ -88,6 +88,12 @@ Linux or macOS:
 
 ```bash
 ./scripts/update-release.sh
+```
+
+Check upstream release availability without updating:
+
+```powershell
+.\scripts\check-updates.ps1
 ```
 
 ## Local development flow
@@ -137,10 +143,22 @@ component_settings:
 Current design:
 
 - Windows default backend: `vulkan`
+- Windows alternate AMD build: `hip`
 - macOS default backend: `metal`
 - Linux default backend: `cpu` unless you override it
 
 Installer state records the installed `llama.cpp` version, backend, asset, install path, and resolved `llama-server` executable path.
+
+If a selected Windows AMD/HIP build needs sidecar DLLs, add them in `config/local/stack.override.yaml`:
+
+```yaml
+component_settings:
+  llama_cpp:
+    backend: hip
+    sidecar_files:
+      - R:\tools\llama-bin-amd\libssl-3-x64.dll
+      - R:\tools\llama-bin-amd\libcrypto-3-x64.dll
+```
 
 ## Reverse proxy
 

@@ -2,7 +2,7 @@ version: 3
 
 project:
   github:
-    owner: AUDia
+    owner: ExampleOrg
     repo: AUDiaLLMGateway
     release_asset_strategy: source_archive
   installer:
@@ -64,6 +64,10 @@ project:
             - win
             - vulkan
             - x64
+          hip:
+            - win
+            - hip
+            - x64
           cpu:
             - win
             - x64
@@ -81,6 +85,8 @@ project:
             - metal
           cpu:
             - macos
+      sidecar_files: []
+      copy_sidecar_to_binary_dir: true
     llama_swap:
       provider: package_manager
     nginx:

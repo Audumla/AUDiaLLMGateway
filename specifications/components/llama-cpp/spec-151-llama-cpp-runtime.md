@@ -9,6 +9,8 @@
 - installer must support selecting a `llama.cpp` release version
 - installer must support backend variants where release assets exist
 - Windows Vulkan is the default baseline for this project
+- Windows HIP/ROCm must be selectable as a distinct variant
+- sidecar runtime DLLs must be supportable for builds that require them
 - install state must record the chosen version, backend, asset, install directory, and executable path
 
 ## Configuration

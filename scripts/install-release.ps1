@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 param(
-  [string]$Owner = "AUDia",
+  [string]$Owner = "ExampleOrg",
   [string]$Repo = "AUDiaLLMGateway",
   [string]$InstallDir = "$HOME\AUDiaLLMGateway",
   [string]$Version = "latest",

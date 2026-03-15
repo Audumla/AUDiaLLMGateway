@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-OWNER="${OWNER:-AUDia}"
+OWNER="${OWNER:-ExampleOrg}"
 REPO="${REPO:-AUDiaLLMGateway}"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/AUDiaLLMGateway}"
 VERSION="${VERSION:-latest}"

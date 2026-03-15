@@ -63,6 +63,18 @@ def find_release_asset(metadata: dict[str, Any], required_tokens: list[str]) -> 
     raise RuntimeError(f"No release asset matched tokens: {required_tokens}")
 
 
+def release_summary(owner: str, repo: str, version: str = "latest") -> dict[str, Any]:
+    metadata = get_release_metadata(owner, repo, version)
+    return {
+        "owner": owner,
+        "repo": repo,
+        "tag_name": str(metadata.get("tag_name", version)),
+        "published_at": metadata.get("published_at"),
+        "name": metadata.get("name"),
+        "html_url": metadata.get("html_url"),
+    }
+
+
 def choose_archive_url(metadata: dict[str, Any], archive_kind: str) -> tuple[str, str]:
     if archive_kind == "zipball":
         return str(metadata["zipball_url"]), ".zip"
@@ -208,6 +220,8 @@ def ensure_llama_cpp(root: Path) -> dict[str, Any]:
     asset_tokens = [str(item) for item in settings.get("asset_match", {}).get(system, {}).get(backend, [])]
     if not asset_tokens:
         raise RuntimeError(f"No asset-match tokens configured for llama.cpp backend '{backend}' on {system}")
+    sidecar_files = [str(item) for item in settings.get("sidecar_files", [])]
+    copy_sidecar_to_binary_dir = bool(settings.get("copy_sidecar_to_binary_dir", True))
 
     metadata = get_release_metadata(owner, repo, version)
     tag = str(metadata.get("tag_name", version))
@@ -234,6 +248,15 @@ def ensure_llama_cpp(root: Path) -> dict[str, Any]:
             raise RuntimeError(f"Installed llama.cpp asset did not contain {executable_name}")
         executable_path = fallback
 
+    copied_sidecars: list[str] = []
+    if copy_sidecar_to_binary_dir and sidecar_files:
+        for source_file in sidecar_files:
+            source_path = Path(source_file)
+            if source_path.exists():
+                target_path = executable_path.parent / source_path.name
+                shutil.copy2(source_path, target_path)
+                copied_sidecars.append(str(target_path))
+
     result = {
         "provider": provider,
         "version": tag,
@@ -241,6 +264,7 @@ def ensure_llama_cpp(root: Path) -> dict[str, Any]:
         "install_dir": str(install_dir),
         "asset_name": asset_name,
         "executable_path": str(executable_path),
+        "copied_sidecars": copied_sidecars,
     }
     if backend == "rocm":
         result["rocm_executable_path"] = str(executable_path)
@@ -350,6 +374,7 @@ def install_or_update_from_bundle(bundle_root: Path, install_root: Path, version
         "selected_components": selected_components,
         "component_results": component_results,
         "config_validation": warnings,
+        "available_updates": check_available_updates(install_root, component_results),
     }
     write_state(install_root, state)
     return state
@@ -402,12 +427,35 @@ def parse_component_args(values: list[str] | None) -> list[str] | None:
     return components
 
 
+def check_available_updates(root: str | Path, component_results: dict[str, Any] | None = None) -> dict[str, Any]:
+    from src.launcher.config_loader import load_stack_config
+
+    install_root = Path(root).resolve()
+    stack = load_stack_config(install_root)
+    state = load_state(install_root) if component_results is None else {"component_results": component_results}
+    updates: dict[str, Any] = {}
+
+    updates["gateway_release"] = release_summary(stack.project.github_owner, stack.project.github_repo, "latest")
+
+    llama_cpp_settings = stack.component_settings.get("llama_cpp", {})
+    updates["llama_cpp_release"] = release_summary(
+        str(llama_cpp_settings.get("repo_owner", "ggml-org")),
+        str(llama_cpp_settings.get("repo_name", "llama.cpp")),
+        "latest",
+    )
+    installed_llama_cpp = state.get("component_results", {}).get("llama_cpp", {})
+    if installed_llama_cpp:
+        updates["llama_cpp_release"]["installed_version"] = installed_llama_cpp.get("version")
+
+    return updates
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Install or update AUDiaLLMGateway from GitHub releases.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     install_parser = subparsers.add_parser("install-release", help="Install from a GitHub release archive")
-    install_parser.add_argument("--owner", default="AUDia")
+    install_parser.add_argument("--owner", default="ExampleOrg")
     install_parser.add_argument("--repo", default="AUDiaLLMGateway")
     install_parser.add_argument("--install-dir", required=True)
     install_parser.add_argument("--version", default="latest")
@@ -423,6 +471,9 @@ def main() -> int:
     update_parser.add_argument("--root", default=".")
     update_parser.add_argument("--version", default="latest")
     update_parser.add_argument("--component", action="append", default=[])
+
+    check_updates_parser = subparsers.add_parser("check-updates", help="Check upstream release availability for the gateway and managed components")
+    check_updates_parser.add_argument("--root", default=".")
 
     validate_parser = subparsers.add_parser("validate-configs", help="Validate project and local config layering")
     validate_parser.add_argument("--root", default=".")
@@ -440,6 +491,8 @@ def main() -> int:
         )
     elif args.command == "update-release":
         result = update_release(args.root, args.version, parse_component_args(args.component))
+    elif args.command == "check-updates":
+        result = check_available_updates(args.root)
     elif args.command == "validate-configs":
         from src.launcher.config_loader import validate_layered_configs
 
