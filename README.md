@@ -46,7 +46,7 @@ Generated outputs:
 
 Install/update state:
 
-- `state/install-state.json`
+- `state/install-state.json` 
 
 ## Initial install from a release
 
