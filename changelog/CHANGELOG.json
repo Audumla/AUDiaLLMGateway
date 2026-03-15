@@ -204,5 +204,22 @@
       "Removed the per-action AUDiaLLMGateway-* wrapper files from scripts/ and updated README and runbook examples to use subcommands.",
       "Verified the unified command with validate-configs and help output, and re-ran the test suite and strict separation check."
     ]
+  },
+  {
+    "id": "CHG-ba467807",
+    "agent": "codex",
+    "change_group": "git-main-branch-fix",
+    "plugin_version": "unreleased",
+    "date": "2026-03-15",
+    "recorded_at": "2026-03-15T06:38:07.691666Z",
+    "summary_tags": [
+      "Configuration Cleanup"
+    ],
+    "summary": "The Gateway repo now tracks origin/main correctly instead of the stale origin/master branch.",
+    "details": [
+      "Set the local main branch upstream to origin/main so git pull uses the correct remote branch.",
+      "Reset origin/HEAD to main and pruned the stale origin/master remote-tracking ref.",
+      "Verified the remote default branch and local pull/push configuration both point to main."
+    ]
   }
 ]
