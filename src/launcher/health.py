@@ -23,6 +23,8 @@ def http_probe(url: str, headers: dict[str, str] | None = None, timeout: float =
         return False, exc.code, body
     except urllib.error.URLError as exc:
         return False, None, str(exc.reason)
+    except OSError as exc:
+        return False, None, str(exc)
 
 
 def wait_for_any(urls: list[str], headers: dict[str, str] | None = None, timeout: float = 120.0, interval: float = 2.0) -> str:

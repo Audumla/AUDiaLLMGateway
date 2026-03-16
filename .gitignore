@@ -5,6 +5,7 @@ __pycache__/
 .runtime/
 state/install-state.json
 config/generated/
+test-work/
 
 # --- agent-system --- DO NOT EDIT THIS BLOCK MANUALLY ---
 # AgentRunner workspace files (code, artifacts, and generated metadata)

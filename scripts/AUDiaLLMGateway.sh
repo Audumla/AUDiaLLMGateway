@@ -2,8 +2,14 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-COMMAND="${1:-help}"
-shift || true
+ACTION="${1:-help}"
+TARGET="${2:-}"
+if [ $# -gt 0 ]; then
+  shift
+fi
+if [ $# -gt 0 ] && [ -n "$TARGET" ]; then
+  shift
+fi
 
 python_cmd() {
   if command -v python3 >/dev/null 2>&1; then
@@ -21,26 +27,40 @@ python_cmd() {
 show_usage() {
   cat <<'EOF'
 Usage:
-  ./scripts/AUDiaLLMGateway.sh <command> [args...]
+  ./scripts/AUDiaLLMGateway.sh <action> [target] [args...]
 
-Commands:
-  install-release  Install from a GitHub release archive
-  update-release   Update this installation from GitHub releases
-  check-updates    Check upstream release availability
-  validate-configs Validate layered project/local config
-  install-stack    Create .venv, install Python deps, and generate configs
-  update-stack     Upgrade Python deps and refresh generated configs
-  generate-configs Generate llama-swap, LiteLLM, and MCP client configs
-  start-stack      Start llama-swap and LiteLLM
-  stop-stack       Stop llama-swap and LiteLLM
-  start-gateway    Start LiteLLM only
-  stop-gateway     Stop LiteLLM only
-  start-llamaswap  Start llama-swap only
-  stop-llamaswap   Stop llama-swap only
-  status           Show runtime process status
-  healthcheck      Run health checks
-  test-routing     Run end-to-end routing tests
-  help             Show this message
+Examples:
+  ./scripts/AUDiaLLMGateway.sh install
+  ./scripts/AUDiaLLMGateway.sh install stack
+  ./scripts/AUDiaLLMGateway.sh install llama_cpp
+  ./scripts/AUDiaLLMGateway.sh update
+  ./scripts/AUDiaLLMGateway.sh update stack
+  ./scripts/AUDiaLLMGateway.sh start
+  ./scripts/AUDiaLLMGateway.sh stop gateway
+  ./scripts/AUDiaLLMGateway.sh check
+  ./scripts/AUDiaLLMGateway.sh validate
+  ./scripts/AUDiaLLMGateway.sh test
+
+Actions:
+  install [release|stack|<component>]
+  update [release|stack|<component>]
+  start [stack|gateway|llamaswap]
+  stop [stack|gateway|llamaswap]
+  check [updates|status|health]
+  validate [configs]
+  test [routing]
+  generate [configs]
+  help
+
+Defaults:
+  install   -> release
+  update    -> release
+  start     -> stack
+  stop      -> stack
+  check     -> updates
+  validate  -> configs
+  test      -> routing
+  generate  -> configs
 EOF
 }
 
@@ -59,77 +79,161 @@ ensure_venv_python() {
     echo "$ROOT_DIR/.venv/bin/python"
     return
   fi
-  echo "Virtual environment not found. Run ./scripts/AUDiaLLMGateway.sh install-stack first." >&2
+  echo "Virtual environment not found. Run ./scripts/AUDiaLLMGateway.sh install stack first." >&2
   exit 1
 }
 
-case "$COMMAND" in
+invoke_install_stack() {
+  if [ ! -d "$ROOT_DIR/.venv" ]; then
+    "$PYTHON_BIN" -m venv "$ROOT_DIR/.venv"
+  fi
+  local venv_python
+  venv_python="$(ensure_venv_python)"
+  (cd "$ROOT_DIR" && "$venv_python" -m pip install --upgrade pip)
+  (cd "$ROOT_DIR" && "$venv_python" -m pip install -r requirements.txt)
+  (cd "$ROOT_DIR" && "$venv_python" -m src.launcher.process_manager --root "$ROOT_DIR" generate-configs)
+}
+
+invoke_update_stack() {
+  local venv_python
+  venv_python="$(ensure_venv_python)"
+  (cd "$ROOT_DIR" && "$venv_python" -m pip install --upgrade pip)
+  (cd "$ROOT_DIR" && "$venv_python" -m pip install --upgrade -r requirements.txt)
+  (cd "$ROOT_DIR" && "$venv_python" -m src.launcher.process_manager --root "$ROOT_DIR" generate-configs)
+}
+
+invoke_release_installer() {
+  local subcommand="$1"
+  shift
+  (cd "$ROOT_DIR" && run_python_module src.installer.release_installer "$subcommand" "$@")
+}
+
+invoke_process_manager() {
+  local subcommand="$1"
+  shift
+  (cd "$ROOT_DIR" && run_python_module src.launcher.process_manager --root "$ROOT_DIR" "$subcommand" "$@")
+}
+
+case "$ACTION" in
   help)
     show_usage
     ;;
-  install-release)
-    (cd "$ROOT_DIR" && run_python_module src.installer.release_installer install-release "$@")
+  install)
+    case "${TARGET:-}" in
+      ""|release)
+        invoke_release_installer install-release "$@"
+        ;;
+      stack)
+        invoke_install_stack
+        ;;
+      *)
+        invoke_release_installer install-release --component "$TARGET" "$@"
+        ;;
+    esac
     ;;
-  update-release)
-    (cd "$ROOT_DIR" && run_python_module src.installer.release_installer update-release --root "$ROOT_DIR" "$@")
+  update)
+    case "${TARGET:-}" in
+      ""|release)
+        invoke_release_installer update-release --root "$ROOT_DIR" "$@"
+        ;;
+      stack)
+        invoke_update_stack
+        ;;
+      *)
+        invoke_release_installer update-release --root "$ROOT_DIR" --component "$TARGET" "$@"
+        ;;
+    esac
     ;;
-  check-updates)
-    (cd "$ROOT_DIR" && run_python_module src.installer.release_installer check-updates --root "$ROOT_DIR" "$@")
+  start)
+    case "${TARGET:-}" in
+      ""|stack)
+        invoke_process_manager start-all "$@"
+        ;;
+      gateway)
+        invoke_process_manager start-gateway "$@"
+        ;;
+      llamaswap)
+        invoke_process_manager start-llama-swap "$@"
+        ;;
+      *)
+        echo "Unsupported start target '$TARGET'." >&2
+        exit 1
+        ;;
+    esac
     ;;
-  validate-configs)
-    (cd "$ROOT_DIR" && run_python_module src.installer.release_installer validate-configs --root "$ROOT_DIR" "$@")
+  stop)
+    case "${TARGET:-}" in
+      ""|stack)
+        invoke_process_manager stop-all "$@"
+        ;;
+      gateway)
+        invoke_process_manager stop-gateway "$@"
+        ;;
+      llamaswap)
+        invoke_process_manager stop-llama-swap "$@"
+        ;;
+      *)
+        echo "Unsupported stop target '$TARGET'." >&2
+        exit 1
+        ;;
+    esac
     ;;
-  install-stack)
-    if [ ! -d "$ROOT_DIR/.venv" ]; then
-      "$PYTHON_BIN" -m venv "$ROOT_DIR/.venv"
-    fi
-    VENV_PYTHON="$(ensure_venv_python)"
-    (cd "$ROOT_DIR" && "$VENV_PYTHON" -m pip install --upgrade pip)
-    (cd "$ROOT_DIR" && "$VENV_PYTHON" -m pip install -r requirements.txt)
-    (cd "$ROOT_DIR" && "$VENV_PYTHON" -m src.launcher.process_manager --root "$ROOT_DIR" generate-configs)
+  check)
+    case "${TARGET:-}" in
+      ""|updates)
+        invoke_release_installer check-updates --root "$ROOT_DIR" "$@"
+        ;;
+      status)
+        invoke_process_manager status "$@"
+        ;;
+      health)
+        (cd "$ROOT_DIR" && run_python_module src.launcher.health --root "$ROOT_DIR" "$@")
+        ;;
+      *)
+        echo "Unsupported check target '$TARGET'." >&2
+        exit 1
+        ;;
+    esac
     ;;
-  update-stack)
-    VENV_PYTHON="$(ensure_venv_python)"
-    (cd "$ROOT_DIR" && "$VENV_PYTHON" -m pip install --upgrade pip)
-    (cd "$ROOT_DIR" && "$VENV_PYTHON" -m pip install --upgrade -r requirements.txt)
-    (cd "$ROOT_DIR" && "$VENV_PYTHON" -m src.launcher.process_manager --root "$ROOT_DIR" generate-configs)
+  validate)
+    case "${TARGET:-}" in
+      ""|configs)
+        invoke_release_installer validate-configs --root "$ROOT_DIR" "$@"
+        ;;
+      *)
+        echo "Unsupported validate target '$TARGET'." >&2
+        exit 1
+        ;;
+    esac
     ;;
-  generate-configs)
-    (cd "$ROOT_DIR" && run_python_module src.launcher.process_manager --root "$ROOT_DIR" generate-configs "$@")
+  generate)
+    case "${TARGET:-}" in
+      ""|configs)
+        invoke_process_manager generate-configs "$@"
+        ;;
+      *)
+        echo "Unsupported generate target '$TARGET'." >&2
+        exit 1
+        ;;
+    esac
     ;;
-  start-stack)
-    (cd "$ROOT_DIR" && run_python_module src.launcher.process_manager --root "$ROOT_DIR" start-all "$@")
-    ;;
-  stop-stack)
-    (cd "$ROOT_DIR" && run_python_module src.launcher.process_manager --root "$ROOT_DIR" stop-all "$@")
-    ;;
-  start-gateway)
-    (cd "$ROOT_DIR" && run_python_module src.launcher.process_manager --root "$ROOT_DIR" start-gateway "$@")
-    ;;
-  stop-gateway)
-    (cd "$ROOT_DIR" && run_python_module src.launcher.process_manager --root "$ROOT_DIR" stop-gateway "$@")
-    ;;
-  start-llamaswap)
-    (cd "$ROOT_DIR" && run_python_module src.launcher.process_manager --root "$ROOT_DIR" start-llama-swap "$@")
-    ;;
-  stop-llamaswap)
-    (cd "$ROOT_DIR" && run_python_module src.launcher.process_manager --root "$ROOT_DIR" stop-llama-swap "$@")
-    ;;
-  status)
-    (cd "$ROOT_DIR" && run_python_module src.launcher.process_manager --root "$ROOT_DIR" status "$@")
-    ;;
-  healthcheck)
-    (cd "$ROOT_DIR" && run_python_module src.launcher.health --root "$ROOT_DIR" "$@")
-    ;;
-  test-routing)
-    if [[ " $* " == *" --all-models "* ]]; then
-      (cd "$ROOT_DIR" && run_python_module src.launcher.router_test --root "$ROOT_DIR" "$@")
-    else
-      (cd "$ROOT_DIR" && run_python_module src.launcher.router_test --root "$ROOT_DIR" --all-models "$@")
-    fi
+  test)
+    case "${TARGET:-}" in
+      ""|routing)
+        if [[ " $* " == *" --all-models "* ]]; then
+          (cd "$ROOT_DIR" && run_python_module src.launcher.router_test --root "$ROOT_DIR" "$@")
+        else
+          (cd "$ROOT_DIR" && run_python_module src.launcher.router_test --root "$ROOT_DIR" --all-models "$@")
+        fi
+        ;;
+      *)
+        echo "Unsupported test target '$TARGET'." >&2
+        exit 1
+        ;;
+    esac
     ;;
   *)
-    echo "Unknown command '$COMMAND'. Run ./scripts/AUDiaLLMGateway.sh help for usage." >&2
+    echo "Unknown action '$ACTION'. Run ./scripts/AUDiaLLMGateway.sh help for usage." >&2
     exit 1
     ;;
 esac

@@ -1,0 +1,3 @@
+# Local model overrides. Omit keys to inherit base catalog values.
+# Add entries here to override specific profiles or restrict exposures for this machine.
+model_profiles: {}
