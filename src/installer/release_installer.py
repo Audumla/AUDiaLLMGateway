@@ -6,11 +6,9 @@ import os
 import platform
 import shutil
 import subprocess
-import tarfile
 import tempfile
 import time
 import urllib.request
-import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -95,14 +93,24 @@ def download_file(url: str, destination: Path) -> Path:
     return destination
 
 
-def extract_archive(archive_path: Path, destination: Path) -> Path:
-    destination.mkdir(parents=True, exist_ok=True)
+def _unpack(archive_path: Path, destination: Path) -> None:
+    """Extract archive to destination, using system tar on Unix to avoid Python gzip bugs."""
     if archive_path.suffix == ".zip":
+        import zipfile
         with zipfile.ZipFile(archive_path) as zf:
             zf.extractall(destination)
+    elif os.name != "nt":
+        subprocess.run(
+            ["tar", "xf", str(archive_path.resolve()), "-C", str(destination.resolve())],
+            check=True,
+        )
     else:
-        with tarfile.open(archive_path, "r:*") as tf:
-            tf.extractall(destination)
+        shutil.unpack_archive(str(archive_path), str(destination))
+
+
+def extract_archive(archive_path: Path, destination: Path) -> Path:
+    destination.mkdir(parents=True, exist_ok=True)
+    _unpack(archive_path, destination)
     children = [child for child in destination.iterdir() if child.is_dir()]
     if len(children) != 1:
         raise RuntimeError(f"Expected one top-level extracted directory in {destination}")
@@ -111,12 +119,7 @@ def extract_archive(archive_path: Path, destination: Path) -> Path:
 
 def extract_component_archive(archive_path: Path, destination: Path) -> Path:
     destination.mkdir(parents=True, exist_ok=True)
-    if archive_path.suffix == ".zip":
-        with zipfile.ZipFile(archive_path) as zf:
-            zf.extractall(destination)
-    else:
-        with tarfile.open(archive_path, "r:*") as tf:
-            tf.extractall(destination)
+    _unpack(archive_path, destination)
     children = [child for child in destination.iterdir()]
     if len(children) == 1 and children[0].is_dir():
         return children[0]
@@ -151,18 +154,22 @@ def run_command(command: list[str], cwd: Path | None = None) -> None:
 
 
 def ensure_python_runtime(root: Path, min_version: str) -> dict[str, Any]:
-    py_exe = root / ".venv" / ("Scripts" if detect_platform() == "windows" else "bin") / ("python.exe" if detect_platform() == "windows" else "python3")
+    system = detect_platform()
+    py_exe = root / ".venv" / ("Scripts" if system == "windows" else "bin") / ("python.exe" if system == "windows" else "python3")
     if py_exe.exists():
         return {"path": str(py_exe), "version": min_version}
-    python_cmd = shutil.which("python")
-    if not python_cmd and detect_platform() == "windows":
-        python_cmd = shutil.which("py")
-        if python_cmd:
+    # Candidate names in priority order; python3 is the standard name on Linux
+    candidates = ["python3", "python"] if system == "linux" else ["python"]
+    if system == "windows":
+        candidates = ["python", "py"]
+    python_cmd = next((shutil.which(c) for c in candidates if shutil.which(c)), None)
+    if python_cmd:
+        if system == "windows" and python_cmd.endswith("py.exe"):
             run_command([python_cmd, "-3", "-m", "venv", str(root / ".venv")], cwd=root)
-    elif python_cmd:
-        run_command([python_cmd, "-m", "venv", str(root / ".venv")], cwd=root)
+        else:
+            run_command([python_cmd, "-m", "venv", str(root / ".venv")], cwd=root)
     else:
-        raise RuntimeError("Python was not found. Install Python first or provide it via PATH.")
+        raise RuntimeError(f"Python was not found. Install Python {min_version}+ first or provide it via PATH.")
     return {"path": str(py_exe), "version": min_version}
 
 
@@ -182,6 +189,8 @@ def package_manager_available(name: str) -> bool:
 
 
 def ensure_llama_swap(root: Path) -> dict[str, Any]:
+    from src.launcher.config_loader import load_stack_config
+
     if os.environ.get("LLAMA_SWAP_EXE"):
         return {"mode": "env", "path": os.environ["LLAMA_SWAP_EXE"]}
     if shutil.which("llama-swap"):
@@ -192,7 +201,38 @@ def ensure_llama_swap(root: Path) -> dict[str, Any]:
     elif system == "macos" and package_manager_available("brew"):
         run_command(["brew", "install", "llama-swap"])
     else:
-        raise RuntimeError("llama-swap could not be installed automatically on this machine. Set LLAMA_SWAP_EXE or install it manually.")
+        # Attempt a GitHub release download for llama-swap
+        stack = load_stack_config(root)
+        swap_settings = stack.component_settings.get("llama_swap", {})
+        owner = str(swap_settings.get("repo_owner", "mostlygeek"))
+        repo = str(swap_settings.get("repo_name", "llama-swap"))
+        version = str(swap_settings.get("version", "latest"))
+        install_root = root / str(swap_settings.get("install_root", "tools/llama-swap"))
+        try:
+            metadata = get_release_metadata(owner, repo, version)
+            exe_name = "llama-swap.exe" if system == "windows" else "llama-swap"
+            # Common token patterns for GitHub release assets.
+            # mostlygeek/llama-swap names assets as linux_amd64, windows_amd64, darwin_amd64.
+            token_map = {
+                "linux": ["linux", "amd64"],
+                "windows": ["windows", "amd64"],
+                "macos": ["darwin", "amd64"],
+            }
+            tokens = token_map.get(system, [system])
+            asset = find_release_asset(metadata, tokens)
+            asset_name = str(asset.get("name", "llama-swap-asset"))
+            browser_url = str(asset.get("browser_download_url", ""))
+            install_root.mkdir(parents=True, exist_ok=True)
+            archive_path = download_file(browser_url, install_root / asset_name)
+            extracted = extract_component_archive(archive_path, install_root / "bin")
+            exe_path = extracted / exe_name if (extracted / exe_name).exists() else next(install_root.rglob(exe_name), None)
+            if exe_path and exe_path.exists():
+                if system != "windows":
+                    exe_path.chmod(exe_path.stat().st_mode | 0o111)
+                os.environ.setdefault("LLAMA_SWAP_EXE", str(exe_path))
+                return {"mode": "github", "path": str(exe_path)}
+        except Exception:
+            pass
     if shutil.which("llama-swap"):
         return {"mode": "path", "path": shutil.which("llama-swap")}
     return {"mode": "manual", "path": ""}
@@ -208,19 +248,19 @@ def ensure_llama_cpp(root: Path) -> dict[str, Any]:
         raise RuntimeError(f"Unsupported llama.cpp provider: {provider}")
 
     system = detect_platform()
-    backend_default = "vulkan" if system == "windows" else ("metal" if system == "macos" else "cpu")
-    backend = str(settings.get("backend", backend_default))
-    version = str(settings.get("version", "latest"))
+    profile_name, profile = resolve_llama_cpp_profile(settings, system)
+    backend = str(profile.get("backend", ""))
+    version = str(profile.get("version", "latest"))
     owner = str(settings.get("repo_owner", "ggml-org"))
     repo = str(settings.get("repo_name", "llama.cpp"))
     install_root = root / str(settings.get("install_root", "tools/llama.cpp"))
     binary_subdir = str(settings.get("binary_subdir", "bin"))
     executable_names = settings.get("executable_names", {})
     executable_name = str(executable_names.get(system, "llama-server.exe" if system == "windows" else "llama-server"))
-    asset_tokens = [str(item) for item in settings.get("asset_match", {}).get(system, {}).get(backend, [])]
+    asset_tokens = [str(item) for item in profile.get("asset_match_tokens", [])]
     if not asset_tokens:
-        raise RuntimeError(f"No asset-match tokens configured for llama.cpp backend '{backend}' on {system}")
-    sidecar_files = [str(item) for item in settings.get("sidecar_files", [])]
+        raise RuntimeError(f"No asset-match tokens configured for llama.cpp profile '{profile_name}'")
+    sidecar_files = [str(item) for item in profile.get("sidecar_files", [])]
     copy_sidecar_to_binary_dir = bool(settings.get("copy_sidecar_to_binary_dir", True))
 
     metadata = get_release_metadata(owner, repo, version)
@@ -259,6 +299,7 @@ def ensure_llama_cpp(root: Path) -> dict[str, Any]:
 
     result = {
         "provider": provider,
+        "profile": profile_name,
         "version": tag,
         "backend": backend,
         "install_dir": str(install_dir),
@@ -271,25 +312,129 @@ def ensure_llama_cpp(root: Path) -> dict[str, Any]:
     return result
 
 
+def resolve_llama_cpp_profile(settings: dict[str, Any], system: str) -> tuple[str, dict[str, Any]]:
+    profiles = settings.get("profiles", {})
+    if not isinstance(profiles, dict) or not profiles:
+        raise RuntimeError("llama.cpp settings do not define any install profiles")
+
+    selected_profile = str(settings.get("selected_profile", "auto")).strip() or "auto"
+    if selected_profile == "auto":
+        defaults = settings.get("default_profiles", {})
+        if not isinstance(defaults, dict):
+            defaults = {}
+        selected_profile = str(defaults.get(system, "")).strip()
+        if not selected_profile:
+            raise RuntimeError(f"llama.cpp settings do not define a default profile for platform '{system}'")
+
+    profile = profiles.get(selected_profile)
+    if not isinstance(profile, dict):
+        raise RuntimeError(f"llama.cpp profile '{selected_profile}' is not defined")
+
+    profile_platform = str(profile.get("platform", "")).strip()
+    if profile_platform and profile_platform != system:
+        raise RuntimeError(
+            f"llama.cpp profile '{selected_profile}' targets platform '{profile_platform}', not '{system}'"
+        )
+    return selected_profile, profile
+
+
+def _find_nginx() -> str:
+    """Return the absolute path to nginx, checking PATH and well-known system locations."""
+    found = shutil.which("nginx")
+    if found:
+        return found
+    # Package managers on Linux install nginx to /usr/sbin/nginx or /usr/bin/nginx;
+    # these may not appear in the PATH of the current non-login process.
+    for candidate in ["/usr/sbin/nginx", "/usr/bin/nginx", "/usr/local/bin/nginx", "/opt/homebrew/bin/nginx"]:
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            return candidate
+    return ""
+
+
 def ensure_nginx(root: Path) -> dict[str, Any]:
-    if shutil.which("nginx"):
-        return {"mode": "path", "path": shutil.which("nginx")}
+    found = _find_nginx()
+    if found:
+        return {"mode": "path", "path": found}
     system = detect_platform()
     if system == "windows" and package_manager_available("winget"):
-        run_command(["winget", "install", "nginx", "--accept-source-agreements", "--accept-package-agreements"])
+        run_command(["winget", "install", "nginxinc.nginx", "--accept-source-agreements", "--accept-package-agreements"])
     elif system == "macos" and package_manager_available("brew"):
         run_command(["brew", "install", "nginx"])
     elif system == "linux":
         if package_manager_available("apt-get"):
             run_command(["sudo", "apt-get", "update"])
             run_command(["sudo", "apt-get", "install", "-y", "nginx"])
+        elif package_manager_available("zypper"):
+            run_command(["sudo", "zypper", "--non-interactive", "install", "nginx"])
         elif package_manager_available("dnf"):
             run_command(["sudo", "dnf", "install", "-y", "nginx"])
+        elif package_manager_available("yum"):
+            run_command(["sudo", "yum", "install", "-y", "nginx"])
+        elif package_manager_available("pacman"):
+            run_command(["sudo", "pacman", "-Sy", "--noconfirm", "nginx"])
         else:
-            raise RuntimeError("No supported Linux package manager found for nginx.")
+            raise RuntimeError("No supported Linux package manager found for nginx. Install it manually: apt-get/zypper/dnf/yum/pacman install nginx")
     else:
         raise RuntimeError("nginx could not be installed automatically on this machine.")
-    return {"mode": "path", "path": shutil.which("nginx") or ""}
+    found = _find_nginx()
+    if not found:
+        raise RuntimeError("nginx was installed but could not be located. Check your PATH or install it manually.")
+    return {"mode": "path", "path": found}
+
+
+def ensure_models(root: Path, model_names: list[str] | None = None) -> dict[str, Any]:
+    """Download model files to workspace/models/ based on the model catalog.
+
+    Each model exposure that matches ``model_names`` (or all exposures when
+    ``model_names`` is ``None``) is downloaded using the URLs declared in the
+    model catalog's ``artifacts`` section.  Files are skipped when they already
+    exist so re-runs only fetch missing files.
+
+    The returned dict includes ``model_dir`` (the absolute path of the models
+    root directory) which ``build_llama_swap_config`` reads to inject the
+    ``model-path`` / ``mmproj-path`` macros automatically.
+    """
+    from src.launcher.config_loader import load_stack_config, load_model_catalog
+
+    stack = load_stack_config(root)
+    models_settings = stack.component_settings.get("models", {})
+    models_root = root / str(models_settings.get("install_root", "models"))
+    models_root.mkdir(parents=True, exist_ok=True)
+
+    _, _, catalog = load_model_catalog(root)
+    exposures = catalog.get("exposures", [])
+    profiles = catalog.get("model_profiles", {})
+
+    results: dict[str, Any] = {}
+    for exposure in exposures:
+        stable_name = str(exposure.get("stable_name", ""))
+        if model_names is not None and stable_name not in model_names:
+            continue
+        profile_name = str(exposure.get("model_profile", ""))
+        profile = profiles.get(profile_name, {})
+        artifacts = profile.get("artifacts", {})
+        model_file = str(artifacts.get("model_file", "")).replace("\\", "/")
+        model_url = str(artifacts.get("model_url", ""))
+        mmproj_file = str(artifacts.get("mmproj_file", "")).replace("\\", "/")
+        mmproj_url = str(artifacts.get("mmproj_url", ""))
+
+        entry: dict[str, Any] = {}
+        if model_url and model_file:
+            dest = models_root / model_file
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            if not dest.exists():
+                download_file(model_url, dest)
+            entry["model_path"] = str(dest)
+        if mmproj_url and mmproj_file:
+            dest = models_root / mmproj_file
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            if not dest.exists():
+                download_file(mmproj_url, dest)
+            entry["mmproj_path"] = str(dest)
+        if entry:
+            results[stable_name] = entry
+
+    return {"model_dir": str(models_root), "models": results}
 
 
 COMPONENT_INSTALLERS = {
@@ -298,6 +443,7 @@ COMPONENT_INSTALLERS = {
     "llama_cpp": ensure_llama_cpp,
     "llama_swap": ensure_llama_swap,
     "nginx": ensure_nginx,
+    "models": ensure_models,
 }
 
 

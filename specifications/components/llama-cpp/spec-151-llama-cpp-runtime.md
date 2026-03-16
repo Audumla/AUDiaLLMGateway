@@ -2,16 +2,19 @@
 
 ## Scope
 
-`llama.cpp` is a managed runtime dependency and must be installable in specific version/backend variants.
+`llama.cpp` is a managed runtime dependency and must be installable through explicit named profiles that model supported platform and backend combinations.
 
 ## Requirements
 
-- installer must support selecting a `llama.cpp` release version
-- installer must support backend variants where release assets exist
-- Windows Vulkan is the default baseline for this project
-- Windows HIP/ROCm must be selectable as a distinct variant
+- installer must support selecting a `llama.cpp` release version per install profile
+- installer must support explicit install profiles for supported platform/backend combinations where release assets exist
+- Windows, Linux, and macOS are all first-tier platforms in the configuration model
+- Windows Vulkan must be selectable as a distinct profile
+- Windows HIP must be selectable as a distinct profile
+- Linux CPU, Vulkan, ROCm, and CUDA must be modelable as distinct profiles
+- macOS Metal and CPU must be modelable as distinct profiles
 - sidecar runtime DLLs must be supportable for builds that require them
-- install state must record the chosen version, backend, asset, install directory, and executable path
+- install state must record the chosen profile, version, backend, asset, install directory, and executable path
 
 ## Configuration
 
@@ -19,8 +22,9 @@ Project defaults live in `project.component_settings.llama_cpp`.
 
 Machine-local overrides may change:
 
-- version
-- backend
+- selected profile
+- profile-specific version
+- profile-specific sidecars
 - install root
 - asset matching rules if needed
 

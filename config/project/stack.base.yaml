@@ -19,7 +19,6 @@ project:
       - bootstrap
       - changelog
       - config/env.example
-      - config/nginx
       - config/project
       - docs
       - install
@@ -45,74 +44,154 @@ project:
     nginx:
       required: false
       default_enabled: false
+    models:
+      required: false
+      default_enabled: false
   component_settings:
     llama_cpp:
       provider: github_release
       repo_owner: ggml-org
       repo_name: llama.cpp
-      version: latest
-      backend: vulkan
       install_root: tools/llama.cpp
       binary_subdir: bin
       executable_names:
         windows: llama-server.exe
         linux: llama-server
         macos: llama-server
-      asset_match:
-        windows:
-          vulkan:
+      selected_profile: auto
+      default_profiles:
+        windows: windows-vulkan
+        linux: linux-cpu
+        macos: macos-metal
+      profiles:
+        windows-vulkan:
+          platform: windows
+          support_tier: first
+          backend: vulkan
+          version: latest
+          asset_match_tokens:
             - win
             - vulkan
             - x64
-          hip:
+          sidecar_files: []
+        windows-hip:
+          platform: windows
+          support_tier: first
+          backend: hip
+          version: latest
+          asset_match_tokens:
             - win
             - hip
             - x64
-          cpu:
-            - win
+          sidecar_files: []
+        windows-cpu:
+          platform: windows
+          support_tier: first
+          backend: cpu
+          version: latest
+          asset_match_tokens:
+            # win-cpu-x64 is the only CPU asset; "win" + "x64" alone would also match vulkan/hip/cuda builds
+            - win-cpu-x64
+          sidecar_files: []
+        linux-vulkan:
+          platform: linux
+          support_tier: first
+          backend: vulkan
+          version: latest
+          asset_match_tokens:
+            # ggml-org names Linux builds as ubuntu-*-x64 regardless of distro
+            - ubuntu-vulkan-x64
+          sidecar_files: []
+        linux-rocm:
+          platform: linux
+          support_tier: first
+          backend: rocm
+          version: latest
+          asset_match_tokens:
+            - ubuntu-rocm
             - x64
-        linux:
-          vulkan:
-            - linux
-            - vulkan
+          sidecar_files: []
+        linux-cuda:
+          platform: linux
+          support_tier: first
+          backend: cuda
+          version: latest
+          asset_match_tokens:
+            # ggml-org releases ship CUDA builds for Windows only; Linux uses ROCm or Vulkan.
+            # If a Linux CUDA asset is added later it will use ubuntu-cuda-<ver>-x64.
+            - ubuntu-cuda
             - x64
-          cpu:
-            - linux
-            - x64
-        macos:
-          metal:
-            - macos
-            - metal
-          cpu:
-            - macos
-      sidecar_files: []
+          sidecar_files: []
+        linux-cpu:
+          platform: linux
+          support_tier: first
+          backend: cpu
+          version: latest
+          asset_match_tokens:
+            # Match ubuntu-x64.tar.gz (plain CPU) but not ubuntu-vulkan-x64, ubuntu-rocm-x64, etc.
+            # Using the compound token ensures no other qualifier sits between ubuntu- and x64.
+            - ubuntu-x64
+          sidecar_files: []
+        macos-metal:
+          platform: macos
+          support_tier: first
+          backend: metal
+          version: latest
+          asset_match_tokens:
+            # macOS builds ship as macos-x64 (Metal is default; no separate metal asset)
+            - macos-x64
+          sidecar_files: []
+        macos-cpu:
+          platform: macos
+          support_tier: first
+          backend: cpu
+          version: latest
+          asset_match_tokens:
+            - macos-x64
+          sidecar_files: []
       copy_sidecar_to_binary_dir: true
     llama_swap:
       provider: package_manager
+      repo_owner: mostlygeek
+      repo_name: llama-swap
+      install_root: tools/llama-swap
+      version: latest
     nginx:
       provider: package_manager
+    models:
+      install_root: models
 
 install:
   venv_path: .venv
   python_min_version: "3.11"
 
+network:
+  backend_bind_host: 127.0.0.1
+  public_host: 127.0.0.1
+  services:
+    llama_swap:
+      host: 127.0.0.1
+      port: 41080
+    litellm:
+      host: 127.0.0.1
+      port: 4000
+    nginx:
+      host: localhost
+      port: 8080
+
 llama_swap:
   executable: ${LLAMA_SWAP_EXE}
-  host: 127.0.0.1
-  port: 41080
   project_config_path: config/project/llama-swap.base.yaml
   local_override_path: config/local/llama-swap.override.yaml
-  generated_config_path: config/generated/llama-swap.generated.yaml
+  generated_config_path: config/generated/llama-swap/llama-swap.generated.yaml
   health_paths:
     - /health
     - /v1/models
   extra_args: []
 
 litellm:
-  host: 127.0.0.1
-  port: 4000
   executable: litellm
-  generated_config_path: config/generated/litellm.config.yaml
+  generated_config_path: config/generated/litellm/litellm.config.yaml
   master_key_env: LITELLM_MASTER_KEY
   health_paths:
     - /health/liveliness
@@ -121,24 +200,9 @@ litellm:
   extra_args:
     - --detailed_debug
 
-published_models:
-  - stable_name: local/qwen27_fast
-    llama_swap_model: qwen3.5-27b-(96k-Q6)
-    backend_model_name: qwen3.5-27b-(96k-Q6)
-    purpose: Fast coding, repo work, and tool-heavy local workflows
-    mode: chat
-
-  - stable_name: local/qwen122_smart
-    llama_swap_model: qwen3.5-122b
-    backend_model_name: qwen3.5-122b
-    purpose: Harder reasoning and larger-context local work
-    mode: chat
-
-  - stable_name: local/qwen4b_vision
-    llama_swap_model: qwen3-5-4b-ud-q5-k-xl-vision
-    backend_model_name: qwen3-5-4b-ud-q5-k-xl-vision
-    purpose: Small vision-capable model exposed through llama-swap
-    mode: chat
+models:
+  project_config_path: config/project/models.base.yaml
+  local_override_path: config/local/models.override.yaml
 
 routing:
   future_fallbacks:
@@ -152,10 +216,10 @@ mcp:
   enabled: false
   project_config_path: config/project/mcp.base.yaml
   local_override_path: config/local/mcp.override.yaml
-  generated_client_path: config/generated/litellm.mcp.client.json
+  generated_client_path: config/generated/mcp/litellm.mcp.client.json
   gateway_server_name: litellm-gateway
 
 reverse_proxy:
   nginx:
     enabled: false
-    config_path: config/nginx/nginx.conf
+    config_path: config/generated/nginx/nginx.conf

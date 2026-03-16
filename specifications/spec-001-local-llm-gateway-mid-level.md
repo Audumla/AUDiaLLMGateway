@@ -14,11 +14,11 @@ AUDiaLLMGateway
 
 ## Purpose
 
-Define the phase 1 architecture, configuration model, operational flows, and initial delivery boundaries for a local-first LLM gateway that uses `llama-swap` as the local backend router, native `llama-server` profiles behind it, and LiteLLM as the OpenAI-compatible gateway layer.
+Define the phase 1 architecture, configuration model, operational flows, and initial delivery boundaries for a local-first LLM gateway that uses `llama-swap` as the local backend router, generated native `llama-server` profiles behind it, and LiteLLM as the OpenAI-compatible gateway layer.
 
 This spec sits between the high-level project intent and the concrete implementation already scaffolded in this repo. It is intended to guide the next build-out steps without dropping into line-by-line implementation detail.
 
-This spec now treats Windows as the first implemented platform while also reserving a Linux deployment path with platform-specific runtime options and operational differences.
+This spec treats Windows, Linux, and macOS as first-tier platforms in the configuration and install model, while Windows remains the first actively exercised baseline runtime.
 
 ## Goals
 
@@ -27,7 +27,7 @@ This spec now treats Windows as the first implemented platform while also reserv
 3. Keep model launch configuration explicit, readable, and versioned.
 4. Provide a small local orchestrator for start, stop, readiness, config generation, and release-based install/update support.
 5. Keep the system easy to inspect and modify from a VS Code terminal.
-6. Preserve a clear path to a Linux deployment variant with different runtime choices.
+6. Preserve a clear path to Linux and macOS deployment variants with different runtime choices.
 7. Scaffold MCP integration without making it a phase 1 dependency.
 8. Support release-archive installation and update without requiring Git on the target machine.
 9. Preserve machine-local config during updates while still allowing project-managed defaults to evolve.
@@ -36,7 +36,7 @@ This spec now treats Windows as the first implemented platform while also reserv
 ## Non-Goals
 
 1. No Docker requirement in phase 1.
-2. No Linux implementation work in phase 1 beyond specification and planning.
+2. No Linux or macOS runtime validation work in phase 1 beyond specification, install modeling, and testable config support.
 3. No replacement of `llama.cpp` / `llama-server` as the inference engine behind `llama-swap`.
 4. No first-pass web UI.
 5. No cloud deployment or hosted orchestration features.
@@ -49,16 +49,21 @@ This spec now treats Windows as the first implemented platform while also reserv
 
 - Phase 1 implementation target
 - Native `llama-swap` and `llama-server.exe`
-- PowerShell wrapper scripts
+- PowerShell bootstrap plus a unified installed command with simple actions and optional targets
 - Windows-friendly path handling
 - Existing Vulkan-based local setup remains authoritative
 
 ### Linux
 
-- Planned platform variant
-- Not implemented in phase 1
-- Expected to reuse the same high-level architecture with platform-specific launch wrappers and service management
-- May use different operational options such as direct shell scripts, systemd services, Docker Compose, or alternative backend comparisons when explicitly evaluated
+- First-tier platform in config and installer design
+- Expected to reuse the same high-level architecture with platform-specific bootstrap plus a unified installed command
+- May use different operational options such as direct shell scripts, systemd services, or alternative backend comparisons when explicitly evaluated
+
+### macOS
+
+- First-tier platform in config and installer design
+- Expected to reuse the same high-level architecture with platform-specific bootstrap plus a unified installed command
+- Uses platform-specific `llama.cpp` install profiles such as Metal and CPU
 
 ## Environment Assumptions
 
@@ -81,13 +86,13 @@ Client or tool
 -> local `llama-server` profiles
 -> optional MCP servers later
 
-The same logical shape is expected to hold for Linux later, even if the launch mechanism and supported backend options differ.
+The same logical shape is expected to hold across Windows, Linux, and macOS, even if launch mechanics and supported backend options differ.
 
 ### Layer responsibilities
 
 #### Local backend layer
 
-- Uses `llama-swap` as the local model router and profile catalog
+- Uses `llama-swap` as the local model router
 - Keeps native `llama-server` launch definitions as the performance-critical layer
 - Preserves explicit executable, model, port, context, and GPU launch arguments inside the `llama-swap` config
 - Remains independently debuggable outside LiteLLM
@@ -102,7 +107,7 @@ The same logical shape is expected to hold for Linux later, even if the launch m
 
 #### Local orchestration layer
 
-- Loads repo-managed stack config plus the `llama-swap` source catalog
+- Loads repo-managed stack config plus the shared model catalog
 - Generates `llama-swap`, LiteLLM, and MCP client-facing config artifacts
 - Starts and stops `llama-swap` and LiteLLM
 - Tracks runtime metadata and logs
@@ -143,7 +148,7 @@ Each published model must define:
 - backend model identifier used in generated LiteLLM config
 - intended purpose or usage notes
 
-The underlying `llama-swap` source config continues to define:
+The underlying generated backend config must define:
 
 - backend executable path
 - model path
@@ -179,8 +184,8 @@ The orchestrator must support:
 
 The orchestration approach may differ by platform:
 
-- Windows phase 1: Python orchestration plus PowerShell wrappers
-- Linux later: Python orchestration plus shell wrappers, systemd integration, or Docker Compose where appropriate
+- Windows phase 1: Python orchestration plus a unified PowerShell command using actions like `install`, `update`, `start`, `stop`, and `check`
+- Linux later: Python orchestration plus a unified shell command using the same action model, systemd integration, or Docker Compose where appropriate
 
 ### 5. Health and diagnostics
 
@@ -264,14 +269,27 @@ Project-managed stack config is the source of truth for:
 
 - `llama-swap` runtime settings
 - LiteLLM runtime settings
+- network bindings for hosts and ports
 - published gateway aliases
 - future routing notes and fallbacks
 
+Project-managed model catalog config is the source of truth for:
+
+- backend-agnostic model profiles
+- shared context presets
+- shared GPU placement presets
+- shared runtime behavior presets
+- model source and download metadata
+- framework-specific deployments for each model profile
+- exposed aliases that should be published through LiteLLM
+- load groups that describe which models should stay resident or be swapped for different activities
+
 Project-managed `llama-swap` config is the source of truth for:
 
-- the local `llama-swap` model catalog
-- native `llama-server` launch definitions
-- groups, macros, and current working local model inventory
+- backend execution substrate shared by generated model entries
+- executable and path primitives that are not model semantics
+
+The shared model catalog is authoritative for model definitions, exposures, load groups, and preset semantics such as context, GPU placement, cache, and runtime behavior. `llama-swap` model entries, groups, and preset macro bodies must be generated from that catalog rather than treated as a parallel source of truth.
 
 The configuration model should evolve so platform-specific overrides can be added later without duplicating the entire profile set.
 
@@ -299,7 +317,8 @@ The current scaffold already maps this spec into the following components:
 - process lifecycle management in `src/launcher/process_manager.py`
 - health checks in `src/launcher/health.py`
 - end-to-end routing tests in `src/launcher/router_test.py`
-- Windows launcher, install, and update wrappers in `scripts/*.ps1`
+- branded bootstrap installers in `bootstrap/`
+- unified installed commands in `scripts/AUDiaLLMGateway.ps1` and `scripts/AUDiaLLMGateway.sh`
 - operational documentation in `docs/`
 - verification coverage in `tests/`
 

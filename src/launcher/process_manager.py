@@ -9,8 +9,36 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from .config_loader import LiteLLMRuntime, LlamaSwapRuntime, load_stack_config, write_generated_configs
+from .config_loader import LiteLLMRuntime, LlamaSwapRuntime, NginxRuntime, load_stack_config, write_generated_configs
 from .health import wait_for_any
+
+
+def _resolve_exe(name: str) -> str:
+    """Resolve a bare executable name to an absolute path if possible.
+
+    Resolution order:
+    1. Already absolute — return as-is.
+    2. Next to sys.executable (venv Scripts/ or bin/ without shell activation).
+    3. shutil.which() against PATH.
+    4. Return the bare name and let the OS resolve it at Popen time.
+
+    For tools installed outside the venv (nginx, litellm installed via pipx, etc.)
+    the caller should resolve the path from install-state.json before calling this
+    function, so that the absolute path is passed in directly.
+    """
+    import shutil
+    if os.path.isabs(name):
+        return name
+    scripts_dir = Path(sys.executable).parent
+    exts = [".exe", ".cmd", ".bat", ""] if os.name == "nt" else [""]
+    for ext in exts:
+        full = scripts_dir / (name + ext)
+        if full.exists():
+            return str(full)
+    found = shutil.which(name)
+    if found:
+        return found
+    return name
 
 
 DETACHED_PROCESS = 0x00000008
@@ -33,6 +61,8 @@ def logs_dir(root: Path) -> Path:
 def ensure_runtime_dirs(root: Path) -> None:
     services_dir(root).mkdir(parents=True, exist_ok=True)
     logs_dir(root).mkdir(parents=True, exist_ok=True)
+    # nginx writes temp files here (client_body_temp, proxy_temp, etc.)
+    (runtime_dir(root) / "temp").mkdir(parents=True, exist_ok=True)
 
 
 def metadata_path(root: Path, service_name: str) -> Path:
@@ -71,7 +101,7 @@ def remove_metadata(root: Path, service_name: str) -> None:
         path.unlink()
 
 
-def launch_detached(root: Path, service_name: str, command: list[str]) -> int:
+def launch_detached(root: Path, service_name: str, command: list[str], env: dict[str, str] | None = None) -> int:
     ensure_runtime_dirs(root)
     log_path = logs_dir(root) / f"{service_name}.log"
     with log_path.open("ab") as log_handle:
@@ -81,6 +111,8 @@ def launch_detached(root: Path, service_name: str, command: list[str]) -> int:
             "stdin": subprocess.DEVNULL,
             "cwd": str(root),
         }
+        if env is not None:
+            kwargs["env"] = env
         if os.name == "nt":
             kwargs["creationflags"] = DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW
         else:
@@ -119,7 +151,7 @@ def llama_swap_command(root: Path, runtime: LlamaSwapRuntime) -> list[str]:
 def litellm_command(root: Path, runtime: LiteLLMRuntime) -> list[str]:
     config_path = str((root / runtime.generated_config_path).resolve())
     return [
-        runtime.executable,
+        _resolve_exe(runtime.executable),
         "--config",
         config_path,
         "--host",
@@ -147,7 +179,10 @@ def start_gateway(root: Path) -> None:
     existing = read_metadata(root, "gateway")
     if existing and is_pid_running(int(existing.get("pid", 0))):
         return
-    launch_detached(root, "gateway", litellm_command(root, stack.litellm))
+    gateway_env = os.environ.copy()
+    gateway_env.pop("DEBUG", None)
+    gateway_env.setdefault("PYTHONIOENCODING", "utf-8")
+    launch_detached(root, "gateway", litellm_command(root, stack.litellm), env=gateway_env)
     headers = {}
     if stack.litellm.master_key_env in os.environ:
         headers["Authorization"] = f"Bearer {os.environ[stack.litellm.master_key_env]}"
@@ -163,8 +198,69 @@ def stop_gateway(root: Path) -> None:
     stop_service(root, "gateway")
 
 
+def _nginx_supports_e_flag(exe: str) -> bool:
+    """Return True if the nginx binary supports the -e <errorlog> flag (added in 1.19.5)."""
+    import re
+    try:
+        result = subprocess.run([exe, "-v"], capture_output=True, text=True, check=False)
+        # nginx -v writes to stderr: "nginx version: nginx/1.18.0"
+        output = result.stderr + result.stdout
+        m = re.search(r"nginx/(\d+)\.(\d+)", output)
+        if m:
+            major, minor = int(m.group(1)), int(m.group(2))
+            return (major, minor) >= (1, 19)
+    except Exception:
+        pass
+    return False
+
+
+def nginx_command(root: Path, runtime: NginxRuntime) -> list[str]:
+    exe = _resolve_exe(runtime.executable)
+    config_path = str((root / runtime.config_path).resolve())
+    cmd = [exe, "-c", config_path, "-p", str(root)]
+    if _nginx_supports_e_flag(exe):
+        error_log = str((root / ".runtime" / "logs" / "nginx-error.log").resolve())
+        cmd += ["-e", error_log]
+    return cmd
+
+
+def nginx_stop_command(root: Path, runtime: NginxRuntime) -> list[str]:
+    exe = _resolve_exe(runtime.executable)
+    config_path = str((root / runtime.config_path).resolve())
+    cmd = [exe, "-c", config_path, "-p", str(root)]
+    if _nginx_supports_e_flag(exe):
+        error_log = str((root / ".runtime" / "logs" / "nginx-error.log").resolve())
+        cmd += ["-e", error_log]
+    cmd += ["-s", "stop"]
+    return cmd
+
+
+def start_nginx(root: Path) -> None:
+    stack = load_stack_config(root)
+    if not stack.nginx.enabled:
+        return
+    write_generated_configs(root)
+    ensure_runtime_dirs(root)
+    existing = read_metadata(root, "nginx")
+    if existing and is_pid_running(int(existing.get("pid", 0))):
+        return
+    pid = launch_detached(root, "nginx", nginx_command(root, stack.nginx))
+    urls = [f"http://{stack.nginx.host}:{stack.nginx.port}{path}" for path in stack.nginx.health_paths]
+    try:
+        wait_for_any(urls, timeout=30.0, interval=1.0)
+    except TimeoutError:
+        pass  # nginx may be up but upstream not ready; PID is tracked
+
+
+def stop_nginx(root: Path) -> None:
+    stack = load_stack_config(root)
+    if stack.nginx.enabled:
+        subprocess.run(nginx_stop_command(root, stack.nginx), check=False, capture_output=True)
+    stop_service(root, "nginx")
+
+
 def print_status(root: Path) -> None:
-    services = ["llama-swap", "gateway"]
+    services = ["llama-swap", "gateway", "nginx"]
     statuses = []
     for service_name in services:
         metadata = read_metadata(root, service_name)
@@ -190,6 +286,8 @@ def main() -> int:
     subparsers.add_parser("stop-backends", help="Compatibility alias for stop-llama-swap")
     subparsers.add_parser("start-gateway", help="Start the LiteLLM gateway")
     subparsers.add_parser("stop-gateway", help="Stop the LiteLLM gateway")
+    subparsers.add_parser("start-nginx", help="Start nginx reverse proxy (if enabled)")
+    subparsers.add_parser("stop-nginx", help="Stop nginx reverse proxy")
     subparsers.add_parser("start-all", help="Start llama-swap and gateway")
     subparsers.add_parser("stop-all", help="Stop gateway and llama-swap")
     subparsers.add_parser("status", help="Show runtime process status")
@@ -209,10 +307,16 @@ def main() -> int:
             start_gateway(root)
         elif args.command == "stop-gateway":
             stop_gateway(root)
+        elif args.command == "start-nginx":
+            start_nginx(root)
+        elif args.command == "stop-nginx":
+            stop_nginx(root)
         elif args.command == "start-all":
             start_llama_swap(root)
             start_gateway(root)
+            start_nginx(root)
         elif args.command == "stop-all":
+            stop_nginx(root)
             stop_gateway(root)
             stop_llama_swap(root)
         elif args.command == "status":

@@ -7,7 +7,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-from .config_loader import load_stack_config
+from .config_loader import load_published_models, load_stack_config
 
 
 def invoke_chat_completion(base_url: str, api_key: str, model_name: str, prompt: str) -> dict[str, Any]:
@@ -44,7 +44,7 @@ def run_tests(root: str | Path, all_models: bool, model_names: list[str], prompt
     base_url = f"http://{stack.litellm.host}:{stack.litellm.port}"
     api_key = os.environ.get(stack.litellm.master_key_env, "sk-local-dev")
 
-    selected = [model.stable_name for model in stack.published_models] if all_models else model_names
+    selected = [model.stable_name for model in load_published_models(root)] if all_models else model_names
     results = []
     for model_name in selected:
         response = invoke_chat_completion(base_url, api_key, model_name, prompt)
