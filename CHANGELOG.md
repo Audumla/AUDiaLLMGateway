@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.8](https://github.com/example/AUDiaLLMGateway/compare/v0.4.7...v0.4.8) (2026-03-17)
+
+
+### Bug Fixes
+
+* release and install updates ([abefbfb](https://github.com/example/AUDiaLLMGateway/commit/abefbfbb66ab6f496a685295c0665b927c919bda))
+* release issues ([d30bbbb](https://github.com/example/AUDiaLLMGateway/commit/d30bbbb8660b20b556279951b29e311818432371))
+
 ## [0.4.7](https://github.com/example/AUDiaLLMGateway/compare/v0.4.6...v0.4.7) (2026-03-17)
 
 
