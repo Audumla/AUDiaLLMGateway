@@ -32,6 +32,9 @@ This spec treats Windows, Linux, and macOS as first-tier platforms in the config
 8. Support release-archive installation and update without requiring Git on the target machine.
 9. Preserve machine-local config during updates while still allowing project-managed defaults to evolve.
 10. Treat `llama.cpp` as an installable, versioned runtime dependency with backend-specific variants.
+11. Install all applicable GPU backend variants of `llama.cpp` in a single component install pass (CPU, ROCm, Vulkan, CUDA on Linux; Vulkan on Windows; Metal on macOS) and expose each as a named macro in the generated `llama-swap` config.
+12. Guarantee that a package install (RPM or DEB) completes a fully operational deployment — including binary downloads — without requiring manual follow-up steps.
+13. Verify every package install path through automated Docker-based smoke tests and end-to-end mock tests that run in CI without live GPU hardware.
 
 ## Non-Goals
 
@@ -56,6 +59,10 @@ This spec treats Windows, Linux, and macOS as first-tier platforms in the config
 - First-tier platform in config and installer design
 - Expected to reuse the same high-level architecture with platform-specific bootstrap plus a unified installed command
 - May use different operational options such as direct shell scripts, systemd services, or alternative backend comparisons when explicitly evaluated
+- RPM and DEB package formats are the primary install mechanism for Linux targets
+- Package postinstall must complete the full dependency chain: Python venv, pip packages, `llama-swap` binary, and all applicable `llama.cpp` GPU backend variants
+- systemd service registration and enablement are performed during package postinstall
+- Multi-GPU backend install on Linux covers CPU, Vulkan, ROCm, and CUDA profiles where available in the upstream `llama.cpp` release assets
 
 ### macOS
 
@@ -207,12 +214,85 @@ The system must support:
 - update from newer GitHub releases without Git operations
 - preserving machine-local overrides during update
 - automatic dependency installation for required components where supported
-- automatic installation of a selected `llama.cpp` version/backend variant where supported
+- automatic installation of all applicable `llama.cpp` backend variants in a single install pass
 - optional component selection for non-mandatory components
 - installation of newly added components on update when selected or required
 - conflict validation between project defaults and local overrides
 
-### 7. MCP scaffolding
+#### Multi-GPU backend install
+
+On Linux, the component installer must download and install all applicable `llama.cpp` profiles from the upstream release in a single pass:
+
+- `linux-cpu` — baseline CPU-only build
+- `linux-vulkan` — Vulkan GPU acceleration
+- `linux-rocm` — AMD ROCm GPU acceleration
+- `linux-cuda` — NVIDIA CUDA GPU acceleration (when asset is available)
+
+Each successfully installed profile is recorded in the install-state file as a named variant under `component_results.llama_cpp.variants`. A profile download failure is treated as a non-fatal warning; remaining profiles continue to install.
+
+On Windows, the default profile is `windows-vulkan`. On macOS, `macos-metal`.
+
+#### Per-backend llama-swap macros
+
+After component install, the config generator must write a named macro for each installed backend variant into the generated `llama-swap` config:
+
+- `llama-server-cpu` — path to the CPU build executable
+- `llama-server-vulkan` — path to the Vulkan build executable
+- `llama-server-rocm` — path to the ROCm build executable
+- `llama-server-cuda` — path to the CUDA build executable
+
+The unqualified `llama-server` macro defaults to the CPU variant when available, falling back to the first successfully installed variant. Model entries in the generated config reference the appropriate backend macro rather than a hardcoded path.
+
+The project-managed `llama-swap.base.yaml` defines fallback values for all backend macros using the bare executable name so the system degrades gracefully when a variant was not installed.
+
+#### `install components` command
+
+The orchestration command surface must expose `install components` as a distinct action that:
+
+- downloads and installs `llama-swap` and all applicable `llama.cpp` backend profiles
+- writes results to the install-state file
+- regenerates all derived config artifacts
+
+Package postinstall scripts must call `install stack` (Python venv and pip dependencies) followed by `install components` (binary downloads) followed by `generate` (config generation) so that a fresh package install produces a fully operational deployment without manual follow-up.
+
+### 7. Package install testing
+
+The project must include automated Docker-based tests that verify the package install path without live GPU hardware or a real internet connection to binary endpoints.
+
+#### Smoke tests
+
+A smoke test suite must:
+
+- build an RPM or DEB package from the current source using `nfpm`
+- install the package inside a container image for each supported Linux distribution (OpenSUSE Tumbleweed, Ubuntu, Debian, Fedora, Rocky Linux)
+- verify that the Python venv and pip dependencies are installed
+- verify that the install-state file is written with component results for `llama-swap` and `llama-cpp`
+- verify that the generated `llama-swap` config contains no platform-foreign paths
+- verify that the `llama-server` macro is set in the generated config
+- verify that `llama-swap` and `llama-server` are importable or callable
+
+Binary downloads are replaced by stub executables placed at well-known PATH locations before package install. The component installer detects stub presence via `PATH` lookup and records the found path without attempting a download.
+
+Smoke tests must be runnable locally via a shell script (`tests/docker/run-smoke-tests.sh`) and must execute in CI as part of the release workflow.
+
+#### End-to-end mock tests
+
+An end-to-end mock test must:
+
+- install the package inside an Ubuntu container
+- start a lightweight Python HTTP server that mimics the `llama-swap` API (`/health`, `/v1/models`, `/v1/chat/completions`)
+- start `litellm` proxy against the generated config pointing at the mock server
+- send an OpenAI-compatible `POST /v1/chat/completions` request through the LiteLLM endpoint
+- verify the response contains a valid `choices[0].message.content` value
+- verify `/v1/models` returns a non-empty model list
+
+The end-to-end mock test is included in the CI matrix alongside the per-distro smoke tests.
+
+#### Test isolation
+
+All test scripts, Dockerfiles, and entrypoints must live under `tests/docker/`. Generated test artifacts (logs, output files, temporary packages) must be excluded from version control via `.gitignore`.
+
+### 8. MCP scaffolding
 
 Phase 1 must include:
 
@@ -289,6 +369,7 @@ Project-managed `llama-swap` config is the source of truth for:
 
 - backend execution substrate shared by generated model entries
 - executable and path primitives that are not model semantics
+- fallback macro values for all GPU backend names (`llama-server`, `llama-server-cpu`, `llama-server-rocm`, `llama-server-vulkan`, `llama-server-cuda`) using bare executable names so uninstalled variants degrade gracefully
 
 The shared model catalog is authoritative for model definitions, exposures, load groups, and preset semantics such as context, GPU placement, cache, and runtime behavior. `llama-swap` model entries, groups, and preset macro bodies must be generated from that catalog rather than treated as a parallel source of truth.
 
@@ -309,6 +390,7 @@ An install-state file must track:
 - install locations
 - validation warnings
 - last successful update time
+- per-variant llama.cpp results including executable path and backend name for each successfully installed profile
 
 ## Current Implementation Mapping
 
@@ -320,10 +402,15 @@ The current scaffold already maps this spec into the following components:
 - end-to-end routing tests in `src/launcher/router_test.py`
 - branded bootstrap installers in `bootstrap/`
 - unified installed commands in `scripts/AUDiaLLMGateway.ps1` and `scripts/AUDiaLLMGateway.sh`
+- multi-profile `llama.cpp` component installer and `install-components` subcommand in `src/installer/release_installer.py`
+- per-backend macro generation in `src/launcher/config_loader.py` (`build_llama_swap_config`)
+- RPM and DEB package definitions in `install/`
+- Docker smoke tests for five Linux distributions in `tests/docker/`
+- end-to-end mock test with LiteLLM proxy round-trip in `tests/docker/`
 - operational documentation in `docs/`
 - verification coverage in `tests/`
 
-This current implementation is Windows-first. Linux support is still specification-only at this stage.
+Windows is the primary development target. Linux package install (RPM/DEB) is implemented and verified via Docker-based CI smoke tests. macOS support is specification-ready but not yet exercised.
 
 ## Operational Flows
 
@@ -375,22 +462,33 @@ Phase 1 is complete when:
 4. A similar Windows machine can run the repo after local path edits.
 5. MCP support is documented and scaffolded even if not enabled in live traffic.
 6. A target machine can install and update the product from GitHub releases without using Git.
+7. Installing the RPM or DEB package on a supported Linux distribution completes a fully operational deployment, including `llama-swap`, all applicable `llama.cpp` GPU backend variants, and the generated `llama-swap` config.
+8. Docker-based smoke tests pass for OpenSUSE Tumbleweed, Ubuntu, Debian, Fedora, and Rocky Linux in CI.
+9. The end-to-end mock test passes, confirming a complete OpenAI-compatible request round-trip through LiteLLM to a mocked `llama-swap` backend.
+10. The generated `llama-swap` config contains named macros for all GPU backends installed on the target platform.
 
-Linux support is not part of phase 1 acceptance, but this spec requires the architecture and configuration model to remain compatible with a later Linux implementation.
+Linux RPM/DEB package install is part of phase 1 acceptance. macOS support remains specification-ready but is not required for phase 1 completion.
 
 ## Known Gaps Between Spec and Live Validation
 
-The scaffolded repo is structurally complete, but live validation still depends on replacing placeholder executable and model paths in local config with the user’s working environment values.
+The package install path and Docker smoke tests are fully implemented and pass in CI. Live inference validation still depends on the target machine having real model files and a compatible GPU.
 
-That means the implementation is currently verified for:
+The implementation is currently verified for:
 
 - config loading
 - generated LiteLLM config
 - health helper logic
 - routing-test request logic
 - script and CLI surface
+- RPM/DEB package install on five Linux distributions (via Docker)
+- full `install components` flow with stub binaries (via Docker)
+- LiteLLM proxy round-trip against a mocked `llama-swap` backend (via Docker e2e)
 
-It is not yet verified in this repo against live local inference until the real model paths and launcher arguments are wired in.
+Not yet verified against live local inference:
+
+- real GGUF model loading and token generation
+- per-backend GPU selection under real hardware conditions
+- multi-GPU split across Vulkan, ROCm, and CUDA on the same host
 
 ## Next Specs
 
