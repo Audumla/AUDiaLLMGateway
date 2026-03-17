@@ -37,7 +37,11 @@ try {
 
   Push-Location $BundleDir.FullName
   try {
-    Invoke-Expression "& $Python -m src.installer.release_installer install-bundle --bundle-root `"$($BundleDir.FullName)`" --install-dir `"$InstallDir`" --version `"$Version`" $($ComponentArgs -join ' ')"
+    # Install Python dependencies first (the installer itself needs them)
+    & $Python -m pip install -q -r requirements.txt
+
+    # Now run the installer
+    & $Python -m src.installer.release_installer install-bundle --bundle-root "$($BundleDir.FullName)" --install-dir "$InstallDir" --version "$Version" $($ComponentArgs -join ' ')
   } finally {
     Pop-Location
   }

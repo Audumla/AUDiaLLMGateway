@@ -27,4 +27,9 @@ tar -xzf "$ARCHIVE_PATH" -C "$EXTRACT_ROOT"
 BUNDLE_DIR="$(find "$EXTRACT_ROOT" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
 
 cd "$BUNDLE_DIR"
+
+# Install Python dependencies first (the installer itself needs them)
+"$PYTHON_BIN" -m pip install -q -r requirements.txt
+
+# Now run the installer
 "$PYTHON_BIN" -m src.installer.release_installer install-bundle --bundle-root "$BUNDLE_DIR" --install-dir "$INSTALL_DIR" --version "$VERSION"
