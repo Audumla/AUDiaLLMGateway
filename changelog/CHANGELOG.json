@@ -731,5 +731,22 @@
       "Updated release-please workflow to build and upload packages",
       "Added scripts/postinstall.sh for automated setup"
     ]
+  },
+  {
+    "id": "CHG-0dc5a85f",
+    "agent": "gemini",
+    "change_group": "infrastructure",
+    "plugin_version": "unreleased",
+    "date": "2026-03-17",
+    "recorded_at": "2026-03-17T09:55:37.526641Z",
+    "summary_tags": [
+      "Documentation Update"
+    ],
+    "summary": "Add vLLM runtime specification",
+    "details": [
+      "Created specifications/components/vllm/spec-251-vllm-runtime.md",
+      "Updated top-level specification to include vLLM architecture",
+      "Added vLLM placeholders to stack configuration"
+    ]
   }
 ]

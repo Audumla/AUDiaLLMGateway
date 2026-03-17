@@ -16,8 +16,8 @@ contents:
     dst: "/opt/AUDiaLLMGateway"
     # Exclude files that shouldn't be in the package
     # We will handle exclusions in the build workflow via find/rm before nfpm runs
-  - src: ./scripts/audia-gateway.service
-    dst: /etc/systemd/system/audia-gateway.service
+  - src: "./scripts/audia-gateway.service"
+    dst: "/etc/systemd/system/audia-gateway.service"
 
 overrides:
   deb:
