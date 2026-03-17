@@ -34,26 +34,12 @@ contents:
     dst: "/opt/AUDiaLLMGateway/requirements.txt"
   - src: "CHANGELOG.md"
     dst: "/opt/AUDiaLLMGateway/CHANGELOG.md"
-
-# Systemd configuration
-systemd:
-  - name: audia-gateway
-    contents: |
-      [Unit]
-      Description=AUDia LLM Gateway
-      After=network.target
-
-      [Service]
-      Type=simple
-      User=root
-      Group=root
-      WorkingDirectory=/opt/AUDiaLLMGateway
-      ExecStart=/opt/AUDiaLLMGateway/scripts/AUDiaLLMGateway.sh start
-      ExecStop=/opt/AUDiaLLMGateway/scripts/AUDiaLLMGateway.sh stop
-      Restart=always
-
-      [Install]
-      WantedBy=multi-user.target
+  - src: "changelog/"
+    dst: "/opt/AUDiaLLMGateway/changelog"
+  - src: "tests/"
+    dst: "/opt/AUDiaLLMGateway/tests"
+  - src: "scripts/audia-gateway.service"
+    dst: "/etc/systemd/system/audia-gateway.service"
 
 overrides:
   deb:
