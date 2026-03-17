@@ -223,4 +223,18 @@
 - Updated top-level specification to include vLLM architecture
 - Added vLLM placeholders to stack configuration
 
+### Explicitly include ROCm support in vLLM specification (Documentation Update)
+- Updated specifications/components/vllm/spec-251-vllm-runtime.md with ROCm hardware requirements
+- Added rocm_docker_image placeholder to stack configuration
+- Included ROCm deployment example in vLLM spec
+
+### Include Vulkan support in vLLM specification (Documentation Update)
+- Updated specifications/components/vllm/spec-251-vllm-runtime.md with Vulkan hardware requirements
+- Added vulkan_docker_image placeholder to stack configuration
+- Included Vulkan deployment example in vLLM spec
+
+### Build and upload Windows and macOS release artifacts (New Feature)
+- Updated release-please workflow to create .zip (Windows) and .tar.gz (macOS) bundles
+- Ensures OS-specific downloads are available on every release
+
 ---

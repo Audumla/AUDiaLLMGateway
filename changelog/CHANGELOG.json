@@ -748,5 +748,55 @@
       "Updated top-level specification to include vLLM architecture",
       "Added vLLM placeholders to stack configuration"
     ]
+  },
+  {
+    "id": "CHG-5acf8605",
+    "agent": "gemini",
+    "change_group": "infrastructure",
+    "plugin_version": "unreleased",
+    "date": "2026-03-17",
+    "recorded_at": "2026-03-17T09:57:08.116423Z",
+    "summary_tags": [
+      "Documentation Update"
+    ],
+    "summary": "Explicitly include ROCm support in vLLM specification",
+    "details": [
+      "Updated specifications/components/vllm/spec-251-vllm-runtime.md with ROCm hardware requirements",
+      "Added rocm_docker_image placeholder to stack configuration",
+      "Included ROCm deployment example in vLLM spec"
+    ]
+  },
+  {
+    "id": "CHG-5acf8605-1",
+    "agent": "gemini",
+    "change_group": "infrastructure",
+    "plugin_version": "unreleased",
+    "date": "2026-03-17",
+    "recorded_at": "2026-03-17T09:57:37.182967Z",
+    "summary_tags": [
+      "Documentation Update"
+    ],
+    "summary": "Include Vulkan support in vLLM specification",
+    "details": [
+      "Updated specifications/components/vllm/spec-251-vllm-runtime.md with Vulkan hardware requirements",
+      "Added vulkan_docker_image placeholder to stack configuration",
+      "Included Vulkan deployment example in vLLM spec"
+    ]
+  },
+  {
+    "id": "CHG-5acf8605-2",
+    "agent": "gemini",
+    "change_group": "infrastructure",
+    "plugin_version": "unreleased",
+    "date": "2026-03-17",
+    "recorded_at": "2026-03-17T09:58:46.406162Z",
+    "summary_tags": [
+      "New Feature"
+    ],
+    "summary": "Build and upload Windows and macOS release artifacts",
+    "details": [
+      "Updated release-please workflow to create .zip (Windows) and .tar.gz (macOS) bundles",
+      "Ensures OS-specific downloads are available on every release"
+    ]
   }
 ]
