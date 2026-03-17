@@ -8,6 +8,7 @@ RemainAfterExit=yes
 User=root
 Group=root
 WorkingDirectory=/opt/AUDiaLLMGateway
+EnvironmentFile=-/opt/AUDiaLLMGateway/config/local/env
 ExecStart=/opt/AUDiaLLMGateway/scripts/AUDiaLLMGateway.sh start
 ExecStop=/opt/AUDiaLLMGateway/scripts/AUDiaLLMGateway.sh stop
 
