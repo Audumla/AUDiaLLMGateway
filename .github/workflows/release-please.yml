@@ -78,11 +78,6 @@ jobs:
           nfpm pkg --packager deb --target audia-llm-gateway_${VERSION}_amd64.deb
           nfpm pkg --packager rpm --target audia-llm-gateway-${VERSION}-1.x86_64.rpm
 
-          # Windows and macOS artifacts (write to /tmp first to avoid "file changed as we read it")
-          zip -r /tmp/audia-llm-gateway_${VERSION}_windows_amd64.zip . -x "*.deb" "*.rpm"
-          tar -czf /tmp/audia-llm-gateway_${VERSION}_macos_amd64.tar.gz --exclude="*.deb" --exclude="*.rpm" .
-          mv /tmp/audia-llm-gateway_${VERSION}_windows_amd64.zip .
-          mv /tmp/audia-llm-gateway_${VERSION}_macos_amd64.tar.gz .
 
       - name: Upload packages to release
         uses: softprops/action-gh-release@v2
@@ -91,5 +86,3 @@ jobs:
           files: |
             *.deb
             *.rpm
-            *.zip
-            *.tar.gz
