@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.4.2](https://github.com/example/AUDiaLLMGateway/compare/v0.4.1...v0.4.2) (2026-03-17)
+
+
+### Bug Fixes
+
+* explicit nfpm file list and workflow cleanup ([3b23fd7](https://github.com/example/AUDiaLLMGateway/commit/3b23fd76cdf0050152dea534ccecf139dd45b653))
+* release syntax error ([593a5fd](https://github.com/example/AUDiaLLMGateway/commit/593a5fd02e0ed6b45763d0cb9e6e3224b719702a))
+* release workflow indentation ([0b67664](https://github.com/example/AUDiaLLMGateway/commit/0b67664ebd008420bc5aead6a5f19448b2e5a09c))
+
+## Changelog
+
 ## Unreleased
 
 ### Scaffolded a native Windows local LLM gateway workspace in AUDiaLLMGateway. (New Feature)
