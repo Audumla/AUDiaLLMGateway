@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.4.1](https://github.com/example/AUDiaLLMGateway/compare/v0.4.0...v0.4.1) (2026-03-17)
+
+
+### Bug Fixes
+
+* release build for distro installation files ([e7e72f8](https://github.com/example/AUDiaLLMGateway/commit/e7e72f8c48c8fff7a31a009955f391ad9af9131f))
+* released installation ([0dc5a85](https://github.com/example/AUDiaLLMGateway/commit/0dc5a85f295b56ef07a4b4e2beedb0ddd410977e))
+
+## Changelog
+
 ## Unreleased
 
 ### Scaffolded a native Windows local LLM gateway workspace in AUDiaLLMGateway. (New Feature)
