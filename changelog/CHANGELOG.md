@@ -218,4 +218,9 @@
 - Updated release-please workflow to build and upload packages
 - Added scripts/postinstall.sh for automated setup
 
+### Add vLLM runtime specification (Documentation Update)
+- Created specifications/components/vllm/spec-251-vllm-runtime.md
+- Updated top-level specification to include vLLM architecture
+- Added vLLM placeholders to stack configuration
+
 ---

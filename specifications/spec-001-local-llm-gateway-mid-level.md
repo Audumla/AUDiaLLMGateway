@@ -401,6 +401,7 @@ Likely follow-on specs:
 1. Low-level `llama-swap` catalog and launch argument specification
 2. Windows implementation detail specification
 3. Linux deployment options and migration specification
-4. LiteLLM gateway behavior and routing policy specification
-5. MCP integration specification
-6. Observability and logging specification
+4. vLLM runtime and integration specification
+5. LiteLLM gateway behavior and routing policy specification
+6. MCP integration specification
+7. Observability and logging specification

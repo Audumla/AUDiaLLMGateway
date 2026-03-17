@@ -44,6 +44,9 @@ project:
     nginx:
       required: false
       default_enabled: false
+    vllm:
+      required: false
+      default_enabled: false
     models:
       required: false
       default_enabled: false
@@ -158,6 +161,10 @@ project:
       version: latest
     nginx:
       provider: package_manager
+    vllm:
+      provider: manual
+      executable: python -m vllm.entrypoints.openai.api_server
+      docker_image: vllm/vllm-openai:latest
     models:
       install_root: models
 
