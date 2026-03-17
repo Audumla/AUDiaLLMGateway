@@ -18,5 +18,10 @@ RUN chmod +x /smoke-entrypoint.sh
 # Stub systemctl before install so postinstall doesn't fail
 RUN printf '#!/bin/sh\necho "[stub] systemctl $*"\nexit 0\n' > /usr/bin/systemctl && \
     chmod +x /usr/bin/systemctl
+# Stub llama-server and llama-swap so component installer skips GitHub download
+RUN printf '#!/bin/sh\necho "[stub] llama-server $*"\nexit 0\n' > /usr/bin/llama-server && \
+    chmod +x /usr/bin/llama-server && \
+    printf '#!/bin/sh\necho "[stub] llama-swap $*"\nexit 0\n' > /usr/bin/llama-swap && \
+    chmod +x /usr/bin/llama-swap
 RUN zypper --non-interactive --no-gpg-checks install -y /tmp/audia-llm-gateway.rpm
 ENTRYPOINT ["bash", "/smoke-entrypoint.sh"]
