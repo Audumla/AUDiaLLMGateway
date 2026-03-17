@@ -223,3 +223,12 @@ reverse_proxy:
   nginx:
     enabled: false
     config_path: config/generated/nginx/nginx.conf
+
+systemd:
+  enabled: true
+  service_name: audia-gateway
+  user: ""
+  group: ""
+  description: "AUDia LLM Gateway"
+  after: network.target
+  restart: always

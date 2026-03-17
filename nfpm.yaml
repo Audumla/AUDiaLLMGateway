@@ -1,0 +1,52 @@
+name: "audia-llm-gateway"
+arch: "amd64"
+platform: "linux"
+version: "${VERSION}"
+section: "default"
+priority: "extra"
+maintainer: "ExampleOrg <example@example.com>"
+description: |
+  Local-first LLM gateway using llama-swap and LiteLLM.
+vendor: "ExampleOrg"
+homepage: "https://github.com/example/AUDiaLLMGateway"
+license: "MIT"
+
+contents:
+  - src: "./"
+    dst: "/opt/AUDiaLLMGateway"
+    # Exclude files that shouldn't be in the package
+    # We will handle exclusions in the build workflow via find/rm before nfpm runs
+  
+# Systemd configuration (uses the standard location)
+systemd:
+  - name: audia-gateway
+    contents: |
+      [Unit]
+      Description=AUDia LLM Gateway
+      After=network.target
+
+      [Service]
+      Type=simple
+      User=root
+      Group=root
+      WorkingDirectory=/opt/AUDiaLLMGateway
+      ExecStart=/opt/AUDiaLLMGateway/scripts/AUDiaLLMGateway.sh start
+      ExecStop=/opt/AUDiaLLMGateway/scripts/AUDiaLLMGateway.sh stop
+      Restart=always
+
+      [Install]
+      WantedBy=multi-user.target
+
+overrides:
+  deb:
+    depends:
+      - python3 (>= 3.11)
+      - curl
+    scripts:
+      postinstall: scripts/postinstall.sh
+  rpm:
+    depends:
+      - python3 >= 3.11
+      - curl
+    scripts:
+      postinstall: scripts/postinstall.sh
