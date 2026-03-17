@@ -22,6 +22,22 @@ permissions:
   pull-requests: write
 
 jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        distro: [tumbleweed, ubuntu, debian, fedora, rocky]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build and run smoke test (${{ matrix.distro }})
+        run: |
+          docker build -f tests/docker/Dockerfile.${{ matrix.distro }} \
+            -t audia-smoke-${{ matrix.distro }} .
+          docker run --rm audia-smoke-${{ matrix.distro }}
+
   release:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
