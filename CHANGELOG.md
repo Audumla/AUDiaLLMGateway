@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.9](https://github.com/Audumla/AUDiaLLMGateway/compare/v0.4.8...v0.4.9) (2026-03-17)
+
+
+### Bug Fixes
+
+* distro deployment fixes ([6d6a104](https://github.com/Audumla/AUDiaLLMGateway/commit/6d6a1047d7c35e07dc38a66266c0cb106e848f21))
+
 ## [0.4.8](https://github.com/Audumla/AUDiaLLMGateway/compare/v0.4.7...v0.4.8) (2026-03-17)
 
 
