@@ -814,5 +814,20 @@
       "Updated nfpm.yaml to use an explicit file list instead of ./",
       "Refined GitHub Actions cleanup step to avoid deleting needed files"
     ]
+  },
+  {
+    "id": "CHG-593a5fd0",
+    "agent": "gemini",
+    "change_group": "infrastructure",
+    "plugin_version": "unreleased",
+    "date": "2026-03-17",
+    "recorded_at": "2026-03-17T10:06:34.024891Z",
+    "summary_tags": [
+      "Bug Fix"
+    ],
+    "summary": "Fix YAML indentation in release workflow",
+    "details": [
+      "Corrected indentation for package job steps which caused a workflow syntax error"
+    ]
   }
 ]
