@@ -68,14 +68,19 @@ jobs:
           # Clean workspace for cleaner packages
           rm -rf .git .github .vscode .agent_runner .pytest_cache .venv test-work
           find . -name "__pycache__" -type d -exec rm -rf {} +
-          
+
           # Extract version from tag (e.g., v1.2.3 -> 1.2.3)
           VERSION=${{ needs.release.outputs.tag_name }}
           VERSION=${VERSION#v}
           export VERSION
-          
+
+          # Linux packages
           nfpm pkg --packager deb --target audia-llm-gateway_${VERSION}_amd64.deb
           nfpm pkg --packager rpm --target audia-llm-gateway-${VERSION}-1.x86_64.rpm
+
+          # Windows and macOS artifacts (standard zip/tar.gz)
+          zip -r audia-llm-gateway_${VERSION}_windows_amd64.zip . -x "*.deb" "*.rpm"
+          tar -czf audia-llm-gateway_${VERSION}_macos_amd64.tar.gz . --exclude="*.deb" --exclude="*.rpm" --exclude="*.zip"
 
       - name: Upload packages to release
         uses: softprops/action-gh-release@v2
@@ -84,3 +89,6 @@ jobs:
           files: |
             *.deb
             *.rpm
+            *.zip
+            *.tar.gz
+
