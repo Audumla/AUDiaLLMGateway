@@ -105,13 +105,17 @@ invoke_update_stack() {
 invoke_release_installer() {
   local subcommand="$1"
   shift
-  (cd "$ROOT_DIR" && run_python_module src.installer.release_installer "$subcommand" "$@")
+  local venv_python
+  venv_python="$(ensure_venv_python)"
+  (cd "$ROOT_DIR" && "$venv_python" -m src.installer.release_installer "$subcommand" "$@")
 }
 
 invoke_process_manager() {
   local subcommand="$1"
   shift
-  (cd "$ROOT_DIR" && run_python_module src.launcher.process_manager --root "$ROOT_DIR" "$subcommand" "$@")
+  local venv_python
+  venv_python="$(ensure_venv_python)"
+  (cd "$ROOT_DIR" && "$venv_python" -m src.launcher.process_manager --root "$ROOT_DIR" "$subcommand" "$@")
 }
 
 case "$ACTION" in
@@ -187,7 +191,7 @@ case "$ACTION" in
         invoke_process_manager status "$@"
         ;;
       health)
-        (cd "$ROOT_DIR" && run_python_module src.launcher.health --root "$ROOT_DIR" "$@")
+        (cd "$ROOT_DIR" && "$(ensure_venv_python)" -m src.launcher.health --root "$ROOT_DIR" "$@")
         ;;
       *)
         echo "Unsupported check target '$TARGET'." >&2
@@ -221,9 +225,9 @@ case "$ACTION" in
     case "${TARGET:-}" in
       ""|routing)
         if [[ " $* " == *" --all-models "* ]]; then
-          (cd "$ROOT_DIR" && run_python_module src.launcher.router_test --root "$ROOT_DIR" "$@")
+          (cd "$ROOT_DIR" && "$(ensure_venv_python)" -m src.launcher.router_test --root "$ROOT_DIR" "$@")
         else
-          (cd "$ROOT_DIR" && run_python_module src.launcher.router_test --root "$ROOT_DIR" --all-models "$@")
+          (cd "$ROOT_DIR" && "$(ensure_venv_python)" -m src.launcher.router_test --root "$ROOT_DIR" --all-models "$@")
         fi
         ;;
       *)
