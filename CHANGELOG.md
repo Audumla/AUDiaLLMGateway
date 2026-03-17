@@ -1,15 +1,5 @@
 # Changelog
 
-## [0.4.1](https://github.com/Audumla/AUDiaLLMGateway/compare/v0.4.0...v0.4.1) (2026-03-17)
-
-
-### Bug Fixes
-
-* release build for distro installation files ([e7e72f8](https://github.com/Audumla/AUDiaLLMGateway/commit/e7e72f8c48c8fff7a31a009955f391ad9af9131f))
-* released installation ([0dc5a85](https://github.com/Audumla/AUDiaLLMGateway/commit/0dc5a85f295b56ef07a4b4e2beedb0ddd410977e))
-
-## Changelog
-
 ## Unreleased
 
 ### Scaffolded a native Windows local LLM gateway workspace in AUDiaLLMGateway. (New Feature)
@@ -246,5 +236,9 @@
 ### Build and upload Windows and macOS release artifacts (New Feature)
 - Updated release-please workflow to create .zip (Windows) and .tar.gz (macOS) bundles
 - Ensures OS-specific downloads are available on every release
+
+### Fix nFPM file globbing in CI (Bug Fix)
+- Updated nfpm.yaml to use an explicit file list instead of ./
+- Refined GitHub Actions cleanup step to avoid deleting needed files
 
 ---
