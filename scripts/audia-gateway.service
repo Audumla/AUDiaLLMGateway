@@ -1,0 +1,15 @@
+[Unit]
+Description=AUDia LLM Gateway
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/AUDiaLLMGateway
+ExecStart=/opt/AUDiaLLMGateway/scripts/AUDiaLLMGateway.sh start
+ExecStop=/opt/AUDiaLLMGateway/scripts/AUDiaLLMGateway.sh stop
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

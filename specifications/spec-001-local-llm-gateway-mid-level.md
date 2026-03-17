@@ -82,8 +82,8 @@ This spec treats Windows, Linux, and macOS as first-tier platforms in the config
 
 Client or tool
 -> LiteLLM gateway
--> llama-swap
--> local `llama-server` profiles
+   -> llama-swap -> local `llama-server` profiles
+   -> vLLM (direct) -> local `vLLM` profiles
 -> optional MCP servers later
 
 The same logical shape is expected to hold across Windows, Linux, and macOS, even if launch mechanics and supported backend options differ.
@@ -92,9 +92,10 @@ The same logical shape is expected to hold across Windows, Linux, and macOS, eve
 
 #### Local backend layer
 
-- Uses `llama-swap` as the local model router
-- Keeps native `llama-server` launch definitions as the performance-critical layer
-- Preserves explicit executable, model, port, context, and GPU launch arguments inside the `llama-swap` config
+- Uses `llama-swap` as the local model router for `llama.cpp` backends
+- Supports `vLLM` as a direct-to-LiteLLM backend for high-throughput or complex model deployments
+- Keeps native `llama-server` launch definitions as the performance-critical layer for GGUF-based models
+- Preserves explicit executable, model, port, context, and GPU launch arguments inside the `llama-swap` and `vLLM` configurations
 - Remains independently debuggable outside LiteLLM
 - Must allow platform-specific execution details without changing the external gateway contract
 
@@ -172,6 +173,8 @@ The orchestrator must support:
 
 - start `llama-swap`
 - stop `llama-swap`
+- start `vLLM` instances
+- stop `vLLM` instances
 - start gateway
 - stop gateway
 - start full stack
