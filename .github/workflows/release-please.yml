@@ -75,8 +75,8 @@ jobs:
           export VERSION
 
           # Linux packages
-          nfpm pkg --packager deb --target audia-llm-gateway_${VERSION}_amd64.deb
-          nfpm pkg --packager rpm --target audia-llm-gateway-${VERSION}-1.x86_64.rpm
+          nfpm pkg --packager deb --target audia-llm-gateway.deb
+          nfpm pkg --packager rpm --target audia-llm-gateway.rpm
 
 
       - name: Upload packages to release
