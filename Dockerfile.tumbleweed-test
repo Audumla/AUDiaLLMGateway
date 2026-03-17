@@ -1,0 +1,17 @@
+FROM opensuse/tumbleweed:latest
+
+# Install dependencies
+RUN zypper --non-interactive refresh && \
+    zypper --non-interactive install -y curl python312
+
+# Download the RPM
+RUN curl -fsSL -o /tmp/audia-llm-gateway-0.4.5-1.x86_64.rpm \
+    https://github.com/Audumla/AUDiaLLMGateway/releases/download/v0.4.5/audia-llm-gateway-0.4.5-1.x86_64.rpm
+
+# Install the RPM (allow unsigned since it's from GitHub releases)
+RUN zypper --non-interactive --no-gpg-checks install /tmp/audia-llm-gateway-0.4.5-1.x86_64.rpm
+
+# Verify installation
+RUN ls -la /opt/AUDiaLLMGateway/scripts/
+
+CMD ["/bin/bash"]
