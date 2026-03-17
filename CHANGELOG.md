@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.4](https://github.com/example/AUDiaLLMGateway/compare/v0.4.3...v0.4.4) (2026-03-17)
+
+
+### Bug Fixes
+
+* agent syntax errors ([8a8be76](https://github.com/example/AUDiaLLMGateway/commit/8a8be76978ea359c4a09dc1eb685c4d6a8faa62a))
+
 ## [0.4.3](https://github.com/example/AUDiaLLMGateway/compare/v0.4.2...v0.4.3) (2026-03-17)
 
 
