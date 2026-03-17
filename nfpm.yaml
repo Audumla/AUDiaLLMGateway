@@ -12,12 +12,48 @@ homepage: "https://github.com/Audumla/AUDiaLLMGateway"
 license: "MIT"
 
 contents:
-  - src: "./"
-    dst: "/opt/AUDiaLLMGateway"
-    # Exclude files that shouldn't be in the package
-    # We will handle exclusions in the build workflow via find/rm before nfpm runs
-  - src: "./scripts/audia-gateway.service"
-    dst: "/etc/systemd/system/audia-gateway.service"
+  - src: "bootstrap/"
+    dst: "/opt/AUDiaLLMGateway/bootstrap"
+  - src: "config/project/"
+    dst: "/opt/AUDiaLLMGateway/config/project"
+  - src: "config/env.example"
+    dst: "/opt/AUDiaLLMGateway/config/env.example"
+  - src: "docs/"
+    dst: "/opt/AUDiaLLMGateway/docs"
+  - src: "install/"
+    dst: "/opt/AUDiaLLMGateway/install"
+  - src: "scripts/"
+    dst: "/opt/AUDiaLLMGateway/scripts"
+  - src: "specifications/"
+    dst: "/opt/AUDiaLLMGateway/specifications"
+  - src: "src/"
+    dst: "/opt/AUDiaLLMGateway/src"
+  - src: "README.md"
+    dst: "/opt/AUDiaLLMGateway/README.md"
+  - src: "requirements.txt"
+    dst: "/opt/AUDiaLLMGateway/requirements.txt"
+  - src: "CHANGELOG.md"
+    dst: "/opt/AUDiaLLMGateway/CHANGELOG.md"
+
+# Systemd configuration
+systemd:
+  - name: audia-gateway
+    contents: |
+      [Unit]
+      Description=AUDia LLM Gateway
+      After=network.target
+
+      [Service]
+      Type=simple
+      User=root
+      Group=root
+      WorkingDirectory=/opt/AUDiaLLMGateway
+      ExecStart=/opt/AUDiaLLMGateway/scripts/AUDiaLLMGateway.sh start
+      ExecStop=/opt/AUDiaLLMGateway/scripts/AUDiaLLMGateway.sh stop
+      Restart=always
+
+      [Install]
+      WantedBy=multi-user.target
 
 overrides:
   deb:
