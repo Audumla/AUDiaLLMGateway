@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.3.1](https://github.com/example/AUDiaLLMGateway/compare/v0.3.0...v0.3.1) (2026-03-17)
+
+
+### Features
+
+* added proper installs ([600da16](https://github.com/example/AUDiaLLMGateway/commit/600da163a34b36afc320bddf33744e28f69acc72))
+
+## Changelog
+
 ## Unreleased
 
 ### Scaffolded a native Windows local LLM gateway workspace in AUDiaLLMGateway. (New Feature)
