@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.6](https://github.com/Audumla/AUDiaLLMGateway/compare/v0.4.5...v0.4.6) (2026-03-17)
+
+
+### Bug Fixes
+
+* clean release ([6d51333](https://github.com/Audumla/AUDiaLLMGateway/commit/6d51333e086d50188ca2e659bde887774dbc1f0b))
+* release problems ([d7eef0a](https://github.com/Audumla/AUDiaLLMGateway/commit/d7eef0a1f255ef9fba8f2cdc94b7620204acec78))
+
 ## [0.4.5](https://github.com/Audumla/AUDiaLLMGateway/compare/v0.4.4...v0.4.5) (2026-03-17)
 
 
