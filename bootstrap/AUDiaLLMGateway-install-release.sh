@@ -28,8 +28,11 @@ BUNDLE_DIR="$(find "$EXTRACT_ROOT" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
 
 cd "$BUNDLE_DIR"
 
-# Install Python dependencies first (the installer itself needs them)
-"$PYTHON_BIN" -m pip install -q -r requirements.txt
+# Install Python dependencies in a venv (needed on modern systems with PEP 668)
+VENV_DIR="$BUNDLE_DIR/.venv-bootstrap"
+"$PYTHON_BIN" -m venv "$VENV_DIR" --system-site-packages
+VENV_PYTHON="$VENV_DIR/bin/python"
+"$VENV_PYTHON" -m pip install -q -r requirements.txt
 
-# Now run the installer
-"$PYTHON_BIN" -m src.installer.release_installer install-bundle --bundle-root "$BUNDLE_DIR" --install-dir "$INSTALL_DIR" --version "$VERSION"
+# Run the installer with the venv Python
+"$VENV_PYTHON" -m src.installer.release_installer install-bundle --bundle-root "$BUNDLE_DIR" --install-dir "$INSTALL_DIR" --version "$VERSION"
