@@ -798,5 +798,21 @@
       "Updated release-please workflow to create .zip (Windows) and .tar.gz (macOS) bundles",
       "Ensures OS-specific downloads are available on every release"
     ]
+  },
+  {
+    "id": "CHG-a605d77a",
+    "agent": "gemini",
+    "change_group": "infrastructure",
+    "plugin_version": "unreleased",
+    "date": "2026-03-17",
+    "recorded_at": "2026-03-17T10:03:45.771347Z",
+    "summary_tags": [
+      "Bug Fix"
+    ],
+    "summary": "Fix nFPM file globbing in CI",
+    "details": [
+      "Updated nfpm.yaml to use an explicit file list instead of ./",
+      "Refined GitHub Actions cleanup step to avoid deleting needed files"
+    ]
   }
 ]

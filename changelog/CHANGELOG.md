@@ -237,4 +237,8 @@
 - Updated release-please workflow to create .zip (Windows) and .tar.gz (macOS) bundles
 - Ensures OS-specific downloads are available on every release
 
+### Fix nFPM file globbing in CI (Bug Fix)
+- Updated nfpm.yaml to use an explicit file list instead of ./
+- Refined GitHub Actions cleanup step to avoid deleting needed files
+
 ---
