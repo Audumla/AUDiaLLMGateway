@@ -241,4 +241,7 @@
 - Updated nfpm.yaml to use an explicit file list instead of ./
 - Refined GitHub Actions cleanup step to avoid deleting needed files
 
+### Fix YAML indentation in release workflow (Bug Fix)
+- Corrected indentation for package job steps which caused a workflow syntax error
+
 ---
