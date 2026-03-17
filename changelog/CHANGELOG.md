@@ -251,4 +251,11 @@
 - Added section 7 Package install testing with smoke test and e2e mock test requirements
 - Updated Configuration Model, Implementation Mapping, Acceptance Criteria, and Known Gaps
 
+### Make package install fully automatic: seed LITELLM_MASTER_KEY env file, add EnvironmentFile to service unit, start service from postinstall (Build / Packaging)
+- scripts/audia-gateway.service: added EnvironmentFile=-/opt/AUDiaLLMGateway/config/local/env so LITELLM_MASTER_KEY is loaded at service start
+- scripts/postinstall.sh: create config/local/ and seed config/local/env with default LITELLM_MASTER_KEY=sk-local-dev if not present
+- scripts/postinstall.sh: replaced set -e with explicit error handling — component download failure is non-fatal warning, stack and generate failures abort
+- scripts/postinstall.sh: added systemctl start audia-gateway at end so service is running immediately after install
+- tests/docker/smoke-entrypoint.sh: extended section 7 to verify EnvironmentFile directive in service unit, config/local/env creation, and LITELLM_MASTER_KEY presence
+
 ---

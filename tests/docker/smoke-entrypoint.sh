@@ -166,13 +166,28 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 7. Systemd stubs were called
+# 7. Systemd and env file
 # ---------------------------------------------------------------------------
-section "systemd"
+section "systemd and env file"
 
 [ -f /etc/systemd/system/audia-gateway.service ] \
     && ok "service file installed" \
     || fail "service file NOT installed at /etc/systemd/system/"
+
+# Service unit must declare EnvironmentFile so LITELLM_MASTER_KEY is picked up
+grep -q "EnvironmentFile" /etc/systemd/system/audia-gateway.service 2>/dev/null \
+    && ok "service unit has EnvironmentFile directive" \
+    || fail "service unit missing EnvironmentFile directive"
+
+# postinstall must have seeded config/local/env
+[ -f "$INSTALL_DIR/config/local/env" ] \
+    && ok "config/local/env seeded by postinstall" \
+    || fail "config/local/env NOT created by postinstall"
+
+# The seeded env file must contain LITELLM_MASTER_KEY
+grep -q "LITELLM_MASTER_KEY" "$INSTALL_DIR/config/local/env" 2>/dev/null \
+    && ok "LITELLM_MASTER_KEY present in config/local/env" \
+    || fail "LITELLM_MASTER_KEY NOT found in config/local/env"
 
 # ---------------------------------------------------------------------------
 # Summary
