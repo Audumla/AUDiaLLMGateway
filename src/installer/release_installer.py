@@ -263,6 +263,20 @@ def ensure_llama_cpp(root: Path) -> dict[str, Any]:
     sidecar_files = [str(item) for item in profile.get("sidecar_files", [])]
     copy_sidecar_to_binary_dir = bool(settings.get("copy_sidecar_to_binary_dir", True))
 
+    # Fast path: if the executable is already available in PATH (e.g. system package or test stub)
+    found_in_path = shutil.which(executable_name)
+    if found_in_path:
+        return {
+            "provider": "path",
+            "profile": profile_name,
+            "version": "system",
+            "backend": backend,
+            "install_dir": str(Path(found_in_path).parent.parent),
+            "asset_name": "",
+            "executable_path": found_in_path,
+            "copied_sidecars": [],
+        }
+
     metadata = get_release_metadata(owner, repo, version)
     tag = str(metadata.get("tag_name", version))
     asset = find_release_asset(metadata, asset_tokens)
@@ -591,6 +605,56 @@ def parse_component_args(values: list[str] | None) -> list[str] | None:
     return components
 
 
+def install_components_on_root(root: str | Path, requested_components: list[str] | None = None) -> dict[str, Any]:
+    """Run component installers on an already-installed root without re-syncing files.
+
+    Used by postinstall scripts after an RPM/DEB package install where the source
+    files are already in place and only the binary dependencies need downloading.
+    """
+    from src.launcher.config_loader import validate_layered_configs, write_generated_configs
+
+    install_root = Path(root).resolve()
+    manifest = load_manifest(install_root)
+    previous_state = load_state(install_root)
+    selected_components = resolve_component_selection(
+        manifest,
+        requested_components,
+        previous_state.get("selected_components"),
+    )
+    new_results = install_components(install_root, manifest, selected_components)
+
+    component_results = previous_state.get("component_results", {}).copy()
+    for k, v in new_results.items():
+        if k == "llama_cpp" and isinstance(v, dict):
+            prev_cpp = component_results.get("llama_cpp", {})
+            if not isinstance(prev_cpp, dict):
+                prev_cpp = {}
+            variants = prev_cpp.get("variants", {})
+            if not isinstance(variants, dict):
+                variants = {}
+            profile_name = v.get("profile")
+            if profile_name:
+                variants[profile_name] = v
+            component_results["llama_cpp"] = {**v, "variants": variants}
+        else:
+            component_results[k] = v
+
+    write_generated_configs(install_root)
+    warnings = validate_layered_configs(install_root)
+    state = {
+        "product": "AUDiaLLMGateway",
+        "version": previous_state.get("version", "package-install"),
+        "install_root": str(install_root),
+        "updated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "selected_components": selected_components,
+        "component_results": component_results,
+        "config_validation": warnings,
+        "available_updates": {},
+    }
+    write_state(install_root, state)
+    return state
+
+
 def check_available_updates(root: str | Path, component_results: dict[str, Any] | None = None) -> dict[str, Any]:
     from src.launcher.config_loader import load_stack_config
 
@@ -636,6 +700,10 @@ def main() -> int:
     update_parser.add_argument("--version", default="latest")
     update_parser.add_argument("--component", action="append", default=[])
 
+    components_parser = subparsers.add_parser("install-components", help="Run component installers on an already-installed root (no file sync)")
+    components_parser.add_argument("--root", default=".")
+    components_parser.add_argument("--component", action="append", default=[])
+
     check_updates_parser = subparsers.add_parser("check-updates", help="Check upstream release availability for the gateway and managed components")
     check_updates_parser.add_argument("--root", default=".")
 
@@ -655,6 +723,8 @@ def main() -> int:
         )
     elif args.command == "update-release":
         result = update_release(args.root, args.version, parse_component_args(args.component))
+    elif args.command == "install-components":
+        result = install_components_on_root(args.root, parse_component_args(args.component))
     elif args.command == "check-updates":
         result = check_available_updates(args.root)
     elif args.command == "validate-configs":

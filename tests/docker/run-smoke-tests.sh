@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Run all Docker smoke tests from the repo root.
+# Run all Docker smoke tests and e2e mock test from the repo root.
 # Usage: bash tests/docker/run-smoke-tests.sh [distro...]
-# Example: bash tests/docker/run-smoke-tests.sh tumbleweed ubuntu
+# Example: bash tests/docker/run-smoke-tests.sh tumbleweed ubuntu e2e
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
-DISTROS=("${@:-tumbleweed ubuntu debian fedora rocky}")
+DISTROS=("${@:-tumbleweed ubuntu debian fedora rocky e2e}")
 
 PASS=0
 FAIL=0
@@ -18,10 +18,17 @@ for distro in "${DISTROS[@]}"; do
         continue
     fi
 
-    image="audia-smoke-$distro"
+    if [ "$distro" = "e2e" ]; then
+        image="audia-e2e"
+        label="e2e mock test"
+    else
+        image="audia-smoke-$distro"
+        label="smoke test: $distro"
+    fi
+
     echo
     echo "=========================================="
-    echo " Building + running smoke test: $distro"
+    echo " Building + running $label"
     echo "=========================================="
 
     if docker build -f "$dockerfile" -t "$image" "$ROOT_DIR" && \
@@ -36,7 +43,7 @@ done
 
 echo
 echo "=========================================="
-echo " Smoke test summary: $PASS passed, $FAIL failed"
+echo " Summary: $PASS passed, $FAIL failed"
 echo "=========================================="
 
 [ "$FAIL" -eq 0 ] || exit 1

@@ -61,9 +61,9 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 3. Verify install stack results
+# 3. Verify install stack + components results
 # ---------------------------------------------------------------------------
-section "install stack results"
+section "install stack + components results"
 
 [ -d "$INSTALL_DIR/.venv" ] \
     && ok ".venv created" \
@@ -93,7 +93,54 @@ if [ -n "$VENV_PYTHON" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# 4. Verify generate results
+# 4. Verify component install (llama-swap and llama.cpp binaries wired up)
+# ---------------------------------------------------------------------------
+section "component install results"
+
+STATE_FILE="$INSTALL_DIR/state/install-state.json"
+[ -f "$STATE_FILE" ] \
+    && ok "install-state.json created" \
+    || fail "install-state.json MISSING — install components did not run"
+
+if [ -f "$STATE_FILE" ] && [ -n "$VENV_PYTHON" ]; then
+    SWAP_PATH=$("$VENV_PYTHON" -c "
+import json, sys
+s = json.load(open('$STATE_FILE'))
+print(s.get('component_results', {}).get('llama_swap', {}).get('path', ''))
+" 2>/dev/null)
+    [ -n "$SWAP_PATH" ] \
+        && ok "llama-swap path recorded: $SWAP_PATH" \
+        || fail "llama-swap path NOT recorded in state"
+
+    LLAMA_PATH=$("$VENV_PYTHON" -c "
+import json, sys
+s = json.load(open('$STATE_FILE'))
+print(s.get('component_results', {}).get('llama_cpp', {}).get('executable_path', ''))
+" 2>/dev/null)
+    [ -n "$LLAMA_PATH" ] \
+        && ok "llama-server path recorded: $LLAMA_PATH" \
+        || fail "llama-server path NOT recorded in state"
+
+    # Verify the generated llama-swap config doesn't have Windows paths
+    GENERATED_CFG="$INSTALL_DIR/config/generated/llama-swap/llama-swap.generated.yaml"
+    if [ -f "$GENERATED_CFG" ]; then
+        if grep -q 'C:\\' "$GENERATED_CFG" 2>/dev/null; then
+            fail "generated llama-swap config contains Windows paths"
+        else
+            ok "generated llama-swap config has no Windows paths"
+        fi
+        # Verify llama-server macro is set to the state path (or a Linux path)
+        MACRO_VAL=$(grep 'llama-server:' "$GENERATED_CFG" | head -1 | sed "s/.*llama-server: //; s/'//g; s/\"//g")
+        if [ -n "$MACRO_VAL" ]; then
+            ok "llama-server macro set: $MACRO_VAL"
+        else
+            fail "llama-server macro NOT set in generated config"
+        fi
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# 5. Verify generate results
 # ---------------------------------------------------------------------------
 section "generate results"
 
@@ -108,7 +155,7 @@ do
 done
 
 # ---------------------------------------------------------------------------
-# 5. Run generate independently to confirm it uses venv Python
+# 6. Run generate independently to confirm it uses venv Python
 # ---------------------------------------------------------------------------
 section "AUDiaLLMGateway.sh generate (standalone)"
 
@@ -119,7 +166,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 6. Systemd stubs were called
+# 7. Systemd stubs were called
 # ---------------------------------------------------------------------------
 section "systemd"
 

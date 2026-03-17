@@ -11,6 +11,7 @@ chmod +x scripts/*.sh scripts/*.ps1 scripts/*.cmd 2>/dev/null || true
 mkdir -p state
 
 ./scripts/AUDiaLLMGateway.sh install stack
+./scripts/AUDiaLLMGateway.sh install components
 ./scripts/AUDiaLLMGateway.sh generate
 
 # Register and enable the systemd service

@@ -1,19 +1,22 @@
+# E2E mock test: install DEB, run install stack + components (stub binaries),
+# then start a mock llama-swap and verify the full litellm request round-trip.
+
 # Stage 1: build the DEB using nfpm
-FROM debian:12 AS builder
+FROM ubuntu:24.04 AS builder
 RUN apt-get update && apt-get install -y curl
 RUN echo 'deb [trusted=yes] https://repo.goreleaser.com/apt/ /' \
         > /etc/apt/sources.list.d/goreleaser.list && \
     apt-get update && apt-get install -y nfpm
 COPY . /src
 WORKDIR /src
-RUN VERSION=0.0.0-smoke nfpm pkg --packager deb --target /audia-llm-gateway.deb
+RUN VERSION=0.0.0-e2e nfpm pkg --packager deb --target /audia-llm-gateway.deb
 
-# Stage 2: install the DEB and run smoke test
-FROM python:3.12-slim-bookworm
-RUN apt-get update && apt-get install -y curl python3-venv
-COPY --from=builder /audia-llm-gateway.deb /tmp/audia-llm-gateway.deb
-COPY tests/docker/smoke-entrypoint.sh /smoke-entrypoint.sh
-RUN chmod +x /smoke-entrypoint.sh
+# Stage 2: install and run e2e test
+FROM ubuntu:24.04
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && \
+    apt-get install -y curl python3 python3-venv python3-pip
+# Stub system services so postinstall doesn't fail
 RUN printf '#!/bin/sh\necho "[stub] systemctl $*"\nexit 0\n' > /usr/bin/systemctl && \
     chmod +x /usr/bin/systemctl
 # Stub llama-server and llama-swap so component installer skips GitHub download
@@ -21,5 +24,8 @@ RUN printf '#!/bin/sh\necho "[stub] llama-server $*"\nexit 0\n' > /usr/bin/llama
     chmod +x /usr/bin/llama-server && \
     printf '#!/bin/sh\necho "[stub] llama-swap $*"\nexit 0\n' > /usr/bin/llama-swap && \
     chmod +x /usr/bin/llama-swap
+COPY --from=builder /audia-llm-gateway.deb /tmp/audia-llm-gateway.deb
+COPY tests/docker/e2e-entrypoint.sh /e2e-entrypoint.sh
+RUN chmod +x /e2e-entrypoint.sh
 RUN apt-get install -y /tmp/audia-llm-gateway.deb
-ENTRYPOINT ["bash", "/smoke-entrypoint.sh"]
+ENTRYPOINT ["bash", "/e2e-entrypoint.sh"]

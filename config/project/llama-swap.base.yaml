@@ -7,10 +7,10 @@ logLevel: info
 startPort: 41000
 
 macros:
-  llama-server-rocm: "C:\\development\\tools\\llama-bin-amd\\llama-server.exe"
-  llama-server: "C:\\development\\tools\\llamacpp\\llama-server.exe"
-  model-path: "--model C:\\development\\llm-models"
-  mmproj-path: "--mmproj C:\\development\\llm-models"
+  llama-server-rocm: "llama-server"
+  llama-server: "llama-server"
+  model-path: "--model models"
+  mmproj-path: "--mmproj models"
 
 models: {}
 groups: {}

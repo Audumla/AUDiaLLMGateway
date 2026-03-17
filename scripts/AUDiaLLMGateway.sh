@@ -130,6 +130,9 @@ case "$ACTION" in
       stack)
         invoke_install_stack
         ;;
+      components)
+        invoke_release_installer install-components --root "$ROOT_DIR" "$@"
+        ;;
       *)
         invoke_release_installer install-release --component "$TARGET" "$@"
         ;;

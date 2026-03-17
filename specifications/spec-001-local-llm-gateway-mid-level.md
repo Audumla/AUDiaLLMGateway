@@ -36,12 +36,10 @@ This spec treats Windows, Linux, and macOS as first-tier platforms in the config
 ## Non-Goals
 
 1. No Docker requirement in phase 1.
-2. No Linux or macOS runtime validation work in phase 1 beyond specification, install modeling, and testable config support.
-3. No replacement of `llama.cpp` / `llama-server` as the inference engine behind `llama-swap`.
-4. No first-pass web UI.
-5. No cloud deployment or hosted orchestration features.
-6. No advanced routing logic beyond basic stable model exposure and documented future stubs.
-7. No requirement that target machines install the repo through `git clone` or `git pull`.
+2. No first-pass web UI.
+3. No cloud deployment or hosted orchestration features.
+4. No advanced routing logic beyond basic stable model exposure and documented future stubs.
+5. No requirement that target machines install the repo through `git clone` or `git pull`.
 
 ## Platform Scope
 

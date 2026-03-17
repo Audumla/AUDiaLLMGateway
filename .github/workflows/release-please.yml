@@ -27,16 +27,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        distro: [tumbleweed, ubuntu, debian, fedora, rocky]
+        distro: [tumbleweed, ubuntu, debian, fedora, rocky, e2e]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Build and run smoke test (${{ matrix.distro }})
         run: |
+          IMAGE=audia-smoke-${{ matrix.distro }}
+          [ "${{ matrix.distro }}" = "e2e" ] && IMAGE=audia-e2e
           docker build -f tests/docker/Dockerfile.${{ matrix.distro }} \
-            -t audia-smoke-${{ matrix.distro }} .
-          docker run --rm audia-smoke-${{ matrix.distro }}
+            -t "$IMAGE" .
+          docker run --rm "$IMAGE"
 
   release:
     runs-on: ubuntu-latest

@@ -7,6 +7,11 @@ state/install-state.json
 config/generated/
 test-work/
 
+# Test artifacts (logs, reports, temp outputs) — not source code
+tests/output/
+tests/**/*.log
+tests/**/*.tmp
+
 # --- agent-system --- DO NOT EDIT THIS BLOCK MANUALLY ---
 # AgentRunner workspace files (code, artifacts, and generated metadata)
 # Machine-local state (new v2 structure)
