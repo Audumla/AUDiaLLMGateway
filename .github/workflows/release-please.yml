@@ -15,7 +15,7 @@ on:
         type: string
 
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 permissions:
   contents: write
@@ -81,7 +81,7 @@ jobs:
           # Windows and macOS artifacts (standard zip/tar.gz)
           # These exclude the linux packages to keep size small
           zip -r audia-llm-gateway_${VERSION}_windows_amd64.zip . -x "*.deb" "*.rpm"
-          tar -czf audia-llm-gateway_${VERSION}_macos_amd64.tar.gz . --exclude="*.deb" --exclude="*.rpm" --exclude="*.zip"
+          tar -czf audia-llm-gateway_${VERSION}_macos_amd64.tar.gz --exclude="*.deb" --exclude="*.rpm" --exclude="*.zip" .
 
       - name: Upload packages to release
         uses: softprops/action-gh-release@v2
