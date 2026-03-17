@@ -165,6 +165,8 @@ project:
       provider: manual
       executable: python -m vllm.entrypoints.openai.api_server
       docker_image: vllm/vllm-openai:latest
+      rocm_docker_image: vllm/vllm-rocm:latest
+      vulkan_docker_image: vllm/vllm-vulkan:latest
     models:
       install_root: models
 

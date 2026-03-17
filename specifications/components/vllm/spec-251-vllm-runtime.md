@@ -7,7 +7,7 @@
 ## Requirements
 
 - **Model Compatibility**: Support for HF-style models that `vLLM` can serve directly.
-- **Hardware Support**: Primarily targeting NVIDIA GPUs via CUDA, but open to other `vLLM`-supported backends (ROCm, TPU).
+- **Hardware Support**: First-tier support for NVIDIA GPUs via CUDA, AMD GPUs via ROCm, and generic GPU acceleration via Vulkan (where supported by `vLLM`).
 - **Managed Lifecycle**: The `AUDiaLLMGateway` orchestrator should be able to start and stop `vLLM` instances.
 - **Configurable Runtime**: Parameters such as `tensor_parallel_size`, `max_model_len`, `quantization`, and `gpu_memory_utilization` should be configurable per deployment.
 - **LiteLLM Integration**: LiteLLM should route to `vLLM` instances as OpenAI-compatible endpoints.
@@ -43,6 +43,25 @@ model_profiles:
           tensor_parallel_size: 2
           max_model_len: 32768
           gpu_memory_utilization: 0.95
+      vllm_rocm:
+        framework: vllm
+        transport: direct
+        backend_model_name: Qwen/Qwen2.5-72B-Instruct
+        port: 8002
+        vllm_options:
+          tensor_parallel_size: 4
+          max_model_len: 32768
+          gpu_memory_utilization: 0.90
+          device: rocm
+      vllm_vulkan:
+        framework: vllm
+        transport: direct
+        backend_model_name: Qwen/Qwen2.5-72B-Instruct
+        port: 8003
+        vllm_options:
+          max_model_len: 32768
+          gpu_memory_utilization: 0.85
+          device: vulkan
 ```
 
 ## Integration
