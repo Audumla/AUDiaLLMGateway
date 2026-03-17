@@ -22,6 +22,9 @@ jobs:
   release:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -42,3 +45,39 @@ jobs:
         with:
           tag_name: ${{ steps.release.outputs.tag_name }}
           fail_on_unmatched_files: false
+
+  package:
+    runs-on: ubuntu-latest
+    needs: release
+    if: ${{ needs.release.outputs.release_created == 'true' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install nFPM
+        run: |
+          echo 'deb [trusted=yes] https://repo.goreleaser.com/apt/ /' | sudo tee /etc/apt/sources.list.d/goreleaser.list
+          sudo apt-get update
+          sudo apt-get install -y nfpm
+
+      - name: Build packages
+        run: |
+          # Clean workspace for cleaner packages
+          rm -rf .git .github .vscode .agent_runner .pytest_cache .venv test-work
+          find . -name "__pycache__" -type d -exec rm -rf {} +
+          
+          # Extract version from tag (e.g., v1.2.3 -> 1.2.3)
+          VERSION=${{ needs.release.outputs.tag_name }}
+          VERSION=${VERSION#v}
+          export VERSION
+          
+          nfpm pkg --packager deb --target audia-llm-gateway_${VERSION}_amd64.deb
+          nfpm pkg --packager rpm --target audia-llm-gateway-${VERSION}-1.x86_64.rpm
+
+      - name: Upload packages to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.release.outputs.tag_name }}
+          files: |
+            *.deb
+            *.rpm

@@ -86,6 +86,17 @@ class NginxRuntime:
 
 
 @dataclass(frozen=True)
+class SystemdConfig:
+    enabled: bool
+    service_name: str
+    user: str
+    group: str
+    description: str
+    after: str
+    restart: str
+
+
+@dataclass(frozen=True)
 class InstallConfig:
     venv_path: str
     python_min_version: str
@@ -116,6 +127,7 @@ class StackConfig:
     routing: dict[str, Any]
     reverse_proxy: dict[str, Any]
     nginx: NginxRuntime
+    systemd: SystemdConfig
     component_settings: dict[str, Any]
     models_project_config_path: str
     models_local_override_path: str
@@ -205,6 +217,29 @@ def load_stack_config(root: str | Path) -> StackConfig:
         port=int(network_raw.get("services", {}).get("nginx", {}).get("port", 8080)),
         health_paths=[str(item) for item in nginx_raw.get("health_paths", ["/health"])],
     )
+
+    systemd_raw = raw.get("systemd", {})
+    _current_user = ""
+    _current_group = ""
+    if os.name != "nt":
+        import getpass
+        import grp
+        try:
+            _current_user = getpass.getuser()
+            _current_group = grp.getgrgid(os.getgid()).gr_name
+        except Exception:
+            pass
+
+    systemd = SystemdConfig(
+        enabled=bool(systemd_raw.get("enabled", True)),
+        service_name=str(systemd_raw.get("service_name", "audia-gateway")),
+        user=str(systemd_raw.get("user") or _current_user),
+        group=str(systemd_raw.get("group") or _current_group),
+        description=str(systemd_raw.get("description", "AUDia LLM Gateway")),
+        after=str(systemd_raw.get("after", "network.target")),
+        restart=str(systemd_raw.get("restart", "always")),
+    )
+
     component_settings = project_raw.get("component_settings", {})
     models_raw = raw.get("models", {})
 
@@ -323,6 +358,7 @@ def load_stack_config(root: str | Path) -> StackConfig:
             routing=routing,
             reverse_proxy=reverse_proxy,
             nginx=nginx,
+            systemd=systemd,
             component_settings=component_settings,
             models_project_config_path=str(models_raw.get("project_config_path", "config/project/models.base.yaml")),
             models_local_override_path=str(models_raw.get("local_override_path", "config/local/models.override.yaml")),
@@ -340,6 +376,7 @@ def load_stack_config(root: str | Path) -> StackConfig:
         routing=routing,
         reverse_proxy=reverse_proxy,
         nginx=nginx,
+        systemd=systemd,
         component_settings=component_settings,
         models_project_config_path=str(models_raw.get("project_config_path", "config/project/models.base.yaml")),
         models_local_override_path=str(models_raw.get("local_override_path", "config/local/models.override.yaml")),
@@ -479,7 +516,7 @@ def _generated_llama_swap_models(stack: StackConfig, macros: dict[str, Any]) -> 
                 continue
 
             framework = frameworks.get(framework_name, {})
-            executable_macro = str(framework.get("llama_swap", {}).get("executable_macro", "llama-server"))
+            executable_macro = str(deployment.get("executable_macro", framework.get("llama_swap", {}).get("executable_macro", "llama-server")))
             server_args_macro = str(framework.get("llama_swap", {}).get("server_args_macro", "server-args"))
             model_path_macro = str(framework.get("llama_swap", {}).get("model_path_macro", "model-path"))
             mmproj_path_macro = str(framework.get("llama_swap", {}).get("mmproj_path_macro", "mmproj-path"))
@@ -642,6 +679,14 @@ def build_llama_swap_config(stack: StackConfig) -> dict[str, Any]:
     rocm_executable_path = llama_cpp_state.get("rocm_executable_path")
     if rocm_executable_path and "llama-server-rocm" not in local_macros:
         macros["llama-server-rocm"] = str(rocm_executable_path)
+
+    # Automatically generate variant-specific macros for every installed profile
+    variants = llama_cpp_state.get("variants", {})
+    for profile_name, info in variants.items():
+        macro_name = f"llama-server-{profile_name}"
+        if macro_name not in local_macros:
+            macros[macro_name] = str(info.get("executable_path", ""))
+
     models_state = install_state.get("component_results", {}).get("models", {})
     model_dir = models_state.get("model_dir", "")
     if model_dir:
@@ -821,6 +866,27 @@ http {{
 """
 
 
+def build_systemd_config(stack: StackConfig) -> str:
+    root = stack.root.resolve()
+    script_path = root / "scripts" / "AUDiaLLMGateway.sh"
+    return f"""[Unit]
+Description={stack.systemd.description}
+After={stack.systemd.after}
+
+[Service]
+Type=simple
+User={stack.systemd.user}
+Group={stack.systemd.group}
+WorkingDirectory={root}
+ExecStart={script_path} start
+ExecStop={script_path} stop
+Restart={stack.systemd.restart}
+
+[Install]
+WantedBy=multi-user.target
+"""
+
+
 def _write_yaml_with_header(path: Path, header: str, payload: dict[str, Any]) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as handle:
@@ -878,6 +944,21 @@ def write_nginx_config(root: str | Path) -> Path:
     return output_path
 
 
+def write_systemd_config(root: str | Path) -> Path | None:
+    stack = load_stack_config(root)
+    if not stack.systemd.enabled:
+        return None
+    output_path = stack.root / "config" / "generated" / "systemd" / f"{stack.systemd.service_name}.service"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    header = (
+        "# Generated from config/project/stack.base.yaml and config/local/stack.override.yaml.\n"
+        "# Regenerate with:\n"
+        "#   python -m src.launcher.process_manager generate-configs\n\n"
+    )
+    output_path.write_text(header + build_systemd_config(stack), encoding="utf-8")
+    return output_path
+
+
 def validate_layered_configs(root: str | Path) -> dict[str, Any]:
     llama_base, llama_local, _ = load_llama_swap_source_config(root)
     mcp_base, mcp_local, _ = load_mcp_registry(root)
@@ -902,4 +983,5 @@ def write_generated_configs(root: str | Path) -> dict[str, Path]:
         "litellm": write_litellm_config(root),
         "mcp_client": write_mcp_client_config(root),
         "nginx": write_nginx_config(root),
+        "systemd": write_systemd_config(root),
     }

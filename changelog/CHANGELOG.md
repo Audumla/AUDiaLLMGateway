@@ -209,4 +209,13 @@
 - Fixed _unpack() helper in release_installer.py to use subprocess tar on POSIX, bypassing Python gzip bugs
 - Updated spec-611-linux-install-and-runtime.md with tested status, Python version caveats, and distro notes
 
+### Add automatic systemd service file generation (New Feature)
+- Generated in config/generated/systemd/ during generate-configs
+- Uses absolute paths and detects local user/group
+
+### Integrate nFPM for Linux .deb and .rpm packaging (New Feature)
+- Added nfpm.yaml configuration
+- Updated release-please workflow to build and upload packages
+- Added scripts/postinstall.sh for automated setup
+
 ---

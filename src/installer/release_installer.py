@@ -508,7 +508,25 @@ def install_or_update_from_bundle(bundle_root: Path, install_root: Path, version
     )
     installed_manifest = load_manifest(install_root)
     selected_components = resolve_component_selection(installed_manifest, requested_components, previous_state.get("selected_components") if previous_state else None)
-    component_results = install_components(install_root, installed_manifest, selected_components)
+    new_results = install_components(install_root, installed_manifest, selected_components)
+
+    # Merge results into previous state to preserve variants (like multiple llama.cpp profiles)
+    component_results = (previous_state or {}).get("component_results", {}).copy()
+    for k, v in new_results.items():
+        if k == "llama_cpp" and isinstance(v, dict):
+            prev_cpp = component_results.get("llama_cpp", {})
+            if not isinstance(prev_cpp, dict):
+                prev_cpp = {}
+            variants = prev_cpp.get("variants", {})
+            if not isinstance(variants, dict):
+                variants = {}
+            profile_name = v.get("profile")
+            if profile_name:
+                variants[profile_name] = v
+            component_results["llama_cpp"] = {**v, "variants": variants}
+        else:
+            component_results[k] = v
+
     from src.launcher.config_loader import validate_layered_configs
 
     warnings = validate_layered_configs(install_root)

@@ -1,44 +1,5 @@
 # Changelog
 
-## [0.3.0](https://github.com/Audumla/AUDiaLLMGateway/compare/v0.2.0...v0.3.0) (2026-03-16)
-
-
-### Features
-
-* added linux distros into support ([d81951d](https://github.com/Audumla/AUDiaLLMGateway/commit/d81951d6a0d8739293a58279dc1b58e40a929f0f))
-* initial implementation ([23d92d9](https://github.com/Audumla/AUDiaLLMGateway/commit/23d92d9e2cebcf64ee46e3eb08b5b5f9287439c7))
-
-
-### Bug Fixes
-
-* added llamacpp install ([c99ab35](https://github.com/Audumla/AUDiaLLMGateway/commit/c99ab35b6c64808554d7582d651c93b642bce353))
-* branch renaming ([ba46780](https://github.com/Audumla/AUDiaLLMGateway/commit/ba467807e28fd85417858576ac638430ee33088f))
-* release please added ([c772da7](https://github.com/Audumla/AUDiaLLMGateway/commit/c772da779f6ae7d67a19b513e40b92f885ff23a8))
-* release please update ([6dde159](https://github.com/Audumla/AUDiaLLMGateway/commit/6dde159b89ede2c3b5a5921f933f491e526005b2))
-* update branch naming ([bd5bd95](https://github.com/Audumla/AUDiaLLMGateway/commit/bd5bd95db812e49c21790e7549106cbdb3a4a1dc))
-* updated install logic ([9cb9c31](https://github.com/Audumla/AUDiaLLMGateway/commit/9cb9c3119fd9da826230b7a3eceb5f43a8c59759))
-* updated install scripts ([aecfd52](https://github.com/Audumla/AUDiaLLMGateway/commit/aecfd52c3b5c593445af193bad431ecc992a201d))
-
-## [0.2.0](https://github.com/Audumla/AUDiaLLMGateway/compare/v0.1.0...v0.2.0) (2026-03-15)
-
-
-### Features
-
-* initial implementation ([23d92d9](https://github.com/Audumla/AUDiaLLMGateway/commit/23d92d9e2cebcf64ee46e3eb08b5b5f9287439c7))
-
-
-### Bug Fixes
-
-* added llamacpp install ([c99ab35](https://github.com/Audumla/AUDiaLLMGateway/commit/c99ab35b6c64808554d7582d651c93b642bce353))
-* branch renaming ([ba46780](https://github.com/Audumla/AUDiaLLMGateway/commit/ba467807e28fd85417858576ac638430ee33088f))
-* release please added ([c772da7](https://github.com/Audumla/AUDiaLLMGateway/commit/c772da779f6ae7d67a19b513e40b92f885ff23a8))
-* release please update ([6dde159](https://github.com/Audumla/AUDiaLLMGateway/commit/6dde159b89ede2c3b5a5921f933f491e526005b2))
-* update branch naming ([bd5bd95](https://github.com/Audumla/AUDiaLLMGateway/commit/bd5bd95db812e49c21790e7549106cbdb3a4a1dc))
-* updated install logic ([9cb9c31](https://github.com/Audumla/AUDiaLLMGateway/commit/9cb9c3119fd9da826230b7a3eceb5f43a8c59759))
-* updated install scripts ([aecfd52](https://github.com/Audumla/AUDiaLLMGateway/commit/aecfd52c3b5c593445af193bad431ecc992a201d))
-
-## Changelog
-
 ## Unreleased
 
 ### Scaffolded a native Windows local LLM gateway workspace in AUDiaLLMGateway. (New Feature)
@@ -247,5 +208,14 @@
 - Ubuntu 22.04: Python 3.10 system — PASS (already tested)
 - Fixed _unpack() helper in release_installer.py to use subprocess tar on POSIX, bypassing Python gzip bugs
 - Updated spec-611-linux-install-and-runtime.md with tested status, Python version caveats, and distro notes
+
+### Add automatic systemd service file generation (New Feature)
+- Generated in config/generated/systemd/ during generate-configs
+- Uses absolute paths and detects local user/group
+
+### Integrate nFPM for Linux .deb and .rpm packaging (New Feature)
+- Added nfpm.yaml configuration
+- Updated release-please workflow to build and upload packages
+- Added scripts/postinstall.sh for automated setup
 
 ---
