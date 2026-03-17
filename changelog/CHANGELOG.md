@@ -244,4 +244,11 @@
 ### Fix YAML indentation in release workflow (Bug Fix)
 - Corrected indentation for package job steps which caused a workflow syntax error
 
+### Update spec-001 to include multi-GPU backend install, per-backend llama-swap macros, install-components requirement, Docker smoke tests, and e2e mock test acceptance criteria (Documentation Update)
+- Added goals 11-13 covering multi-GPU variant install, full package-time dependency completion, and CI Docker test requirements
+- Expanded Linux platform scope with RPM/DEB packaging, systemd service, and multi-GPU backend detail
+- Added section 6 subsections for multi-GPU install, per-backend macros, and install components command
+- Added section 7 Package install testing with smoke test and e2e mock test requirements
+- Updated Configuration Model, Implementation Mapping, Acceptance Criteria, and Known Gaps
+
 ---

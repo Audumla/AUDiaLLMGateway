@@ -64,7 +64,11 @@ project:
       selected_profile: auto
       default_profiles:
         windows: windows-vulkan
-        linux: linux-cpu
+        linux:
+          - linux-cpu
+          - linux-vulkan
+          - linux-rocm
+          - linux-cuda
         macos: macos-metal
       profiles:
         windows-vulkan:

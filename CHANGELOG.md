@@ -1,67 +1,5 @@
 # Changelog
 
-## [0.4.9](https://github.com/example/AUDiaLLMGateway/compare/v0.4.8...v0.4.9) (2026-03-17)
-
-
-### Bug Fixes
-
-* distro deployment fixes ([6d6a104](https://github.com/example/AUDiaLLMGateway/commit/6d6a1047d7c35e07dc38a66266c0cb106e848f21))
-
-## [0.4.8](https://github.com/example/AUDiaLLMGateway/compare/v0.4.7...v0.4.8) (2026-03-17)
-
-
-### Bug Fixes
-
-* release and install updates ([abefbfb](https://github.com/example/AUDiaLLMGateway/commit/abefbfbb66ab6f496a685295c0665b927c919bda))
-* release issues ([d30bbbb](https://github.com/example/AUDiaLLMGateway/commit/d30bbbb8660b20b556279951b29e311818432371))
-
-## [0.4.7](https://github.com/example/AUDiaLLMGateway/compare/v0.4.6...v0.4.7) (2026-03-17)
-
-
-### Bug Fixes
-
-* release issues ([c16189d](https://github.com/example/AUDiaLLMGateway/commit/c16189d066e9c963a5410e5b27c5b8b11a050741))
-
-## [0.4.6](https://github.com/example/AUDiaLLMGateway/compare/v0.4.5...v0.4.6) (2026-03-17)
-
-
-### Bug Fixes
-
-* clean release ([6d51333](https://github.com/example/AUDiaLLMGateway/commit/6d51333e086d50188ca2e659bde887774dbc1f0b))
-* release problems ([d7eef0a](https://github.com/example/AUDiaLLMGateway/commit/d7eef0a1f255ef9fba8f2cdc94b7620204acec78))
-
-## [0.4.5](https://github.com/example/AUDiaLLMGateway/compare/v0.4.4...v0.4.5) (2026-03-17)
-
-
-### Bug Fixes
-
-* agent release errors ([4977b4c](https://github.com/example/AUDiaLLMGateway/commit/4977b4cea7e9c5681eaf11d9418e6fdb2f44adb1))
-
-## [0.4.4](https://github.com/example/AUDiaLLMGateway/compare/v0.4.3...v0.4.4) (2026-03-17)
-
-
-### Bug Fixes
-
-* agent syntax errors ([8a8be76](https://github.com/example/AUDiaLLMGateway/commit/8a8be76978ea359c4a09dc1eb685c4d6a8faa62a))
-
-## [0.4.3](https://github.com/example/AUDiaLLMGateway/compare/v0.4.2...v0.4.3) (2026-03-17)
-
-
-### Bug Fixes
-
-* release issues ([a4c523a](https://github.com/example/AUDiaLLMGateway/commit/a4c523abc8625d85f811d6e16dac0058adc6da73))
-
-## [0.4.2](https://github.com/example/AUDiaLLMGateway/compare/v0.4.1...v0.4.2) (2026-03-17)
-
-
-### Bug Fixes
-
-* explicit nfpm file list and workflow cleanup ([3b23fd7](https://github.com/example/AUDiaLLMGateway/commit/3b23fd76cdf0050152dea534ccecf139dd45b653))
-* release syntax error ([593a5fd](https://github.com/example/AUDiaLLMGateway/commit/593a5fd02e0ed6b45763d0cb9e6e3224b719702a))
-* release workflow indentation ([0b67664](https://github.com/example/AUDiaLLMGateway/commit/0b67664ebd008420bc5aead6a5f19448b2e5a09c))
-
-## Changelog
-
 ## Unreleased
 
 ### Scaffolded a native Windows local LLM gateway workspace in AUDiaLLMGateway. (New Feature)
@@ -305,5 +243,12 @@
 
 ### Fix YAML indentation in release workflow (Bug Fix)
 - Corrected indentation for package job steps which caused a workflow syntax error
+
+### Update spec-001 to include multi-GPU backend install, per-backend llama-swap macros, install-components requirement, Docker smoke tests, and e2e mock test acceptance criteria (Documentation Update)
+- Added goals 11-13 covering multi-GPU variant install, full package-time dependency completion, and CI Docker test requirements
+- Expanded Linux platform scope with RPM/DEB packaging, systemd service, and multi-GPU backend detail
+- Added section 6 subsections for multi-GPU install, per-backend macros, and install components command
+- Added section 7 Package install testing with smoke test and e2e mock test requirements
+- Updated Configuration Model, Implementation Mapping, Acceptance Criteria, and Known Gaps
 
 ---

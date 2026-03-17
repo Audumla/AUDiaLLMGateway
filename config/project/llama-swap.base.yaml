@@ -7,8 +7,11 @@ logLevel: info
 startPort: 41000
 
 macros:
-  llama-server-rocm: "llama-server"
   llama-server: "llama-server"
+  llama-server-cpu: "llama-server"
+  llama-server-rocm: "llama-server"
+  llama-server-cuda: "llama-server"
+  llama-server-vulkan: "llama-server"
   model-path: "--model models"
   mmproj-path: "--mmproj models"
 

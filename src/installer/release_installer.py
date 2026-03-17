@@ -238,17 +238,51 @@ def ensure_llama_swap(root: Path) -> dict[str, Any]:
     return {"mode": "manual", "path": ""}
 
 
-def ensure_llama_cpp(root: Path) -> dict[str, Any]:
-    from src.launcher.config_loader import load_stack_config
+def _resolve_llama_cpp_profiles(settings: dict[str, Any], system: str) -> list[tuple[str, dict[str, Any]]]:
+    """Return ordered list of (profile_name, profile_dict) to install for the given platform.
 
-    stack = load_stack_config(root)
-    settings = stack.component_settings.get("llama_cpp", {})
-    provider = str(settings.get("provider", "github_release"))
-    if provider != "github_release":
-        raise RuntimeError(f"Unsupported llama.cpp provider: {provider}")
+    ``default_profiles.<system>`` may be a single string or a list of profile names.
+    Profiles whose ``platform`` field doesn't match the current system are silently skipped.
+    """
+    profiles = settings.get("profiles", {})
+    if not isinstance(profiles, dict) or not profiles:
+        raise RuntimeError("llama.cpp settings do not define any install profiles")
 
-    system = detect_platform()
-    profile_name, profile = resolve_llama_cpp_profile(settings, system)
+    selected = settings.get("selected_profile", "auto")
+    if str(selected).strip() in ("", "auto"):
+        defaults = settings.get("default_profiles", {})
+        selected = defaults.get(system, "")
+
+    if isinstance(selected, str):
+        selected = [selected] if selected.strip() else []
+    elif not isinstance(selected, list):
+        selected = [str(selected)]
+
+    if not selected:
+        raise RuntimeError(f"llama.cpp settings do not define a default profile for platform '{system}'")
+
+    result: list[tuple[str, dict[str, Any]]] = []
+    for name in selected:
+        name = str(name).strip()
+        p = profiles.get(name)
+        if not isinstance(p, dict):
+            print(f"  [warn] llama.cpp profile '{name}' not defined — skipping", flush=True)
+            continue
+        pp = str(p.get("platform", "")).strip()
+        if pp and pp != system:
+            continue
+        result.append((name, p))
+    return result
+
+
+def _install_one_llama_cpp_profile(
+    root: Path,
+    settings: dict[str, Any],
+    profile_name: str,
+    profile: dict[str, Any],
+    system: str,
+) -> dict[str, Any]:
+    """Download, extract, and install a single llama.cpp build profile."""
     backend = str(profile.get("backend", ""))
     version = str(profile.get("version", "latest"))
     owner = str(settings.get("repo_owner", "ggml-org"))
@@ -262,20 +296,6 @@ def ensure_llama_cpp(root: Path) -> dict[str, Any]:
         raise RuntimeError(f"No asset-match tokens configured for llama.cpp profile '{profile_name}'")
     sidecar_files = [str(item) for item in profile.get("sidecar_files", [])]
     copy_sidecar_to_binary_dir = bool(settings.get("copy_sidecar_to_binary_dir", True))
-
-    # Fast path: if the executable is already available in PATH (e.g. system package or test stub)
-    found_in_path = shutil.which(executable_name)
-    if found_in_path:
-        return {
-            "provider": "path",
-            "profile": profile_name,
-            "version": "system",
-            "backend": backend,
-            "install_dir": str(Path(found_in_path).parent.parent),
-            "asset_name": "",
-            "executable_path": found_in_path,
-            "copied_sidecars": [],
-        }
 
     metadata = get_release_metadata(owner, repo, version)
     tag = str(metadata.get("tag_name", version))
@@ -311,8 +331,8 @@ def ensure_llama_cpp(root: Path) -> dict[str, Any]:
                 shutil.copy2(source_path, target_path)
                 copied_sidecars.append(str(target_path))
 
-    result = {
-        "provider": provider,
+    result: dict[str, Any] = {
+        "provider": "github_release",
         "profile": profile_name,
         "version": tag,
         "backend": backend,
@@ -324,6 +344,62 @@ def ensure_llama_cpp(root: Path) -> dict[str, Any]:
     if backend == "rocm":
         result["rocm_executable_path"] = str(executable_path)
     return result
+
+
+def ensure_llama_cpp(root: Path) -> dict[str, Any]:
+    from src.launcher.config_loader import load_stack_config
+
+    stack = load_stack_config(root)
+    settings = stack.component_settings.get("llama_cpp", {})
+    provider = str(settings.get("provider", "github_release"))
+    if provider != "github_release":
+        raise RuntimeError(f"Unsupported llama.cpp provider: {provider}")
+
+    system = detect_platform()
+    executable_name = str(settings.get("executable_names", {}).get(
+        system, "llama-server.exe" if system == "windows" else "llama-server"
+    ))
+
+    # Fast path: if executable is already in PATH (system package or test stub)
+    found_in_path = shutil.which(executable_name)
+    if found_in_path:
+        return {
+            "provider": "path",
+            "profile": "system",
+            "version": "system",
+            "backend": "cpu",
+            "install_dir": str(Path(found_in_path).parent.parent),
+            "asset_name": "",
+            "executable_path": found_in_path,
+            "copied_sidecars": [],
+            "variants": {"system": {
+                "provider": "path",
+                "profile": "system",
+                "version": "system",
+                "backend": "cpu",
+                "executable_path": found_in_path,
+            }},
+        }
+
+    profiles_to_install = _resolve_llama_cpp_profiles(settings, system)
+    installed_variants: dict[str, Any] = {}
+    primary_result: dict[str, Any] | None = None
+
+    for pname, profile in profiles_to_install:
+        try:
+            print(f"  Installing llama.cpp profile: {pname}", flush=True)
+            r = _install_one_llama_cpp_profile(root, settings, pname, profile, system)
+            installed_variants[pname] = r
+            # Prefer the cpu build as the default llama-server; otherwise first success
+            if primary_result is None or str(r.get("backend", "")) == "cpu":
+                primary_result = r
+        except Exception as exc:
+            print(f"  [warn] llama.cpp profile '{pname}' skipped: {exc}", flush=True)
+
+    if primary_result is None:
+        raise RuntimeError("No llama.cpp profiles could be installed")
+
+    return {**primary_result, "variants": installed_variants}
 
 
 def resolve_llama_cpp_profile(settings: dict[str, Any], system: str) -> tuple[str, dict[str, Any]]:
@@ -512,6 +588,26 @@ def write_state(root: Path, payload: dict[str, Any]) -> Path:
     return path
 
 
+def _merge_llama_cpp_result(previous: dict[str, Any], new: dict[str, Any]) -> dict[str, Any]:
+    """Merge a new llama_cpp installer result into the accumulated state dict.
+
+    Preserves all previously-installed variants and adds/updates with new ones.
+    The top-level fields (executable_path, profile, etc.) come from ``new``.
+    """
+    if not isinstance(previous, dict):
+        previous = {}
+    merged_variants: dict[str, Any] = dict(previous.get("variants", {}) or {})
+    # Absorb all variants reported by the new result
+    for vname, vinfo in (new.get("variants", {}) or {}).items():
+        merged_variants[vname] = {k: v for k, v in vinfo.items() if k != "variants"}
+    # Ensure the primary profile is also in variants
+    primary = new.get("profile")
+    if primary and primary not in merged_variants:
+        merged_variants[primary] = {k: v for k, v in new.items() if k != "variants"}
+    top = {k: v for k, v in new.items() if k != "variants"}
+    return {**top, "variants": merged_variants}
+
+
 def install_or_update_from_bundle(bundle_root: Path, install_root: Path, version: str, requested_components: list[str] | None, previous_state: dict[str, Any] | None = None) -> dict[str, Any]:
     manifest = load_manifest(bundle_root)
     sync_release_tree(
@@ -528,16 +624,9 @@ def install_or_update_from_bundle(bundle_root: Path, install_root: Path, version
     component_results = (previous_state or {}).get("component_results", {}).copy()
     for k, v in new_results.items():
         if k == "llama_cpp" and isinstance(v, dict):
-            prev_cpp = component_results.get("llama_cpp", {})
-            if not isinstance(prev_cpp, dict):
-                prev_cpp = {}
-            variants = prev_cpp.get("variants", {})
-            if not isinstance(variants, dict):
-                variants = {}
-            profile_name = v.get("profile")
-            if profile_name:
-                variants[profile_name] = v
-            component_results["llama_cpp"] = {**v, "variants": variants}
+            component_results["llama_cpp"] = _merge_llama_cpp_result(
+                component_results.get("llama_cpp", {}), v
+            )
         else:
             component_results[k] = v
 
@@ -626,16 +715,9 @@ def install_components_on_root(root: str | Path, requested_components: list[str]
     component_results = previous_state.get("component_results", {}).copy()
     for k, v in new_results.items():
         if k == "llama_cpp" and isinstance(v, dict):
-            prev_cpp = component_results.get("llama_cpp", {})
-            if not isinstance(prev_cpp, dict):
-                prev_cpp = {}
-            variants = prev_cpp.get("variants", {})
-            if not isinstance(variants, dict):
-                variants = {}
-            profile_name = v.get("profile")
-            if profile_name:
-                variants[profile_name] = v
-            component_results["llama_cpp"] = {**v, "variants": variants}
+            component_results["llama_cpp"] = _merge_llama_cpp_result(
+                component_results.get("llama_cpp", {}), v
+            )
         else:
             component_results[k] = v
 

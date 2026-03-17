@@ -673,19 +673,39 @@ def build_llama_swap_config(stack: StackConfig) -> dict[str, Any]:
     macros = merged.setdefault("macros", {})
     if "server-args" not in local_macros:
         macros["server-args"] = f"--port ${{PORT}} --host {stack.network.backend_bind_host}"
-    executable_path = llama_cpp_state.get("executable_path")
-    if executable_path and "llama-server" not in local_macros:
-        macros["llama-server"] = str(executable_path)
-    rocm_executable_path = llama_cpp_state.get("rocm_executable_path")
-    if rocm_executable_path and "llama-server-rocm" not in local_macros:
-        macros["llama-server-rocm"] = str(rocm_executable_path)
-
-    # Automatically generate variant-specific macros for every installed profile
+    # Generate per-backend macros from all installed variants
+    # e.g. llama-server-cpu, llama-server-rocm, llama-server-vulkan, llama-server-cuda
     variants = llama_cpp_state.get("variants", {})
     for profile_name, info in variants.items():
-        macro_name = f"llama-server-{profile_name}"
-        if macro_name not in local_macros:
-            macros[macro_name] = str(info.get("executable_path", ""))
+        backend = str(info.get("backend", "")).strip() or profile_name
+        exe = str(info.get("executable_path", ""))
+        if not exe:
+            continue
+        # Backend-named macro (llama-server-rocm, llama-server-vulkan, etc.)
+        backend_macro = f"llama-server-{backend}"
+        if backend_macro not in local_macros:
+            macros[backend_macro] = exe
+        # Also add rocm_executable_path alias for backward compat
+        if backend == "rocm" and "rocm_executable_path" not in llama_cpp_state:
+            llama_cpp_state["rocm_executable_path"] = exe
+
+    # llama-server (default) — prefer the cpu variant, then primary executable_path
+    executable_path = llama_cpp_state.get("executable_path")
+    if "llama-server" not in local_macros:
+        cpu_exe = next(
+            (str(i.get("executable_path", "")) for i in variants.values()
+             if str(i.get("backend", "")) == "cpu" and i.get("executable_path")),
+            None,
+        )
+        if cpu_exe:
+            macros["llama-server"] = cpu_exe
+        elif executable_path:
+            macros["llama-server"] = str(executable_path)
+
+    # llama-server-rocm backward compat from top-level state field
+    rocm_executable_path = llama_cpp_state.get("rocm_executable_path")
+    if rocm_executable_path and "llama-server-rocm" not in local_macros and "llama-server-rocm" not in macros:
+        macros["llama-server-rocm"] = str(rocm_executable_path)
 
     models_state = install_state.get("component_results", {}).get("models", {})
     model_dir = models_state.get("model_dir", "")
