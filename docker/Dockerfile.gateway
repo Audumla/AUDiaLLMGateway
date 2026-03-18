@@ -1,8 +1,12 @@
 FROM python:3.11-slim
 
 WORKDIR /app
+
+# Install system dependencies including curl for health checks
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt litellm
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src/ ./src/
 COPY config/project/ ./config/project/
@@ -12,7 +16,6 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:4000/health || exit 1
 
 # This image runs our config generator before starting LiteLLM
-# Use a shell script as entrypoint to handle the command sequence
 RUN echo '#!/bin/sh\npython -m src.launcher.process_manager --root . generate-configs && exec litellm --config /app/config/generated/litellm/litellm.config.yaml --port 4000' > /app/entrypoint.sh && \
     chmod +x /app/entrypoint.sh
 
