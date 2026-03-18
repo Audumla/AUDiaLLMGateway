@@ -1,0 +1,37 @@
+name: Tests
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Runs at 00:00 UTC every day
+  workflow_dispatch:      # Allows manual triggering from the Actions tab
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest
+      - name: Run tests
+        run: pytest
+
+  smoke-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        distro: [tumbleweed, ubuntu, debian, fedora, rocky]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build and run smoke test (${{ matrix.distro }})
+        run: |
+          docker build -f tests/docker/Dockerfile.${{ matrix.distro }} \
+            -t audia-smoke-${{ matrix.distro }} .
+          docker run --rm audia-smoke-${{ matrix.distro }}
