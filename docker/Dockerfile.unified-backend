@@ -1,0 +1,34 @@
+# Use NVIDIA CUDA as the base
+FROM nvidia/cuda:12.2.0-base-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y \
+    curl ca-certificates wget gnupg2 libvulkan1 mesa-vulkan-drivers \
+    vulkan-tools clinfo procps libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add ROCm Support
+RUN mkdir -p /etc/apt/keyrings && \
+    wget -qO - https://repo.radeon.com/rocm/rocm.gpg.key | gpg --dearmor -o /etc/apt/keyrings/rocm.gpg && \
+    echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/rocm/apt/6.0 jammy main" > /etc/apt/sources.list.d/rocm.list && \
+    echo 'Package: *\nPin: release o=repo.radeon.com\nPin-Priority: 1001' > /etc/apt/preferences.d/rocm-pin && \
+    apt-get update && \
+    apt-get install -y rocminfo rocm-hip-runtime && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install a known-good static llama-server binary
+RUN curl -L -o /usr/local/bin/llama-server https://github.com/ggml-org/llama.cpp/releases/download/b4632/llama-b4632-bin-ubuntu-x64.tar.gz && \
+    mkdir -p /tmp/llama && tar -xzf /usr/local/bin/llama-server -C /tmp/llama && \
+    cp /tmp/llama/build/bin/llama-server /usr/local/bin/llama-server && \
+    chmod +x /usr/local/bin/llama-server && \
+    rm -rf /tmp/llama
+
+# Create a permanent shim for llama-swap
+RUN echo '#!/bin/sh\necho "Llama-swap shim starting..."\nexec /usr/local/bin/llama-server "$@"' > /usr/local/bin/llama-swap && \
+    chmod +x /usr/local/bin/llama-swap
+
+WORKDIR /app
+EXPOSE 41080
+
+# Basic entrypoint for testing
+ENTRYPOINT ["/usr/local/bin/llama-swap", "--help"]
