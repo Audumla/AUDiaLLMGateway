@@ -810,7 +810,7 @@ def build_mcp_client_config(stack: StackConfig) -> dict[str, Any]:
 
 
 def build_nginx_landing_page(stack: StackConfig) -> str:
-    host = stack.network.nginx_host
+    host = stack.network.public_host
     port = stack.network.nginx_port
     base = f"http://{host}:{port}"
     return f"""<!DOCTYPE html>
