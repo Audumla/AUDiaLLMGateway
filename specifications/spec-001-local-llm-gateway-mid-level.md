@@ -13,6 +13,15 @@ The project has transitioned to a Docker-first deployment model to provide consi
 5.  **Watcher**: `audia-watcher` (Handles config regeneration and container restarts).
 6.  **Reverse Proxy**: `nginx` (Optional, can be externalized).
 
+### Deployment Profiles
+
+The project provides several pre-configured Docker Compose examples in `docker/examples/`:
+
+- **Universal**: `docker-compose.yml` (Root) - Auto-detects NVIDIA/AMD and handles both.
+- **NVIDIA-Only**: `docker/examples/docker-compose.nvidia.yml` - Minimal setup for CUDA.
+- **AMD-Only**: `docker/examples/docker-compose.amd.yml` - Minimal setup for ROCm.
+- **External Proxy**: `docker/examples/docker-compose.external-proxy.yml` - For integration with host-level Traefik or Nginx.
+
 ### Hot Reloading Workflow
 
 1.  User edits `./config/local/*.yaml`.
@@ -26,4 +35,4 @@ The project has transitioned to a Docker-first deployment model to provide consi
 
 The stack is configured to expose:
 - `/dev/kfd` and `/dev/dri` for AMD (ROCm/Vulkan).
-- `nvidia` driver capabilities for NVIDIA
+- `nvidia` driver capabilities for NVIDIA (CUDA).
