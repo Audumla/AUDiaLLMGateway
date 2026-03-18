@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.5.0](https://github.com/Audumla/AUDiaLLMGateway/compare/v0.4.12...v0.5.0) (2026-03-18)
+
+
+### Features
+
+* docker enabled ([11fe981](https://github.com/Audumla/AUDiaLLMGateway/commit/11fe9810796725b212ee8cda906af1d8e56ea697))
+
+
+### Bug Fixes
+
+* expose all proxied endpoints without auth and fix redirect rewriting ([a8137e8](https://github.com/Audumla/AUDiaLLMGateway/commit/a8137e8a372bb354215c0a39a1af3b48a0e0c31e))
+* inject litellm auth header in nginx and restore master_key config ([aed96a3](https://github.com/Audumla/AUDiaLLMGateway/commit/aed96a3b433528dcb387bac60b2bae674835f5f7))
+* lifecycle management updates ([c84ab38](https://github.com/Audumla/AUDiaLLMGateway/commit/c84ab385e73956f73e57ffd8258223187ce3c0e4))
+* normalize model file paths to forward slashes for Linux compatibility ([7af3142](https://github.com/Audumla/AUDiaLLMGateway/commit/7af3142f1a02a960495a3cc276498dc2ad0c9605))
+* pin backend service hosts to 127.0.0.1 in stack.base.yaml ([426a707](https://github.com/Audumla/AUDiaLLMGateway/commit/426a7074007777b31c2fb17d95adea94052edeec))
+* remove master_key from litellm config to allow no_auth to take effect ([3a06c6c](https://github.com/Audumla/AUDiaLLMGateway/commit/3a06c6c7eef06b30620ca8a4cca9243eb81716c2))
+* use public_host for nginx landing page links ([729a741](https://github.com/Audumla/AUDiaLLMGateway/commit/729a74142f44d9884ca6123bf1a0be02f7050dce))
+
+
+### Documentation
+
+* update spec-002 and changelog for nginx proxy fixes ([55b3b8d](https://github.com/Audumla/AUDiaLLMGateway/commit/55b3b8d156a5adb5eaa7e0e7e8a2dbe2c38e9020))
+
+## Changelog
+
 ## Unreleased
 
 ### Scaffolded a native Windows local LLM gateway workspace in AUDiaLLMGateway. (New Feature)
