@@ -786,6 +786,7 @@ def build_litellm_config(stack: StackConfig) -> dict[str, Any]:
         },
         "general_settings": {
             "disable_spend_logs": True,
+            "no_auth": True,
         },
         "router_settings": {},
     }
@@ -855,6 +856,11 @@ def build_nginx_landing_page(stack: StackConfig) -> str:
         <td>llama-swap model router &mdash; direct backend access
           (<code>{stack.network.llamaswap_host}:{stack.network.llamaswap_port}</code>)</td>
         <td><span class="tag">Proxy</span></td>
+      </tr>
+      <tr>
+        <td><a href="{base}/ui/">/ui/</a></td>
+        <td>LiteLLM admin UI</td>
+        <td><span class="tag">UI</span></td>
       </tr>
       <tr>
         <td><a href="{base}/health">/health</a></td>
@@ -959,6 +965,8 @@ http {{
         location /llamaswap/ {{
             rewrite ^/llamaswap/(.*)$ /$1 break;
             proxy_pass http://llamaswap_upstream;
+            proxy_redirect ~^/(.+)$ /llamaswap/$1;
+            proxy_redirect / /llamaswap/;
             proxy_http_version 1.1;
             proxy_set_header Host $host;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -975,6 +983,23 @@ http {{
 
         location = /llamaswap-health {{
             proxy_pass http://llamaswap_upstream/health;
+        }}
+
+        location = /ui {{
+            return 301 /ui/;
+        }}
+
+        location /ui/ {{
+            proxy_pass http://litellm_upstream;
+            proxy_redirect http://{stack.network.litellm_host}:{stack.network.litellm_port}/ /;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
+            proxy_buffering off;
+            proxy_request_buffering off;
         }}
 
         location = / {{
