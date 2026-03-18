@@ -783,10 +783,11 @@ def build_litellm_config(stack: StackConfig) -> dict[str, Any]:
 
     return {
         "model_list": model_list,
-        "litellm_settings": {},
+        "litellm_settings": {
+            "master_key": f"os.environ/{stack.litellm.master_key_env}",
+        },
         "general_settings": {
             "disable_spend_logs": True,
-            "no_auth": True,
         },
         "router_settings": {},
     }
@@ -884,7 +885,21 @@ def build_nginx_landing_page(stack: StackConfig) -> str:
 """
 
 
+def _read_local_env_var(stack: StackConfig, var_name: str) -> str:
+    """Read a variable from config/local/env (KEY=value format). Returns empty string if not found."""
+    env_path = stack.root / "config" / "local" / "env"
+    if not env_path.exists():
+        return ""
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line.startswith(f"{var_name}="):
+            return line[len(var_name) + 1:].strip()
+    return ""
+
+
 def build_nginx_config(stack: StackConfig) -> str:
+    litellm_key = _read_local_env_var(stack, stack.litellm.master_key_env)
+    litellm_auth_header = f'\n            proxy_set_header Authorization "Bearer {litellm_key}";' if litellm_key else ""
     return f"""pid .runtime/nginx.pid;
 error_log .runtime/logs/nginx-error.log warn;
 
@@ -936,7 +951,7 @@ http {{
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
             proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection $connection_upgrade;
+            proxy_set_header Connection $connection_upgrade;{litellm_auth_header}
             proxy_buffering off;
             proxy_request_buffering off;
         }}
@@ -953,7 +968,7 @@ http {{
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
             proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection $connection_upgrade;
+            proxy_set_header Connection $connection_upgrade;{litellm_auth_header}
             proxy_buffering off;
             proxy_request_buffering off;
         }}
@@ -979,6 +994,8 @@ http {{
 
         location = /health {{
             proxy_pass http://litellm_upstream/health;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;{litellm_auth_header}
         }}
 
         location = /llamaswap-health {{
@@ -997,7 +1014,7 @@ http {{
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
             proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection $connection_upgrade;
+            proxy_set_header Connection $connection_upgrade;{litellm_auth_header}
             proxy_buffering off;
             proxy_request_buffering off;
         }}
