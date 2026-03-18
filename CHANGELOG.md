@@ -1,14 +1,5 @@
 # Changelog
 
-## [0.4.11](https://github.com/Audumla/AUDiaLLMGateway/compare/v0.4.10...v0.4.11) (2026-03-17)
-
-
-### Bug Fixes
-
-* installation fixes ([2b46d50](https://github.com/Audumla/AUDiaLLMGateway/commit/2b46d50cf7c6e195f576103f75c98354525a55ff))
-
-## Changelog
-
 ## Unreleased
 
 ### Scaffolded a native Windows local LLM gateway workspace in AUDiaLLMGateway. (New Feature)
@@ -266,5 +257,21 @@
 - scripts/postinstall.sh: replaced set -e with explicit error handling — component download failure is non-fatal warning, stack and generate failures abort
 - scripts/postinstall.sh: added systemctl start audia-gateway at end so service is running immediately after install
 - tests/docker/smoke-entrypoint.sh: extended section 7 to verify EnvironmentFile directive in service unit, config/local/env creation, and LITELLM_MASTER_KEY presence
+
+### Seed config/local/stack.override.yaml and set world-writable permissions on config/local/ so users can customise without sudo (Build / Packaging)
+- scripts/postinstall.sh: create config/local/stack.override.yaml with commented examples (ports, nginx) if not present; chmod 666
+- scripts/postinstall.sh: chmod 777 config/local/ so any local user can edit or add override files without sudo
+- scripts/postinstall.sh: chmod 600 config/local/env to protect the master key credential
+- tests/docker/smoke-entrypoint.sh: verify stack.override.yaml is seeded and has 666 permissions; verify config/local/ has 777
+
+### Add spec-002 covering deployment-agnostic model catalog, config auto-regen, selective component reload, llama-swap watch mode, and interactive component selection (Documentation Update)
+- specifications/spec-002-model-catalog-and-config-lifecycle.md: new mid-level spec
+- Model catalog: formalises multi-deployment-target schema (llama_swap, vllm, unsloth, future), backend-agnostic load groups, deployment-enabled flags, framework registry in stack config
+- Config lifecycle: deployment-aware generator skips frameworks not in install-state; records generate-report.json, generate-hashes.json, runtime-bindings.json
+- Auto-detection: watcher polls source config mtimes, diffs generated outputs, applies per-component reload (litellm restart, nginx reload, llama-swap watch, port-change restart)
+- llama-swap watch: always launched with --watch; model changes picked up without process restart; restart only for substrate-level changes
+- Component selection: all components default_enabled true; interactive menu in bootstrap; persisted to config/local/components.yaml; package installs use platform-aware defaults
+- Port management: watcher detects binding changes, restarts affected component, updates runtime-bindings.json; downstream configs regenerated automatically
+- specifications/spec-001: updated Next Specs section to reference spec-002
 
 ---

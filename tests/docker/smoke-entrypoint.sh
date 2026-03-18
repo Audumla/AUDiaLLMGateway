@@ -189,6 +189,22 @@ grep -q "LITELLM_MASTER_KEY" "$INSTALL_DIR/config/local/env" 2>/dev/null \
     && ok "LITELLM_MASTER_KEY present in config/local/env" \
     || fail "LITELLM_MASTER_KEY NOT found in config/local/env"
 
+# stack.override.yaml must be seeded and world-writable
+[ -f "$INSTALL_DIR/config/local/stack.override.yaml" ] \
+    && ok "config/local/stack.override.yaml seeded" \
+    || fail "config/local/stack.override.yaml NOT created by postinstall"
+
+OVERRIDE_PERMS=$(stat -c '%a' "$INSTALL_DIR/config/local/stack.override.yaml" 2>/dev/null || echo "")
+[ "$OVERRIDE_PERMS" = "666" ] \
+    && ok "stack.override.yaml is world-writable (666)" \
+    || fail "stack.override.yaml permissions are '$OVERRIDE_PERMS', expected 666"
+
+# config/local/ must be world-writable so users can edit without sudo
+LOCAL_PERMS=$(stat -c '%a' "$INSTALL_DIR/config/local" 2>/dev/null || echo "")
+[ "$LOCAL_PERMS" = "777" ] \
+    && ok "config/local/ is world-writable (777)" \
+    || fail "config/local/ permissions are '$LOCAL_PERMS', expected 777"
+
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------

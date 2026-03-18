@@ -492,12 +492,12 @@ Not yet verified against live local inference:
 
 ## Next Specs
 
-Likely follow-on specs:
-
-1. Low-level `llama-swap` catalog and launch argument specification
-2. Windows implementation detail specification
-3. Linux deployment options and migration specification
-4. vLLM runtime and integration specification
-5. LiteLLM gateway behavior and routing policy specification
-6. MCP integration specification
-7. Observability and logging specification
+1. **Spec 002** — Model catalog and config lifecycle (deployment routing, auto-regen,
+   auto-reload, llama-swap `--watch`, component selection menu) — `spec-002-model-catalog-and-config-lifecycle.md`
+2. Low-level `llama-swap` catalog and launch argument specification
+3. Windows implementation detail specification
+4. Linux deployment options and migration specification
+5. vLLM runtime and integration specification
+6. LiteLLM gateway behavior and routing policy specification
+7. MCP integration specification
+8. Observability and logging specification
