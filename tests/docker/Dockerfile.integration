@@ -1,0 +1,63 @@
+# Integration test image: builds the gateway stack and runs real inference tests
+# with a tiny GGUF model (SmolLM2-135M) that runs on CPU.
+#
+# Build:
+#   docker build --network=host -f tests/docker/Dockerfile.integration -t audia-integration .
+#
+# Run:
+#   docker run --rm -e LITELLM_MASTER_KEY=sk-test audia-integration
+
+# Stage 1: Build the DEB package
+FROM ubuntu:24.04 AS builder
+RUN apt-get update && apt-get install -y curl
+RUN echo 'deb [trusted=yes] https://repo.goreleaser.com/apt/ /' \
+        > /etc/apt/sources.list.d/goreleaser.list && \
+    apt-get update && apt-get install -y nfpm
+COPY . /src
+WORKDIR /src
+RUN VERSION=0.0.0-integration nfpm pkg --packager deb --target /audia-llm-gateway.deb
+
+# Stage 2: Integration test runner
+FROM ubuntu:24.04
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y \
+    curl python3 python3-venv python3-pip wget jq \
+    && rm -rf /var/lib/apt/lists/*
+
+# Stub systemctl so postinstall.sh doesn't fail in Docker
+RUN printf '#!/bin/sh\necho "[stub] systemctl $*"\nexit 0\n' > /usr/bin/systemctl && \
+    chmod +x /usr/bin/systemctl
+
+# Download llama.cpp CPU binary (small, no GPU needed for integration testing)
+ARG LLAMA_VERSION=b4632
+RUN ASSET="llama-${LLAMA_VERSION}-bin-ubuntu-x64.zip" && \
+    echo "Downloading llama.cpp ${LLAMA_VERSION}..." && \
+    curl -L -o /tmp/llama.zip \
+        "https://github.com/ggml-org/llama.cpp/releases/download/${LLAMA_VERSION}/${ASSET}" && \
+    unzip /tmp/llama.zip -d /tmp/llama && \
+    find /tmp/llama -name "llama-server" -exec cp {} /usr/local/bin/llama-server \; && \
+    chmod +x /usr/local/bin/llama-server && \
+    rm -rf /tmp/llama.zip /tmp/llama
+
+# Download llama-swap
+RUN curl -L -o /usr/local/bin/llama-swap \
+    https://github.com/mostlygeek/llama-swap/releases/latest/download/llama-swap-linux-amd64 && \
+    chmod +x /usr/local/bin/llama-swap
+
+# Stub nvidia-related commands to prevent detection failures
+RUN printf '#!/bin/sh\necho "[stub] nvidia-smi $*"\nexit 1\n' > /usr/bin/nvidia-smi && \
+    chmod +x /usr/bin/nvidia-smi
+
+# Install the gateway package
+COPY --from=builder /audia-llm-gateway.deb /tmp/audia-llm-gateway.deb
+RUN apt-get install -y /tmp/audia-llm-gateway.deb
+
+# Copy test entrypoint
+COPY tests/docker/integration-entrypoint.sh /integration-entrypoint.sh
+RUN chmod +x /integration-entrypoint.sh
+
+ENV LITELLM_MASTER_KEY=sk-integration-test
+ENV INSTALL_DIR=/opt/AUDiaLLMGateway
+
+ENTRYPOINT ["bash", "/integration-entrypoint.sh"]

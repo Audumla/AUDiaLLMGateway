@@ -1,59 +1,110 @@
 # Architecture
 
+## Deployment paths
+
+Two paths lead to the same runtime stack. Choose based on your environment.
+
+**Docker (Linux — recommended):**
+
+```text
+docker compose up -d
+  └─> audia-gateway container   (LiteLLM + config generator)
+  └─> backend-swappable         (llama-swap + llama.cpp, auto-provisioned)
+  └─> nginx container           (optional reverse proxy)
+```
+
+**Native install (Windows / macOS / Linux):**
+
+```text
+bootstrap script
+  └─> release_installer.py
+        └─> downloads llama.cpp, llama-swap, nginx from GitHub releases
+        └─> installs Python deps into .venv
+        └─> seeds config/local/ files
+        └─> writes state/install-state.json
+```
+
+After native install, `AUDiaLLMGateway.sh` / `.ps1` manages start/stop.
+
+---
+
 ## Runtime topology
 
+```text
 Client or tool
--> optional nginx
--> LiteLLM
--> llama-swap
--> local llama-server profiles from an installed llama.cpp runtime
+  └─> nginx (optional, port 8080)
+        └─> LiteLLM (port 4000)
+              └─> llama-swap (port 41080)
+                    └─> llama-server processes (llama.cpp)
+```
 
-Optional MCP path later:
+Optional MCP path (scaffolded, not production-complete):
 
+```text
 Client or tool
--> LiteLLM MCP endpoint
--> configured MCP servers
+  └─> LiteLLM MCP endpoint
+        └─> configured MCP servers
+```
+
+---
 
 ## Config topology
 
-Project layer:
+Three layers merge at generation time. The config generator reads project base and
+local overrides, then writes the generated layer.
+
+**Project layer** (`config/project/`):
 
 - shipped in GitHub releases
-- updated by release installer
-- safe to replace during updates
+- updated by the release installer on each update
+- safe to replace — do not edit directly
 
-Local layer:
+**Local layer** (`config/local/`):
 
-- machine-owned
-- never overwritten by release update
-- used for paths, local model additions, site-specific overrides, and optional component choices
+- machine-owned; managed by you
+- never overwritten by a release update
+- holds paths, local model additions, port overrides, optional component choices
 
-Generated layer:
+**Generated layer** (`config/generated/`):
 
-- derived from project plus local config
-- safe to regenerate at any time
+- derived from project + local config
+- safe to regenerate at any time with `generate`
+- grouped by component: `llama-swap/`, `litellm/`, `nginx/`, `mcp/`
 
-## Installer topology
+---
 
+## Installer topology (native path)
+
+```text
 Bootstrap script
--> GitHub release archive
--> unpack bundle
--> sync managed files
--> preserve local files
--> install required and selected components
--> validate layered config
--> write install state
+  └─> download GitHub release archive
+  └─> unpack bundle
+  └─> sync managed files (project layer)
+  └─> preserve local files (local layer)
+  └─> install required and selected components
+        └─> python_runtime
+        └─> gateway_python_deps (.venv)
+        └─> llama_cpp (versioned binary, platform profile)
+        └─> llama_swap (GitHub release binary)
+        └─> nginx (optional)
+  └─> validate layered config
+  └─> write install state (state/install-state.json)
+```
+
+---
 
 ## State tracking
 
 `state/install-state.json` is the installer-facing source for:
 
 - installed version
-- selected components
-- install locations
-- installed llama.cpp version/backend metadata
-- validation warnings
+- selected components and their install results
+- install locations and resolved executable paths
+- installed llama.cpp version, backend, and profile metadata
+- config validation warnings
 - last successful update time
+
+---
 
 ## Executable resolution
 
@@ -62,19 +113,43 @@ three-tier priority chain:
 
 1. **YAML config** — an absolute path in `stack.override.yaml` wins outright.
 2. **install-state.json** — `component_results.<name>.path` written by the
-   component installer (`ensure_nginx`, `ensure_llama_swap`, etc.).  This is
-   the primary mechanism for tools installed outside the venv (e.g. nginx via
-   winget/apt, llama-swap via GitHub release).
-3. **Fallback** — `shutil.which()` / bare name passed to the OS.
+   component installer. This is the primary mechanism for tools installed outside
+   the venv (e.g. nginx via apt, llama-swap via GitHub release).
+3. **Fallback** — `shutil.which()` or bare name passed to the OS.
 
-The Windows registry is intentionally **not** consulted.  Installers write the
-resolved absolute path to `install-state.json` immediately after installing, so
-the path is available in any subsequent process regardless of how the shell
-environment was inherited.
+The Windows registry is intentionally not consulted. Installers write the resolved
+absolute path to `install-state.json` immediately after installing, so the path is
+available in any subsequent process regardless of how the shell environment was
+inherited.
 
 Components that write to `install-state.json`:
 
 - `ensure_llama_swap` → `component_results.llama_swap.path`
-- `ensure_nginx`      → `component_results.nginx.path`
-- `ensure_llama_cpp`  → `component_results.llama_cpp.executable_path`
-- `ensure_models`     → `component_results.models.model_dir` + per-model paths
+- `ensure_nginx` → `component_results.nginx.path`
+- `ensure_llama_cpp` → `component_results.llama_cpp.executable_path`
+- `ensure_models` → `component_results.models.model_dir` + per-model paths
+
+---
+
+## Config generation
+
+The generator (`src/launcher/config_loader.py`) merges the three config layers and
+writes five output files:
+
+| Output | Path | Consumed by |
+| ------ | ---- | ----------- |
+| llama-swap config | `config/generated/llama-swap/llama-swap.generated.yaml` | llama-swap |
+| LiteLLM config | `config/generated/litellm/litellm.config.yaml` | LiteLLM |
+| nginx config | `config/generated/nginx/nginx.conf` | nginx |
+| nginx landing page | `config/generated/nginx/index.html` | nginx |
+| MCP client config | `config/generated/mcp/litellm.mcp.client.json` | MCP clients |
+| systemd unit | `config/generated/systemd/audia-gateway.service` | systemd |
+
+Run generation manually:
+
+```bash
+./scripts/AUDiaLLMGateway.sh generate
+```
+
+The generator is idempotent and tracks content hashes to detect which outputs
+actually changed.

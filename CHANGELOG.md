@@ -1,44 +1,5 @@
 # Changelog
 
-## [0.5.2](https://github.com/example/AUDiaLLMGateway/compare/v0.5.1...v0.5.2) (2026-03-18)
-
-
-### Bug Fixes
-
-* updated documentation ([c3508f2](https://github.com/example/AUDiaLLMGateway/commit/c3508f2040f241205f5f696ce29aaa35af28b9e2))
-
-## [0.5.1](https://github.com/example/AUDiaLLMGateway/compare/v0.5.0...v0.5.1) (2026-03-18)
-
-
-### Bug Fixes
-
-* docker updates ([abe361f](https://github.com/example/AUDiaLLMGateway/commit/abe361ff3aa9303de3a70c2dcddee66748949e33))
-
-## [0.5.0](https://github.com/example/AUDiaLLMGateway/compare/v0.4.12...v0.5.0) (2026-03-18)
-
-
-### Features
-
-* docker enabled ([11fe981](https://github.com/example/AUDiaLLMGateway/commit/11fe9810796725b212ee8cda906af1d8e56ea697))
-
-
-### Bug Fixes
-
-* expose all proxied endpoints without auth and fix redirect rewriting ([a8137e8](https://github.com/example/AUDiaLLMGateway/commit/a8137e8a372bb354215c0a39a1af3b48a0e0c31e))
-* inject litellm auth header in nginx and restore master_key config ([aed96a3](https://github.com/example/AUDiaLLMGateway/commit/aed96a3b433528dcb387bac60b2bae674835f5f7))
-* lifecycle management updates ([c84ab38](https://github.com/example/AUDiaLLMGateway/commit/c84ab385e73956f73e57ffd8258223187ce3c0e4))
-* normalize model file paths to forward slashes for Linux compatibility ([7af3142](https://github.com/example/AUDiaLLMGateway/commit/7af3142f1a02a960495a3cc276498dc2ad0c9605))
-* pin backend service hosts to 127.0.0.1 in stack.base.yaml ([426a707](https://github.com/example/AUDiaLLMGateway/commit/426a7074007777b31c2fb17d95adea94052edeec))
-* remove master_key from litellm config to allow no_auth to take effect ([3a06c6c](https://github.com/example/AUDiaLLMGateway/commit/3a06c6c7eef06b30620ca8a4cca9243eb81716c2))
-* use public_host for nginx landing page links ([729a741](https://github.com/example/AUDiaLLMGateway/commit/729a74142f44d9884ca6123bf1a0be02f7050dce))
-
-
-### Documentation
-
-* update spec-002 and changelog for nginx proxy fixes ([55b3b8d](https://github.com/example/AUDiaLLMGateway/commit/55b3b8d156a5adb5eaa7e0e7e8a2dbe2c38e9020))
-
-## Changelog
-
 ## Unreleased
 
 ### Scaffolded a native Windows local LLM gateway workspace in AUDiaLLMGateway. (New Feature)
@@ -331,5 +292,22 @@
 - Model file paths in models.base.yaml normalized from Windows backslashes to forward slashes
 - config_loader.py also normalizes backslashes at generation time for safety
 - All proxied endpoints (/v1/models /health /ui/ /litellm/ /llamaswap/) now return HTTP 200
+
+### Revamp documentation: expand docker.md, README navigation, spec-001 accuracy, architecture.md Docker topology, specs README status legend (Documentation Update)
+- Rewrote docs/docker.md with full deployment guide (all 4 profiles with complete examples, port reference, env vars, troubleshooting)
+- Updated README.md with navigation table, Docker quick-start path, and structured overview sections
+- Rewrote spec-001 to reflect actual implemented state and removed aspirational hot-reload claims
+- Expanded docs/architecture.md with Docker deployment path alongside native install topology
+- Updated specifications/README.md with Implemented/Draft/Planned status legend
+
+### Add vLLM profiles to all Docker compose examples, CPU-only example, integration test with real inference, scheduled CI workflow, and fix provision-runtime.sh GPU detection (New Feature, Test Update, Build / Packaging)
+- Added vLLM as opt-in Docker profile (--profile vllm) to all 4 compose examples
+- Added CPU-only compose example (docker/examples/docker-compose.cpu.yml)
+- Fixed provision-runtime.sh: honors LLAMA_BACKEND env var, /dev/kfd AMD detection, cleaner provisioning flow
+- Fixed Dockerfile.gateway: multi-stage build with pip prefix install, removed broken non-root user
+- Added pciutils to Dockerfile.unified-backend for reliable lspci GPU detection
+- Created integration test (Dockerfile.integration + integration-entrypoint.sh) with real llama.cpp inference using SmolLM2-135M
+- Updated run-smoke-tests.sh to include integration target with model caching
+- Rewrote tests.yml: added e2e-mock job, integration job (weekly + manual), docker-build validation job, --network=host for all builds
 
 ---

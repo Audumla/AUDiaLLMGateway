@@ -1,248 +1,207 @@
 # AUDiaLLMGateway
 
-Local-first LLM gateway for a home lab.
+Local-first LLM gateway for a home lab. Runs entirely on your own hardware — no
+cloud dependencies, no usage fees.
 
-Runtime shape:
+## What it does
 
-- `llama.cpp` as an installable/versioned runtime dependency
-- `llama-swap` as the local model router and generated backend runtime
-- native `llama-server` processes behind `llama-swap`
-- LiteLLM as the OpenAI-compatible gateway
-- optional nginx as a single front-door reverse proxy
-- MCP scaffolding kept separate and version-aware
+Provides an OpenAI-compatible API endpoint backed by local models:
 
-## Release install model
+- `llama.cpp` as the inference runtime (versioned, managed component)
+- `llama-swap` as the local model router — load/unload models on demand
+- `LiteLLM` as the OpenAI-compatible API gateway
+- `nginx` as an optional single front-door reverse proxy
+- Config generated from a shared model catalog — define a model once, target multiple backends
 
-This project is now designed to be installed and updated from GitHub release archives, not `git clone`.
+---
 
-Key properties:
+## Quick Start
 
-- standalone bootstrap scripts for Windows, Linux, and macOS
-- update flow that pulls the latest release archive
-- project-managed files are replaced on update
-- `config/local/*` and `state/*` are preserved on update
-- local override configs are validated during updates and warnings are recorded in install state
-- `llama.cpp` can be installed in a selected backend/version variant, with Windows Vulkan as the default baseline
+**Choose your deployment path:**
 
-## Config layering
+| Path | Best for |
+| ---- | -------- |
+| [Docker](docs/docker.md) | Linux home lab or server — recommended |
+| [Native install](docs/runbook.md) | Windows, macOS, or Linux without Docker |
 
-Project-managed defaults:
+### Docker (Linux — recommended)
 
-- `config/project/stack.base.yaml`
-- `config/project/llama-swap.base.yaml`
-- `config/project/models.base.yaml`
-- `config/project/mcp.base.yaml`
+```bash
+cp config/env.example .env
+# edit .env — set LITELLM_MASTER_KEY
+docker compose up -d
+```
 
-Local machine overrides:
+See [docs/docker.md](docs/docker.md) for all deployment profiles (Universal, NVIDIA, AMD, External Proxy).
+
+### Native install
+
+**Windows:**
+
+```powershell
+.\bootstrap\AUDiaLLMGateway-install-release.ps1 -Owner ExampleOrg -Repo AUDiaLLMGateway -InstallDir "$HOME\AUDiaLLMGateway"
+```
+
+**Linux / macOS:**
+
+```bash
+./bootstrap/AUDiaLLMGateway-install-release.sh
+```
+
+See [docs/runbook.md](docs/runbook.md) for the full native install and operations guide.
+
+---
+
+## Documentation
+
+| Document | Contents |
+| -------- | -------- |
+| [docs/docker.md](docs/docker.md) | Docker deployment — all profiles, setup, management |
+| [docs/runbook.md](docs/runbook.md) | Native install, update, start/stop, config validation |
+| [docs/architecture.md](docs/architecture.md) | System design — runtime, config, and installer topology |
+| [docs/reverse-proxy.md](docs/reverse-proxy.md) | nginx routes, config generation, upstream layout |
+| [docs/troubleshooting.md](docs/troubleshooting.md) | Common issues and fixes |
+
+---
+
+## How it works
+
+### Runtime shape
+
+```text
+Client / tool
+  └─> nginx (optional, port 8080)
+        └─> LiteLLM (port 4000)
+              └─> llama-swap (port 41080)
+                    └─> llama-server processes (llama.cpp)
+```
+
+Clients speak the OpenAI API. LiteLLM translates model alias names to backend routes.
+llama-swap loads and unloads llama.cpp model processes as requests arrive.
+
+### Config layering
+
+The system uses three config layers that merge at generation time:
+
+| Layer | Location | Managed by |
+| ----- | -------- | ---------- |
+| Project base | `config/project/` | Release updates |
+| Local overrides | `config/local/` | You — never overwritten |
+| Generated | `config/generated/` | Config generator — safe to overwrite |
+
+Project base files:
+
+- `config/project/stack.base.yaml` — services, network, components
+- `config/project/models.base.yaml` — model catalog (backend-agnostic)
+- `config/project/llama-swap.base.yaml` — llama-swap substrate
+- `config/project/mcp.base.yaml` — MCP scaffold
+
+Local override files:
 
 - `config/local/stack.override.yaml`
-- `config/local/llama-swap.override.yaml`
 - `config/local/models.override.yaml`
+- `config/local/llama-swap.override.yaml`
 - `config/local/mcp.override.yaml`
 
 Generated outputs:
 
 - `config/generated/llama-swap/llama-swap.generated.yaml`
 - `config/generated/litellm/litellm.config.yaml`
-- `config/generated/mcp/litellm.mcp.client.json`
 - `config/generated/nginx/nginx.conf`
+- `config/generated/mcp/litellm.mcp.client.json`
 
-## Shared model catalog
+### Shared model catalog
 
-The repo now has a backend-agnostic model catalog layer:
+Models are defined once in `config/project/models.base.yaml` — no duplicating
+parameters into per-backend files. The catalog holds:
 
-- `config/project/models.base.yaml`
-- `config/local/models.override.yaml`
+- model profiles (artifacts, deployments per backend)
+- context presets (`32k`, `64k`, `96k`, `256k`)
+- GPU placement presets
+- runtime behavior presets
+- exposed LiteLLM gateway aliases
+- load groups (coding, reasoning, vision)
 
-This is the common model definition layer for:
+The config generator translates the catalog into backend-specific config at
+generation time. Machine-specific additions go in `config/local/models.override.yaml`.
 
-- model profiles
-- shared context presets
-- shared GPU presets
-- runtime presets
-- framework-specific deployments
-- exposed gateway aliases
-- source/download URLs for model artifacts
-- load groups for persistent or swappable model sets
+### Central network config
 
-Context presets can now use simple aliases like `32k`, `64k`, or `96k`. The generator will translate the alias into the backend arg string, so you do not need a hand-authored macro entry for every context size.
+All service hosts and ports are configured once in `config/project/stack.base.yaml`
+under `network`. The generator propagates those values into LiteLLM, llama-swap,
+nginx, and MCP client configs automatically.
 
-GPU and runtime presets are also defined at the catalog layer as structured `llama.cpp` option maps. The generator renders those into backend-specific `llama-swap` macros, so the project no longer treats the raw macro bodies as the source of truth.
+Override a port in `config/local/stack.override.yaml`:
 
-This repo now treats the catalog schema as greenfield: the alias-first model catalog is the current format, and there is no second shipped model catalog in `llama-swap` project config.
-
-## Central network config
-
-Hosts and ports should be configured centrally in `config/project/stack.base.yaml` under `network`.
-
-That central section now drives generated bindings for:
-
-- LiteLLM API base URLs
-- `llama-swap` runtime host/port
-- generated nginx upstreams and listen address
-- generated MCP client URL for the local gateway
-
-Current generators use that catalog to:
-
-- build LiteLLM model exposure config
-- generate `llama-swap` model entries, load groups, and translated preset macros for `llama.cpp` deployments
-
-That means model intent and common parameters live once, then get translated into backend-specific config at generation time.
-
-Install/update state:
-
-- `state/install-state.json`
-
-## Initial install from a release
-
-Windows:
-
-```powershell
-.\bootstrap\AUDiaLLMGateway-install-release.ps1 -Owner ExampleOrg -Repo AUDiaLLMGateway -InstallDir "$HOME\AUDiaLLMGateway"
+```yaml
+network:
+  litellm:
+    port: 5000
 ```
 
-Linux:
+---
+
+## Unified management command
+
+After install, everything is managed through a single command:
+
+**Linux / macOS:**
 
 ```bash
-./bootstrap/AUDiaLLMGateway-install-release.sh
+./scripts/AUDiaLLMGateway.sh help
+./scripts/AUDiaLLMGateway.sh install
+./scripts/AUDiaLLMGateway.sh update
+./scripts/AUDiaLLMGateway.sh start
+./scripts/AUDiaLLMGateway.sh stop
+./scripts/AUDiaLLMGateway.sh check
+./scripts/AUDiaLLMGateway.sh check health
+./scripts/AUDiaLLMGateway.sh generate
+./scripts/AUDiaLLMGateway.sh validate
+./scripts/AUDiaLLMGateway.sh test
 ```
 
-macOS:
-
-```bash
-./bootstrap/AUDiaLLMGateway-install-release-macos.sh
-```
-
-These install scripts:
-
-1. download a GitHub release archive
-2. unpack it locally
-3. seed local config files if missing
-4. install selected components and dependencies
-5. write install state
-
-## Unified command
-
-Once the repo is installed locally, use a single command with simple actions and optional targets:
-
-Windows:
+**Windows (PowerShell):**
 
 ```powershell
 .\scripts\AUDiaLLMGateway.ps1 help
 ```
 
-Windows Command Prompt compatibility:
+**Windows (Command Prompt):**
 
 ```bat
 .\scripts\AUDiaLLMGateway.cmd help
 ```
 
-Linux or macOS:
-
-```bash
-./scripts/AUDiaLLMGateway.sh help
-```
-
-Per-action wrapper scripts are not part of the supported installed interface.
-
-Examples:
-
-```powershell
-.\scripts\AUDiaLLMGateway.ps1 install
-.\scripts\AUDiaLLMGateway.ps1 install stack
-.\scripts\AUDiaLLMGateway.ps1 update
-.\scripts\AUDiaLLMGateway.ps1 start
-.\scripts\AUDiaLLMGateway.ps1 stop gateway
-.\scripts\AUDiaLLMGateway.ps1 check
-.\scripts\AUDiaLLMGateway.ps1 validate
-.\scripts\AUDiaLLMGateway.ps1 test
-```
-
-The `.cmd` file is a thin compatibility shim for Command Prompt. PowerShell remains the canonical Windows entrypoint.
-
-## Updating an installed copy
-
-Windows:
-
-```powershell
-.\scripts\AUDiaLLMGateway.ps1 update
-```
-
-Linux or macOS:
-
-```bash
-./scripts/AUDiaLLMGateway.sh update
-```
-
-Check upstream release availability without updating:
-
-```powershell
-.\scripts\AUDiaLLMGateway.ps1 check
-```
-
-## Local development flow
-
-```powershell
-.\scripts\AUDiaLLMGateway.ps1 install stack
-.\scripts\AUDiaLLMGateway.ps1 generate
-.\scripts\AUDiaLLMGateway.ps1 validate
-.\scripts\AUDiaLLMGateway.ps1 start
-.\scripts\AUDiaLLMGateway.ps1 check health
-.\scripts\AUDiaLLMGateway.ps1 test
-```
-
-## Published LiteLLM aliases
-
-- `local/qwen27_fast` -> `qwen3.5-27b-(96k-Q6)`
-- `local/qwen122_smart` -> `qwen3.5-122b`
-- `local/qwen4b_vision` -> `qwen3-5-4b-ud-q5-k-xl-vision`
-
-Change those in `config/project/stack.base.yaml` or override them in `config/local/stack.override.yaml`.
-
-## Optional components
-
-The release installer tracks installed components and can install newly added ones during update. Current component set:
-
-- `python_runtime`
-- `gateway_python_deps`
-- `llama_cpp`
-- `llama_swap`
-- `nginx` optional
+---
 
 ## llama.cpp component
 
-`llama.cpp` is now treated as a managed component.
+`llama.cpp` is a managed component — the installer downloads the right build for
+your hardware and records the path in `state/install-state.json`.
 
-The project defaults live in `config/project/stack.base.yaml` under `project.component_settings.llama_cpp`.
+Platform defaults:
 
-Machine-specific overrides can go in `config/local/stack.override.yaml`, for example:
+| Platform | Default profile |
+| -------- | --------------- |
+| Windows | `windows-vulkan` |
+| Linux | `linux-cpu` |
+| macOS | `macos-metal` |
+
+Available profiles:
+
+- Windows: `windows-vulkan`, `windows-hip`, `windows-cpu`
+- Linux: `linux-vulkan`, `linux-rocm`, `linux-cuda`, `linux-cpu`
+- macOS: `macos-metal`, `macos-cpu`
+
+Override the profile in `config/local/stack.override.yaml`:
 
 ```yaml
 component_settings:
   llama_cpp:
-    selected_profile: windows-vulkan
-    profiles:
-      windows-vulkan:
-        version: b9999
+    selected_profile: linux-rocm
 ```
 
-Current design:
-
-- first-tier platform defaults:
-  - Windows: `windows-vulkan`
-  - Linux: `linux-cpu`
-  - macOS: `macos-metal`
-- first-tier install profiles also include:
-  - `windows-hip`
-  - `windows-cpu`
-  - `linux-vulkan`
-  - `linux-rocm`
-  - `linux-cuda`
-  - `macos-cpu`
-
-Installer state records the installed `llama.cpp` profile, version, backend, asset, install path, and resolved `llama-server` executable path.
-
-If a selected Windows AMD/HIP build needs sidecar DLLs, add them in `config/local/stack.override.yaml`:
+For Windows AMD/HIP builds that need sidecar DLLs:
 
 ```yaml
 component_settings:
@@ -255,13 +214,60 @@ component_settings:
           - R:\tools\llama-bin-amd\libcrypto-3-x64.dll
 ```
 
+---
+
+## Published LiteLLM aliases
+
+The default model catalog exposes:
+
+- `local/qwen27_fast` → `qwen3.5-27b-(96k-Q6)`
+- `local/qwen122_smart` → `qwen3.5-122b`
+- `local/qwen4b_vision` → `qwen3-5-4b-ud-q5-k-xl-vision`
+
+Change aliases in `config/project/stack.base.yaml` or override in
+`config/local/stack.override.yaml`.
+
+---
+
+## Optional components
+
+| Component | Required | Notes |
+| --------- | -------- | ----- |
+| `python_runtime` | Yes | Python 3.10+ |
+| `gateway_python_deps` | Yes | LiteLLM and dependencies |
+| `llama_cpp` | Yes | Inference runtime |
+| `llama_swap` | Yes | Model router |
+| `nginx` | No | Reverse proxy front-door |
+
+---
+
 ## Reverse proxy
 
-Optional nginx config is included at:
+Optional nginx is configured via code generation. See [docs/reverse-proxy.md](docs/reverse-proxy.md).
+Route layout: `/v1/` → LiteLLM, `/llamaswap/` → llama-swap, `/health` → status.
 
-- `config/generated/nginx/nginx.conf`
-- `docs/reverse-proxy.md`
+---
 
-## MCP note
+## MCP
 
-MCP remains scaffolded, not fully claimed as production-complete. The repo isolates MCP registry and client config so LiteLLM MCP changes can be absorbed without corrupting the core gateway and backend configuration layers.
+MCP remains scaffolded but not production-complete. Config is isolated so LiteLLM
+MCP changes can be absorbed without touching the core gateway config.
+
+---
+
+## Updating
+
+**Native install:**
+
+```bash
+./scripts/AUDiaLLMGateway.sh update
+```
+
+**Docker:**
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+The update replaces project-managed files from the release archive and preserves
+`config/local/`, `state/`, `models/`, and `.env`.
