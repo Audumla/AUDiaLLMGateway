@@ -365,13 +365,15 @@ All network port bindings remain in `config/project/stack.base.yaml` under
 `network`. Machine-specific overrides go in `config/local/stack.override.yaml`.
 No port or host literal appears in any other project file.
 
-Host values are **not** hardcoded in `stack.base.yaml`. At config-load time
-`config_loader.py` auto-detects the machine's outbound IPv4 address and uses it
-as the default for every service host (`public_host`, `backend_bind_host`,
-`litellm`, `llama_swap`, `nginx`). If the machine has exactly one non-loopback
-IPv4 interface the detected address is used; otherwise `127.0.0.1` is used as a
-safe fallback. Any host can be pinned explicitly in
-`config/local/stack.override.yaml`.
+Backend service hosts (`litellm`, `llama_swap`, `backend_bind_host`) are
+**pinned to `127.0.0.1`** in `stack.base.yaml`. These services are only
+reachable via the nginx reverse proxy and must not be exposed directly on the
+network. `public_host` (used for nginx landing page links and any externally
+advertised URLs) is **not** hardcoded — `config_loader.py` auto-detects the
+machine's outbound IPv4 address at config-load time. If the machine has exactly
+one non-loopback IPv4 interface the detected address is used; otherwise
+`127.0.0.1` is used as a safe fallback. `public_host` can be pinned explicitly
+in `config/local/stack.override.yaml`.
 
 ### Seeded override file
 
@@ -391,6 +393,45 @@ When the watcher detects a port or host change in the merged stack config:
 
 Downstream components that depend on the changed binding (e.g., LiteLLM upstream
 URL pointing at llama-swap) are also regenerated and reloaded.
+
+---
+
+## nginx Reverse Proxy
+
+### Architecture
+
+nginx is the only externally-facing service. litellm and llama-swap bind to
+`127.0.0.1` and are not directly reachable from the network. All public traffic
+enters through nginx on port 8080 (default).
+
+### Routes
+
+| nginx path | Upstream | Notes |
+| --- | --- | --- |
+| `/` | static `config/generated/nginx/index.html` | Landing page with links to all endpoints |
+| `/v1/` | litellm | OpenAI-compatible API |
+| `/litellm/` | litellm | Full litellm API under prefix |
+| `/ui/` | litellm | LiteLLM admin UI — `proxy_redirect` rewrites absolute redirect to public host |
+| `/health` | litellm `/health` | |
+| `/llamaswap/` | llama-swap | Path prefix stripped; `proxy_redirect` rewrites upstream Location headers to `/llamaswap/` prefix so redirect chains stay inside the proxy |
+| `/llamaswap-health` | llama-swap `/health` | |
+
+The `server_name` directive is set to `_` (catch-all) so any `Host` header is
+accepted. The listen directive binds to all interfaces on the configured port.
+
+### Authentication
+
+LiteLLM is configured with `general_settings.no_auth: true` so all endpoints
+are accessible without a bearer token through the nginx proxy. The
+`LITELLM_MASTER_KEY` env var is still set in `config/local/env` for internal
+admin operations but is not enforced on incoming requests.
+
+### Landing page
+
+`config/generated/nginx/index.html` is regenerated on each `generate-configs`
+run. All links use `network.public_host` (auto-detected LAN IP) so they resolve
+correctly from a remote browser. The page lists every proxied endpoint with its
+description and type.
 
 ---
 
