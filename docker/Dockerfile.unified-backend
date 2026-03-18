@@ -4,7 +4,7 @@ FROM nvidia/cuda:12.2.0-base-ubuntu22.04
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y \
     curl ca-certificates wget gnupg2 libvulkan1 mesa-vulkan-drivers \
-    vulkan-tools clinfo procps libgomp1 \
+    vulkan-tools clinfo procps libgomp1 unzip jq \
     && rm -rf /var/lib/apt/lists/*
 
 # Add ROCm Support
@@ -16,19 +16,37 @@ RUN mkdir -p /etc/apt/keyrings && \
     apt-get install -y rocminfo rocm-hip-runtime && \
     rm -rf /var/lib/apt/lists/*
 
-# Install a known-good static llama-server binary
-RUN curl -L -o /usr/local/bin/llama-server https://github.com/ggml-org/llama.cpp/releases/download/b4632/llama-b4632-bin-ubuntu-x64.tar.gz && \
-    mkdir -p /tmp/llama && tar -xzf /usr/local/bin/llama-server -C /tmp/llama && \
-    cp /tmp/llama/build/bin/llama-server /usr/local/bin/llama-server && \
+# Dynamically find and install the latest llama-server binary and its libraries
+RUN ARCH=$(uname -m) && \
+    echo "Querying GitHub API for latest llama.cpp release assets..." && \
+    if [ "$ARCH" = "x86_64" ]; then \
+        PATTERN="ubuntu-x64\.(tar\.gz|zip)$"; \
+    else \
+        PATTERN="ubuntu-arm64\.(tar\.gz|zip)$"; \
+    fi && \
+    URL=$(curl -sL https://api.github.com/repos/ggml-org/llama.cpp/releases/latest | jq -r --arg PATTERN "$PATTERN" '.assets[] | select(.name | test($PATTERN)) | .browser_download_url') && \
+    if [ -z "$URL" ] || [ "$URL" = "null" ]; then echo "Failed to find any compatible assets." && exit 1; fi && \
+    echo "Downloading ${URL}..." && \
+    curl -L -o /tmp/llama.archive "$URL" && \
+    mkdir -p /tmp/llama && \
+    if echo "$URL" | grep -q "\.zip$"; then \
+        unzip /tmp/llama.archive -d /tmp/llama; \
+    else \
+        tar -xzf /tmp/llama.archive -C /tmp/llama; \
+    fi && \
+    find /tmp/llama -name "llama-server" -exec cp {} /usr/local/bin/llama-server \; && \
+    find /tmp/llama -name "*.so*" -exec cp {} /usr/local/bin/ \; && \
     chmod +x /usr/local/bin/llama-server && \
-    rm -rf /tmp/llama
+    rm -rf /tmp/llama /tmp/llama.archive
 
-# Create a permanent shim for llama-swap
-RUN echo '#!/bin/sh\necho "Llama-swap shim starting..."\nexec /usr/local/bin/llama-server "$@"' > /usr/local/bin/llama-swap && \
+RUN ldconfig
+
+# Create a permanent shim for llama-swap that stays alive
+RUN echo '#!/bin/sh\necho "Llama-swap shim starting..."\nif [ "$#" -eq 0 ]; then\n  echo "No arguments provided. Keeping shim alive..."\n  exec sleep infinity\nfi\nexec /usr/local/bin/llama-server "$@"' > /usr/local/bin/llama-swap && \
     chmod +x /usr/local/bin/llama-swap
 
 WORKDIR /app
 EXPOSE 41080
 
-# Basic entrypoint for testing
-ENTRYPOINT ["/usr/local/bin/llama-swap", "--help"]
+# The actual entrypoint will be overridden by docker-compose or used as is
+ENTRYPOINT ["/usr/local/bin/llama-swap"]
