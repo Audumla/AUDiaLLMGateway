@@ -13,6 +13,31 @@ import yaml
 ENV_PATTERN = re.compile(r"\$\{([A-Z0-9_]+)\}")
 
 
+def _detect_local_ip() -> str:
+    """Return the single non-loopback IPv4 address, or '127.0.0.1' if zero or multiple."""
+    import socket
+
+    candidates: set[str] = set()
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            addr = s.getsockname()[0]
+            if not addr.startswith("127."):
+                candidates.add(addr)
+    except Exception:
+        pass
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            addr = info[4][0]
+            if not addr.startswith("127."):
+                candidates.add(addr)
+    except Exception:
+        pass
+    if len(candidates) == 1:
+        return next(iter(candidates))
+    return "127.0.0.1"
+
+
 @dataclass(frozen=True)
 class ProjectSettings:
     github_owner: str
@@ -152,9 +177,9 @@ def _resolve_env(obj: Any) -> Any:
 
 def _load_yaml(path: Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8") as handle:
-        content = yaml.safe_load(handle) or {}
+        content = yaml.safe_load(handle)
     if not isinstance(content, dict):
-        raise ValueError(f"Expected a mapping in {path}")
+        return {}
     return _resolve_env(content)
 
 
@@ -213,7 +238,7 @@ def load_stack_config(root: str | Path) -> StackConfig:
         enabled=bool(nginx_raw.get("enabled", False)),
         executable=_nginx_exe_raw,  # resolved below after install-state is loaded
         config_path=str(nginx_raw.get("config_path", "config/generated/nginx/nginx.conf")),
-        host=str(network_raw.get("services", {}).get("nginx", {}).get("host", "localhost")),
+        host="",  # resolved below after _auto_ip is computed
         port=int(network_raw.get("services", {}).get("nginx", {}).get("port", 8080)),
         health_paths=[str(item) for item in nginx_raw.get("health_paths", ["/health"])],
     )
@@ -270,14 +295,15 @@ def load_stack_config(root: str | Path) -> StackConfig:
     litellm_service = services_raw.get("litellm", {}) if isinstance(services_raw, dict) else {}
     nginx_service = services_raw.get("nginx", {}) if isinstance(services_raw, dict) else {}
 
+    _auto_ip = _detect_local_ip()
     network = NetworkConfig(
-        backend_bind_host=str(network_raw.get("backend_bind_host", "127.0.0.1")),
-        public_host=str(network_raw.get("public_host", "127.0.0.1")),
-        llamaswap_host=str(llamaswap_service.get("host", llama_swap_raw.get("host", "127.0.0.1"))),
+        backend_bind_host=str(network_raw.get("backend_bind_host") or _auto_ip),
+        public_host=str(network_raw.get("public_host") or _auto_ip),
+        llamaswap_host=str(llamaswap_service.get("host") or llama_swap_raw.get("host") or _auto_ip),
         llamaswap_port=int(llamaswap_service.get("port", llama_swap_raw.get("port", 41080))),
-        litellm_host=str(litellm_service.get("host", litellm_raw.get("host", "127.0.0.1"))),
+        litellm_host=str(litellm_service.get("host") or litellm_raw.get("host") or _auto_ip),
         litellm_port=int(litellm_service.get("port", litellm_raw.get("port", 4000))),
-        nginx_host=str(nginx_service.get("host", "127.0.0.1")),
+        nginx_host=str(nginx_service.get("host") or _auto_ip),
         nginx_port=int(nginx_service.get("port", 8080)),
     )
 
@@ -310,7 +336,7 @@ def load_stack_config(root: str | Path) -> StackConfig:
         enabled=nginx.enabled,
         executable=_nginx_exe_raw,
         config_path=nginx.config_path,
-        host=nginx.host,
+        host=network.nginx_host,
         port=nginx.port,
         health_paths=nginx.health_paths,
     )
@@ -783,6 +809,75 @@ def build_mcp_client_config(stack: StackConfig) -> dict[str, Any]:
     }
 
 
+def build_nginx_landing_page(stack: StackConfig) -> str:
+    host = stack.network.nginx_host
+    port = stack.network.nginx_port
+    base = f"http://{host}:{port}"
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AUDia LLM Gateway</title>
+  <style>
+    body {{ font-family: system-ui, sans-serif; max-width: 720px; margin: 3rem auto; padding: 0 1.5rem; color: #222; }}
+    h1 {{ font-size: 1.6rem; margin-bottom: 0.25rem; }}
+    .sub {{ color: #666; margin-bottom: 2rem; font-size: 0.95rem; }}
+    table {{ width: 100%; border-collapse: collapse; margin-bottom: 2rem; }}
+    th {{ text-align: left; padding: 0.5rem 0.75rem; background: #f4f4f4; border-bottom: 2px solid #ddd; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; }}
+    td {{ padding: 0.6rem 0.75rem; border-bottom: 1px solid #eee; vertical-align: top; }}
+    a {{ color: #0066cc; text-decoration: none; }}
+    a:hover {{ text-decoration: underline; }}
+    code {{ background: #f4f4f4; padding: 0.1em 0.4em; border-radius: 3px; font-size: 0.9em; }}
+    .tag {{ display: inline-block; font-size: 0.75rem; padding: 0.1em 0.5em; border-radius: 3px; background: #e8f4ff; color: #0066cc; }}
+  </style>
+</head>
+<body>
+  <h1>AUDia LLM Gateway</h1>
+  <p class="sub">Running on <code>{host}:{port}</code></p>
+
+  <table>
+    <thead><tr><th>Endpoint</th><th>Description</th><th>Type</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><a href="{base}/v1/models">/v1/models</a></td>
+        <td>OpenAI-compatible model list via LiteLLM</td>
+        <td><span class="tag">API</span></td>
+      </tr>
+      <tr>
+        <td><a href="{base}/litellm/">/litellm/</a></td>
+        <td>LiteLLM gateway &mdash; full OpenAI-compatible API
+          (<code>{stack.network.litellm_host}:{stack.network.litellm_port}</code>)</td>
+        <td><span class="tag">Proxy</span></td>
+      </tr>
+      <tr>
+        <td><a href="{base}/llamaswap/">/llamaswap/</a></td>
+        <td>llama-swap model router &mdash; direct backend access
+          (<code>{stack.network.llamaswap_host}:{stack.network.llamaswap_port}</code>)</td>
+        <td><span class="tag">Proxy</span></td>
+      </tr>
+      <tr>
+        <td><a href="{base}/health">/health</a></td>
+        <td>LiteLLM health check</td>
+        <td><span class="tag">Health</span></td>
+      </tr>
+      <tr>
+        <td><a href="{base}/llamaswap-health">/llamaswap-health</a></td>
+        <td>llama-swap health check</td>
+        <td><span class="tag">Health</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p style="font-size:0.85rem;color:#888;">
+    Generated by AUDia LLM Gateway &mdash;
+    edit <code>config/local/stack.override.yaml</code> to change hosts and ports.
+  </p>
+</body>
+</html>
+"""
+
+
 def build_nginx_config(stack: StackConfig) -> str:
     return f"""pid .runtime/nginx.pid;
 error_log .runtime/logs/nginx-error.log warn;
@@ -824,7 +919,7 @@ http {{
 
     server {{
         listen       {stack.network.nginx_port};
-        server_name  {stack.network.nginx_host};
+        server_name  _;
 
         client_max_body_size 100m;
 
@@ -880,6 +975,12 @@ http {{
 
         location = /llamaswap-health {{
             proxy_pass http://llamaswap_upstream/health;
+        }}
+
+        location = / {{
+            root config/generated/nginx;
+            try_files /index.html =404;
+            default_type text/html;
         }}
     }}
 }}
@@ -961,6 +1062,8 @@ def write_nginx_config(root: str | Path) -> Path:
         "#   python -m src.launcher.process_manager generate-configs\n\n"
     )
     output_path.write_text(header + build_nginx_config(stack), encoding="utf-8")
+    landing_path = output_path.parent / "index.html"
+    landing_path.write_text(build_nginx_landing_page(stack), encoding="utf-8")
     return output_path
 
 

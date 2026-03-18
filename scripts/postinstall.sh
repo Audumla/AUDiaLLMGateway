@@ -75,6 +75,12 @@ fi
 ./scripts/AUDiaLLMGateway.sh generate \
     || { echo "[error] Config generation failed"; exit 1; }
 
+# Open firewall ports for any service ports that are bound to a non-loopback
+# address. Skipped silently when no recognised firewall manager is present or
+# when all services are bound to loopback only.
+./scripts/AUDiaLLMGateway.sh install firewall \
+    || echo "[warn] Firewall setup had errors — run 'AUDiaLLMGateway.sh install firewall' to retry, or open ports manually"
+
 # Register and enable the systemd service
 systemctl daemon-reload
 systemctl enable audia-gateway

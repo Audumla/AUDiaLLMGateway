@@ -133,6 +133,9 @@ case "$ACTION" in
       components)
         invoke_release_installer install-components --root "$ROOT_DIR" "$@"
         ;;
+      firewall|nginx|llama_cpp|llama_swap|models|vllm)
+        invoke_release_installer install-components --root "$ROOT_DIR" --component "$TARGET" "$@"
+        ;;
       *)
         invoke_release_installer install-release --component "$TARGET" "$@"
         ;;
