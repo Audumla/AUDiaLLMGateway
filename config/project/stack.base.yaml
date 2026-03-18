@@ -182,10 +182,13 @@ install:
   python_min_version: "3.11"
 
 network:
+  backend_bind_host: 127.0.0.1
   services:
     llama_swap:
+      host: 127.0.0.1
       port: 41080
     litellm:
+      host: 127.0.0.1
       port: 4000
     nginx:
       port: 8080
