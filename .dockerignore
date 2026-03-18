@@ -1,17 +1,15 @@
-# Exclude large/generated/machine-local paths from Docker build context
-.runtime
-.venv
-.agent_runner
-state
-tools
-models
-__pycache__
-*.pyc
-*.pyo
 .git
-# Exclude generated configs (smoke runner regenerates them)
-test-work/*/config/generated
-test-work/*/.runtime
-test-work/*/state
-test-work/*/tools
-test-work/*/models
+.github
+.vscode
+.venv
+.pytest_cache
+__pycache__
+models/*
+runtime/*
+state/*
+config/generated/*
+test-work/*
+*.deb
+*.rpm
+*.bak
+.agent_runner

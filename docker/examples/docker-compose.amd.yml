@@ -1,27 +1,63 @@
-# Example: AMD-Optimized Stack
-# Use this if you only have AMD GPUs
+# Example: AMD-Optimised Stack
+# Use this when you only have AMD GPUs (ROCm or Vulkan).
+# llama.cpp uses ROCm; vLLM is available as an optional profile (requires ROCm-capable vLLM build).
+#
+# Prerequisite: ROCm 5.6+ drivers installed, /dev/kfd accessible.
+#
+# Start with llama.cpp only:
+#   docker compose -f docker/examples/docker-compose.amd.yml up -d
+#
+# Start with vLLM added:
+#   docker compose -f docker/examples/docker-compose.amd.yml --profile vllm up -d
 services:
   gateway:
-    image: ${DOCKERHUB_USERNAME:-audiallmgateway}/audia-llm-gateway:latest
+    image: audumla/audia-llm-gateway-orchestrator:latest
     container_name: audia-gateway
     ports:
-      - "4000:4000"
+      - "${GATEWAY_PORT:-4000}:4000"
     environment:
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
     volumes:
       - ./config:/app/config
     depends_on:
       - backend-swappable
+    restart: unless-stopped
 
   backend-swappable:
-    image: ${DOCKERHUB_USERNAME:-audiallmgateway}/audia-llm-gateway-backend:latest
+    image: audumla/audia-llm-gateway-server:latest
     container_name: audia-llama-cpp
     environment:
       - LLAMA_BACKEND=rocm
+      - LLAMA_VERSION=${LLAMA_VERSION:-latest}
     volumes:
-      - ./models:/app/models:ro
+      - ${MODEL_ROOT:-./models}:/app/models:ro
       - ./config/generated/llama-swap:/app/config:ro
       - backend-runtime:/app/runtime
+    devices:
+      - /dev/kfd:/dev/kfd
+      - /dev/dri:/dev/dri
+    group_add:
+      - video
+      - render
+    restart: unless-stopped
+
+  # vLLM backend (ROCm) — start with --profile vllm
+  # Uses the official ROCm-enabled vLLM image.
+  backend-vllm:
+    image: vllm/vllm-openai:latest
+    container_name: audia-vllm
+    profiles:
+      - vllm
+    ports:
+      - "${VLLM_PORT:-41090}:8000"
+    environment:
+      - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN:-}
+    volumes:
+      - ${MODEL_ROOT:-./models}:/root/.cache/huggingface:rw
+    command: >
+      --model ${VLLM_MODEL:-Qwen/Qwen2.5-0.5B-Instruct}
+      --gpu-memory-utilization ${VLLM_GPU_MEM:-0.85}
+      --max-model-len ${VLLM_MAX_LEN:-4096}
     devices:
       - /dev/kfd:/dev/kfd
       - /dev/dri:/dev/dri

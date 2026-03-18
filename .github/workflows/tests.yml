@@ -1,37 +1,154 @@
 name: Tests
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'config/**'
+      - 'scripts/**'
+      - 'docker/**'
+      - 'docker-compose.yml'
+      - 'requirements.txt'
   schedule:
-    - cron: '0 0 * * *'  # Runs at 00:00 UTC every day
-  workflow_dispatch:      # Allows manual triggering from the Actions tab
+    - cron: '0 2 * * *'    # daily at 02:00 UTC — unit + smoke + e2e
+    - cron: '0 3 * * 0'    # weekly on Sunday at 03:00 UTC — full integration
+  workflow_dispatch:
+    inputs:
+      run_integration:
+        description: 'Run integration tests (downloads ~100MB model)'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
+  # --------------------------------------------------------------------------
+  # Unit tests (pytest)
+  # --------------------------------------------------------------------------
   pytest:
+    name: Unit tests (Python)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt pytest
-      - name: Run tests
-        run: pytest
 
+      - name: Run pytest
+        run: pytest tests/ -v --ignore=tests/docker
+
+  # --------------------------------------------------------------------------
+  # Docker smoke tests — per-distro install validation
+  # --------------------------------------------------------------------------
   smoke-tests:
+    name: Smoke test (${{ matrix.distro }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        distro: [tumbleweed, ubuntu, debian, fedora, rocky]
+        distro: [ubuntu, debian, fedora, rocky, tumbleweed]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Build and run smoke test (${{ matrix.distro }})
+
+      - name: Build smoke image (${{ matrix.distro }})
         run: |
-          docker build -f tests/docker/Dockerfile.${{ matrix.distro }} \
+          docker build --network=host \
+            -f tests/docker/Dockerfile.${{ matrix.distro }} \
             -t audia-smoke-${{ matrix.distro }} .
-          docker run --rm audia-smoke-${{ matrix.distro }}
+
+      - name: Run smoke test (${{ matrix.distro }})
+        run: docker run --rm audia-smoke-${{ matrix.distro }}
+
+  # --------------------------------------------------------------------------
+  # E2E mock test — full gateway routing with mock llama-swap backend
+  # --------------------------------------------------------------------------
+  e2e-mock:
+    name: E2E mock test (gateway routing)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build e2e image
+        run: |
+          docker build --network=host \
+            -f tests/docker/Dockerfile.e2e \
+            -t audia-e2e .
+
+      - name: Run e2e mock test
+        run: docker run --rm audia-e2e
+
+  # --------------------------------------------------------------------------
+  # Integration test — real llama.cpp inference with tiny model
+  # Runs: weekly (Sunday) + on manual dispatch with run_integration=true + on push to docker/
+  # --------------------------------------------------------------------------
+  integration:
+    name: Integration test (real inference)
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' && inputs.run_integration == 'true' ||
+      github.event.schedule == '0 3 * * 0' ||
+      (github.event_name == 'push' && contains(github.event.head_commit.modified, 'docker/'))
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache test model
+        uses: actions/cache@v4
+        with:
+          path: test-work/models
+          key: integration-model-SmolLM2-135M-v1
+          restore-keys: |
+            integration-model-SmolLM2-135M-
+
+      - name: Build integration image
+        run: |
+          docker build --network=host \
+            -f tests/docker/Dockerfile.integration \
+            -t audia-integration .
+
+      - name: Run integration test
+        run: |
+          mkdir -p test-work/models
+          docker run --rm \
+            -v "${{ github.workspace }}/test-work/models:/models" \
+            -e MODEL_DIR=/models \
+            -e LITELLM_MASTER_KEY=sk-ci-test \
+            audia-integration
+
+  # --------------------------------------------------------------------------
+  # Docker image build validation — ensures both images build successfully
+  # --------------------------------------------------------------------------
+  docker-build:
+    name: Docker image build (${{ matrix.image }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: gateway
+            dockerfile: docker/Dockerfile.gateway
+          - image: backend
+            dockerfile: docker/Dockerfile.unified-backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build ${{ matrix.image }} image
+        run: |
+          docker build --network=host \
+            -f ${{ matrix.dockerfile }} \
+            -t audia-${{ matrix.image }}-test \
+            .

@@ -1,27 +1,61 @@
-# Example: NVIDIA-Optimized Stack
-# Use this if you only have NVIDIA GPUs
+# Example: NVIDIA-Optimised Stack
+# Use this when you only have NVIDIA GPUs.
+# llama.cpp uses CUDA; vLLM is available as an optional profile.
+#
+# Start with llama.cpp only:
+#   docker compose -f docker/examples/docker-compose.nvidia.yml up -d
+#
+# Start with vLLM added:
+#   docker compose -f docker/examples/docker-compose.nvidia.yml --profile vllm up -d
 services:
   gateway:
-    image: ${DOCKERHUB_USERNAME:-audiallmgateway}/audia-llm-gateway:latest
+    image: audumla/audia-llm-gateway-orchestrator:latest
     container_name: audia-gateway
     ports:
-      - "4000:4000"
+      - "${GATEWAY_PORT:-4000}:4000"
     environment:
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
     volumes:
       - ./config:/app/config
     depends_on:
       - backend-swappable
+    restart: unless-stopped
 
   backend-swappable:
-    image: ${DOCKERHUB_USERNAME:-audiallmgateway}/audia-llm-gateway-backend:latest
+    image: audumla/audia-llm-gateway-server:latest
     container_name: audia-llama-cpp
     environment:
       - LLAMA_BACKEND=cuda
+      - LLAMA_VERSION=${LLAMA_VERSION:-latest}
     volumes:
-      - ./models:/app/models:ro
+      - ${MODEL_ROOT:-./models}:/app/models:ro
       - ./config/generated/llama-swap:/app/config:ro
       - backend-runtime:/app/runtime
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  # vLLM backend — start with --profile vllm
+  backend-vllm:
+    image: vllm/vllm-openai:latest
+    container_name: audia-vllm
+    profiles:
+      - vllm
+    ports:
+      - "${VLLM_PORT:-41090}:8000"
+    environment:
+      - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN:-}
+    volumes:
+      - ${MODEL_ROOT:-./models}:/root/.cache/huggingface:rw
+    command: >
+      --model ${VLLM_MODEL:-Qwen/Qwen2.5-0.5B-Instruct}
+      --gpu-memory-utilization ${VLLM_GPU_MEM:-0.85}
+      --max-model-len ${VLLM_MAX_LEN:-4096}
     deploy:
       resources:
         reservations:

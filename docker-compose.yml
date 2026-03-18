@@ -1,18 +1,50 @@
 services:
-  # ... (Nginx, Gateway, Watcher same as before) ...
+  # --- Reverse Proxy (always on) ---
+  nginx:
+    image: nginx:alpine
+    container_name: audia-nginx
+    ports:
+      - "${NGINX_PORT:-8080}:8080"
+    volumes:
+      - ./config/generated/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - gateway
+    restart: unless-stopped
 
+  # --- API Gateway / Traffic Orchestrator (always on) ---
+  gateway:
+    image: audumla/audia-llm-gateway-orchestrator:latest
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.gateway
+    container_name: audia-gateway
+    ports:
+      - "${GATEWAY_PORT:-4000}:4000"
+    environment:
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-local-dev}
+    volumes:
+      - ./config:/app/config
+    depends_on:
+      - backend-swappable
+    restart: unless-stopped
+
+  # --- llama.cpp Inference Server (always on) ---
+  # Auto-detects NVIDIA/AMD on first start and downloads the matching llama.cpp binary.
+  # Results are cached in the backend-runtime volume — no re-download on restart.
   backend-swappable:
+    image: audumla/audia-llm-gateway-server:latest
     build:
       context: .
       dockerfile: ./docker/Dockerfile.unified-backend
     container_name: audia-llama-cpp
     environment:
       - LLAMA_VERSION=${LLAMA_VERSION:-latest}
+      # Override auto-detection: auto | cuda | rocm | vulkan | cpu
+      - LLAMA_BACKEND=${LLAMA_BACKEND:-auto}
     volumes:
       - ${MODEL_ROOT:-./models}:/app/models:ro
       - ./config/generated/llama-swap:/app/config:ro
       - backend-runtime:/app/runtime
-    # All Hardware Passthrough
     deploy:
       resources:
         reservations:
@@ -21,9 +53,55 @@ services:
               count: all
               capabilities: [gpu]
     devices:
-      - /dev/kfd:/dev/kfd       # AMD ROCm
-      - /dev/dri:/dev/dri       # AMD/Vulkan
-    privileged: true # Helps with heterogeneous device access on some distros
+      - /dev/kfd:/dev/kfd
+      - /dev/dri:/dev/dri
+    privileged: true
+    restart: unless-stopped
+
+  # --- vLLM High-Performance Backend (optional — start with: docker compose --profile vllm up) ---
+  # Uses the official vLLM image. Models are lazily loaded from the models directory
+  # or downloaded from HuggingFace on first request.
+  # Requires NVIDIA GPU with CUDA support.
+  backend-vllm:
+    image: vllm/vllm-openai:latest
+    container_name: audia-vllm
+    profiles:
+      - vllm
+      - full
+    ports:
+      - "${VLLM_PORT:-41090}:8000"
+    environment:
+      - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN:-}
+    volumes:
+      - ${MODEL_ROOT:-./models}:/root/.cache/huggingface:rw
+    command: >
+      --model ${VLLM_MODEL:-Qwen/Qwen2.5-0.5B-Instruct}
+      --gpu-memory-utilization ${VLLM_GPU_MEM:-0.85}
+      --max-model-len ${VLLM_MAX_LEN:-4096}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  # --- Hot-Reload Watcher (optional — not yet implemented) ---
+  # Watches config/local/ for changes and triggers generate + selective restart.
+  # Disabled by default until watcher.py is fully implemented.
+  watcher:
+    image: audumla/audia-llm-gateway-orchestrator:latest
+    container_name: audia-watcher
+    profiles:
+      - watcher
+      - full
+    volumes:
+      - ./config:/app/config
+      - /var/run/docker.sock:/var/run/docker.sock
+    entrypoint: ["python3", "src/launcher/watcher.py"]
+    depends_on:
+      - gateway
     restart: unless-stopped
 
 volumes:
