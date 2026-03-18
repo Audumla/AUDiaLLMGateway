@@ -97,13 +97,13 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/audia-llm-gateway-backend
-            ${{ secrets.DOCKERHUB_USERNAME }}/audia-llm-gateway
+            example/audia-llm-gateway-server
+            example/audia-llm-gateway-orchestrator
           tags: |
             type=raw,value=latest
             type=raw,value=${{ needs.release.outputs.tag_name }}
 
-      - name: Build and push Backend Image
+      - name: Build and push Server Image
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -112,7 +112,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-      - name: Build and push Gateway Image
+      - name: Build and push Orchestrator Image
         uses: docker/build-push-action@v5
         with:
           context: .

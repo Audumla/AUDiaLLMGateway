@@ -1,22 +1,33 @@
+# Stage 1: Builder — installs Python dependencies into /install
+FROM python:3.11-slim AS builder
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+
+# Stage 2: Final — lean runtime image
 FROM python:3.11-slim
+
+LABEL org.opencontainers.image.source="https://github.com/example/AUDiaLLMGateway"
+LABEL org.opencontainers.image.description="AUDia LLM Gateway Orchestrator (LiteLLM + config generator)"
 
 WORKDIR /app
 
-# Install system dependencies including curl for health checks
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+# curl is needed by the health check
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy pip-installed packages from builder stage into system Python paths
+COPY --from=builder /install /usr/local
 
 COPY src/ ./src/
 COPY config/project/ ./config/project/
 
-# Health check for LiteLLM
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD curl -f http://localhost:4000/health || exit 1
 
-# This image runs our config generator before starting LiteLLM
-RUN echo '#!/bin/sh\npython -m src.launcher.process_manager --root . generate-configs && exec litellm --config /app/config/generated/litellm/litellm.config.yaml --port 4000' > /app/entrypoint.sh && \
-    chmod +x /app/entrypoint.sh
+COPY docker/gateway-entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 ENTRYPOINT ["/app/entrypoint.sh"]

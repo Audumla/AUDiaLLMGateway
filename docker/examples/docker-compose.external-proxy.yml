@@ -1,10 +1,17 @@
-# Example: Production Setup (External Proxy)
-# Use this if you have your own Nginx or Traefik
+# Example: External Proxy Setup
+# Use this when you already run a reverse proxy (Traefik, nginx, Caddy) on the host.
+# The gateway joins your existing proxy network instead of publishing a port.
+#
+# Start with llama.cpp only:
+#   docker compose -f docker/examples/docker-compose.external-proxy.yml up -d
+#
+# Start with vLLM added:
+#   docker compose -f docker/examples/docker-compose.external-proxy.yml --profile vllm up -d
 services:
   gateway:
-    image: ${DOCKERHUB_USERNAME:-audiallmgateway}/audia-llm-gateway:latest
+    image: example/audia-llm-gateway-orchestrator:latest
     container_name: audia-gateway
-    # No port mapping needed if using internal Docker network
+    # No port mapping — traffic comes through the external proxy on the web-proxy network
     environment:
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
     volumes:
@@ -14,16 +21,46 @@ services:
     networks:
       - web-proxy
       - internal
+    restart: unless-stopped
 
   backend-swappable:
-    image: ${DOCKERHUB_USERNAME:-audiallmgateway}/audia-llm-gateway-backend:latest
+    image: example/audia-llm-gateway-server:latest
     container_name: audia-llama-cpp
     environment:
-      - LLAMA_BACKEND=auto
+      - LLAMA_BACKEND=${LLAMA_BACKEND:-auto}
+      - LLAMA_VERSION=${LLAMA_VERSION:-latest}
     volumes:
-      - ./models:/app/models:ro
+      - ${MODEL_ROOT:-./models}:/app/models:ro
       - ./config/generated/llama-swap:/app/config:ro
       - backend-runtime:/app/runtime
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    devices:
+      - /dev/kfd:/dev/kfd
+      - /dev/dri:/dev/dri
+    networks:
+      - internal
+    restart: unless-stopped
+
+  # vLLM backend — start with --profile vllm
+  backend-vllm:
+    image: vllm/vllm-openai:latest
+    container_name: audia-vllm
+    profiles:
+      - vllm
+    environment:
+      - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN:-}
+    volumes:
+      - ${MODEL_ROOT:-./models}:/root/.cache/huggingface:rw
+    command: >
+      --model ${VLLM_MODEL:-Qwen/Qwen2.5-0.5B-Instruct}
+      --gpu-memory-utilization ${VLLM_GPU_MEM:-0.85}
+      --max-model-len ${VLLM_MAX_LEN:-4096}
     deploy:
       resources:
         reservations:
@@ -37,7 +74,7 @@ services:
 
 networks:
   web-proxy:
-    external: true
+    external: true   # must already exist on the host
   internal:
     driver: bridge
 

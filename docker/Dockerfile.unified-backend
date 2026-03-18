@@ -1,9 +1,15 @@
-FROM nvidia/cuda:12.2.0-base-ubuntu22.04
+# Use a standard stable base - NVIDIA/AMD support is injected at runtime
+FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
-# Install ONLY the base tools needed to fetch the rest
-RUN apt-get update && apt-get install -y \
-    curl ca-certificates wget gnupg2 jq unzip procps libgomp1 \
+
+# Labels for better Docker Hub visibility
+LABEL org.opencontainers.image.source="https://github.com/example/AUDiaLLMGateway"
+LABEL org.opencontainers.image.description="Universal LLM Backend Provisioner"
+
+# Essentials: pciutils for lspci (GPU detection), libgomp1 for llama.cpp OpenMP support
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl ca-certificates wget gnupg2 jq unzip procps libgomp1 pciutils \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -12,5 +18,6 @@ WORKDIR /app
 COPY scripts/provision-runtime.sh /usr/local/bin/provision-runtime.sh
 RUN chmod +x /usr/local/bin/provision-runtime.sh
 
-# Entrypoint runs the provisioner
+# The backend runtime volume must be owned by the user running the process
+# Note: provision-runtime.sh needs root to install system libs if they change
 ENTRYPOINT ["/usr/local/bin/provision-runtime.sh"]

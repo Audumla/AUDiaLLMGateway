@@ -962,5 +962,48 @@
       "config_loader.py also normalizes backslashes at generation time for safety",
       "All proxied endpoints (/v1/models /health /ui/ /litellm/ /llamaswap/) now return HTTP 200"
     ]
+  },
+  {
+    "id": "CHG-22ed6c9e",
+    "agent": "claude",
+    "change_group": "doc-revamp-20260319",
+    "plugin_version": "unreleased",
+    "date": "2026-03-19",
+    "recorded_at": "2026-03-18T23:46:51.499362Z",
+    "summary_tags": [
+      "Documentation Update"
+    ],
+    "summary": "Revamp documentation: expand docker.md, README navigation, spec-001 accuracy, architecture.md Docker topology, specs README status legend",
+    "details": [
+      "Rewrote docs/docker.md with full deployment guide (all 4 profiles with complete examples, port reference, env vars, troubleshooting)",
+      "Updated README.md with navigation table, Docker quick-start path, and structured overview sections",
+      "Rewrote spec-001 to reflect actual implemented state and removed aspirational hot-reload claims",
+      "Expanded docs/architecture.md with Docker deployment path alongside native install topology",
+      "Updated specifications/README.md with Implemented/Draft/Planned status legend"
+    ]
+  },
+  {
+    "id": "CHG-22ed6c9e-1",
+    "agent": "claude",
+    "change_group": "docker-vllm-integration-20260319",
+    "plugin_version": "unreleased",
+    "date": "2026-03-19",
+    "recorded_at": "2026-03-18T23:56:12.913805Z",
+    "summary_tags": [
+      "New Feature",
+      "Test Update",
+      "Build / Packaging"
+    ],
+    "summary": "Add vLLM profiles to all Docker compose examples, CPU-only example, integration test with real inference, scheduled CI workflow, and fix provision-runtime.sh GPU detection",
+    "details": [
+      "Added vLLM as opt-in Docker profile (--profile vllm) to all 4 compose examples",
+      "Added CPU-only compose example (docker/examples/docker-compose.cpu.yml)",
+      "Fixed provision-runtime.sh: honors LLAMA_BACKEND env var, /dev/kfd AMD detection, cleaner provisioning flow",
+      "Fixed Dockerfile.gateway: multi-stage build with pip prefix install, removed broken non-root user",
+      "Added pciutils to Dockerfile.unified-backend for reliable lspci GPU detection",
+      "Created integration test (Dockerfile.integration + integration-entrypoint.sh) with real llama.cpp inference using SmolLM2-135M",
+      "Updated run-smoke-tests.sh to include integration target with model caching",
+      "Rewrote tests.yml: added e2e-mock job, integration job (weekly + manual), docker-build validation job, --network=host for all builds"
+    ]
   }
 ]
