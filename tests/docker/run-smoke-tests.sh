@@ -31,7 +31,7 @@ for distro in "${DISTROS[@]}"; do
     echo " Building + running $label"
     echo "=========================================="
 
-    if docker build -f "$dockerfile" -t "$image" "$ROOT_DIR" && \
+    if docker build --network=host -f "$dockerfile" -t "$image" "$ROOT_DIR" && \
        docker run --rm "$image"; then
         echo "RESULT: $distro PASSED"
         PASS=$((PASS+1))
