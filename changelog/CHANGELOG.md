@@ -287,4 +287,10 @@
 - Added /ui/ link to nginx landing page.
 - All 13 endpoints verified: correct HTTP status, data matches direct upstream on /v1/models and /llamaswap/v1/models.
 
+### Fix nginx reverse proxy: inject litellm auth header and normalize model file paths (Bug Fix)
+- nginx now reads config/local/env and injects Authorization Bearer header on all litellm-proxied routes so external callers reach the gateway without auth
+- Model file paths in models.base.yaml normalized from Windows backslashes to forward slashes
+- config_loader.py also normalizes backslashes at generation time for safety
+- All proxied endpoints (/v1/models /health /ui/ /litellm/ /llamaswap/) now return HTTP 200
+
 ---

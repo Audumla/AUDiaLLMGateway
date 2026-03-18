@@ -944,5 +944,23 @@
       "Added /ui/ link to nginx landing page.",
       "All 13 endpoints verified: correct HTTP status, data matches direct upstream on /v1/models and /llamaswap/v1/models."
     ]
+  },
+  {
+    "id": "CHG-aed96a3b",
+    "agent": "claude",
+    "change_group": "h-development-projects-audia-audiallmgat",
+    "plugin_version": "unreleased",
+    "date": "2026-03-18",
+    "recorded_at": "2026-03-18T08:36:48.839662Z",
+    "summary_tags": [
+      "Bug Fix"
+    ],
+    "summary": "Fix nginx reverse proxy: inject litellm auth header and normalize model file paths",
+    "details": [
+      "nginx now reads config/local/env and injects Authorization Bearer header on all litellm-proxied routes so external callers reach the gateway without auth",
+      "Model file paths in models.base.yaml normalized from Windows backslashes to forward slashes",
+      "config_loader.py also normalizes backslashes at generation time for safety",
+      "All proxied endpoints (/v1/models /health /ui/ /litellm/ /llamaswap/) now return HTTP 200"
+    ]
   }
 ]
