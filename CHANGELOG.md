@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/example/AUDiaLLMGateway/compare/v0.5.0...v0.5.1) (2026-03-18)
+
+
+### Bug Fixes
+
+* docker updates ([abe361f](https://github.com/example/AUDiaLLMGateway/commit/abe361ff3aa9303de3a70c2dcddee66748949e33))
+
 ## [0.5.0](https://github.com/example/AUDiaLLMGateway/compare/v0.4.12...v0.5.0) (2026-03-18)
 
 
