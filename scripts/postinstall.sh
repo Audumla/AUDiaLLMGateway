@@ -11,15 +11,55 @@ chmod +x scripts/*.sh scripts/*.ps1 scripts/*.cmd 2>/dev/null || true
 # Ensure runtime directories exist
 mkdir -p state config/local
 
-# Seed a default env file for the systemd service if none exists.
 # config/local/ is a protected path — updates never overwrite it.
+# Make it and its files editable by all local users (home-lab default).
+chmod 777 config/local
+
+# Seed the service environment file (contains the LiteLLM master key).
+# Keep it root-readable only since it holds credentials.
 if [ ! -f config/local/env ]; then
     cat > config/local/env <<'EOF'
-# AUDia LLM Gateway — local environment overrides.
-# This file is loaded by the systemd service unit (EnvironmentFile).
-# Edit to set your own master key before starting the service.
+# AUDia LLM Gateway — service environment overrides.
+# Loaded by the systemd unit (EnvironmentFile). Changes take effect on
+# the next 'systemctl restart audia-gateway'.
 LITELLM_MASTER_KEY=sk-local-dev
 EOF
+    chmod 600 config/local/env
+fi
+
+# Seed a base stack override file so users can customise ports and hosts
+# without editing the project-managed defaults. World-writable so any
+# local user can edit it without sudo.
+if [ ! -f config/local/stack.override.yaml ]; then
+    cat > config/local/stack.override.yaml <<'EOF'
+# AUDia LLM Gateway — local stack overrides.
+# Values here are merged on top of config/project/stack.base.yaml.
+# This file is preserved across updates. Edit freely.
+# After editing run: ./scripts/AUDiaLLMGateway.sh generate
+#                then: systemctl restart audia-gateway
+#
+# --- Common customisations ---
+#
+# Change the LiteLLM gateway port and bind address:
+# network:
+#   public_host: 0.0.0.0
+#   services:
+#     litellm:
+#       host: 0.0.0.0
+#       port: 4000
+#
+# Change the llama-swap internal port:
+# network:
+#   services:
+#     llama_swap:
+#       port: 41080
+#
+# Enable nginx reverse proxy:
+# reverse_proxy:
+#   nginx:
+#     enabled: true
+EOF
+    chmod 666 config/local/stack.override.yaml
 fi
 
 # Install Python venv and pip dependencies (hard failure — nothing works without this)
