@@ -1,0 +1,45 @@
+# Example: Production Setup (External Proxy)
+# Use this if you have your own Nginx or Traefik
+services:
+  gateway:
+    image: ${DOCKERHUB_USERNAME:-audiallmgateway}/audia-llm-gateway:latest
+    container_name: audia-gateway
+    # No port mapping needed if using internal Docker network
+    environment:
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
+    volumes:
+      - ./config:/app/config
+    depends_on:
+      - backend-swappable
+    networks:
+      - web-proxy
+      - internal
+
+  backend-swappable:
+    image: ${DOCKERHUB_USERNAME:-audiallmgateway}/audia-llm-gateway-backend:latest
+    container_name: audia-llama-cpp
+    environment:
+      - LLAMA_BACKEND=auto
+    volumes:
+      - ./models:/app/models:ro
+      - ./config/generated/llama-swap:/app/config:ro
+      - backend-runtime:/app/runtime
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    networks:
+      - internal
+    restart: unless-stopped
+
+networks:
+  web-proxy:
+    external: true
+  internal:
+    driver: bridge
+
+volumes:
+  backend-runtime:
