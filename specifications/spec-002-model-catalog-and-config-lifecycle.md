@@ -361,15 +361,25 @@ selection are installed if `default_enabled: true` and recorded in
 
 ### Single point of configuration
 
-All network bindings remain in `config/project/stack.base.yaml` under `network`.
-Machine-specific overrides go in `config/local/stack.override.yaml`. No port or
-host literal appears in any other project file.
+All network port bindings remain in `config/project/stack.base.yaml` under
+`network`. Machine-specific overrides go in `config/local/stack.override.yaml`.
+No port or host literal appears in any other project file.
+
+Host values are **not** hardcoded in `stack.base.yaml`. At config-load time
+`config_loader.py` auto-detects the machine's outbound IPv4 address and uses it
+as the default for every service host (`public_host`, `backend_bind_host`,
+`litellm`, `llama_swap`, `nginx`). If the machine has exactly one non-loopback
+IPv4 interface the detected address is used; otherwise `127.0.0.1` is used as a
+safe fallback. Any host can be pinned explicitly in
+`config/local/stack.override.yaml`.
 
 ### Seeded override file
 
 The package postinstall creates `config/local/stack.override.yaml` with all
-relevant port and host settings commented out and their project defaults shown
-as reference. Users edit this file; no sudo required (permissions: 666).
+relevant port settings commented out and their project defaults shown as
+reference. Host values are omitted from the seed because they are auto-detected;
+users only need to add them if overriding the detected address. No sudo required
+(permissions: 666).
 
 ### Auto-propagation
 
@@ -459,7 +469,7 @@ The following components require changes or creation:
 4. `install stack` runs (venv, pip).
 5. `install components` runs selected components.
 6. `generate` runs — emits configs for installed components only.
-7. `config/local/stack.override.yaml` seeded with commented port/host reference.
+7. `config/local/stack.override.yaml` seeded with commented port reference (hosts auto-detected; not seeded).
 8. `config/local/components.yaml` written with user's selection.
 9. Service registered and started.
 

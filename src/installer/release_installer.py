@@ -472,6 +472,74 @@ def ensure_nginx(root: Path) -> dict[str, Any]:
     return {"mode": "path", "path": found}
 
 
+def _detect_firewall_manager() -> str:
+    """Return the active firewall manager name, or '' if none found."""
+    system = detect_platform()
+    if system == "windows":
+        return "netsh" if shutil.which("netsh") else ""
+    if system == "linux":
+        if shutil.which("firewall-cmd"):
+            return "firewalld"
+        if shutil.which("ufw"):
+            return "ufw"
+        if shutil.which("iptables"):
+            return "iptables"
+    return ""
+
+
+def ensure_firewall(root: Path) -> dict[str, Any]:
+    """Open gateway service ports in the system firewall.
+
+    Only opens ports whose bound host is not loopback (127.x.x.x).
+    Skips silently on platforms with no recognised firewall manager.
+    """
+    from src.launcher.config_loader import load_stack_config
+
+    stack = load_stack_config(root)
+    manager = _detect_firewall_manager()
+    if not manager:
+        return {"manager": "none", "opened": [], "skipped": []}
+
+    ports_to_open: list[int] = []
+    skipped: list[str] = []
+
+    def _consider(host: str, port: int, label: str) -> None:
+        if host and not host.startswith("127."):
+            ports_to_open.append(port)
+        else:
+            skipped.append(f"{label}:{port} (loopback)")
+
+    _consider(stack.network.litellm_host, stack.network.litellm_port, "litellm")
+    _consider(stack.network.llamaswap_host, stack.network.llamaswap_port, "llama-swap")
+    if stack.nginx.enabled:
+        _consider(stack.network.nginx_host, stack.network.nginx_port, "nginx")
+
+    opened: list[str] = []
+    for port in sorted(set(ports_to_open)):
+        try:
+            if manager == "firewalld":
+                run_command(["firewall-cmd", "--permanent", f"--add-port={port}/tcp"])
+            elif manager == "ufw":
+                run_command(["ufw", "allow", f"{port}/tcp"])
+            elif manager == "iptables":
+                run_command(["iptables", "-C", "INPUT", "-p", "tcp", "--dport", str(port), "-j", "ACCEPT"])
+            elif manager == "netsh":
+                run_command(["netsh", "advfirewall", "firewall", "add", "rule",
+                             "name=AUDiaLLMGateway", "dir=in", "action=allow",
+                             "protocol=TCP", f"localport={port}"])
+            opened.append(str(port))
+        except subprocess.CalledProcessError as exc:
+            print(f"  [warn] firewall: failed to open port {port}: {exc}", flush=True)
+
+    if manager == "firewalld" and opened:
+        try:
+            run_command(["firewall-cmd", "--reload"])
+        except subprocess.CalledProcessError as exc:
+            print(f"  [warn] firewall: reload failed: {exc}", flush=True)
+
+    return {"manager": manager, "opened": opened, "skipped": skipped}
+
+
 def ensure_models(root: Path, model_names: list[str] | None = None) -> dict[str, Any]:
     """Download model files to workspace/models/ based on the model catalog.
 
@@ -533,6 +601,7 @@ COMPONENT_INSTALLERS = {
     "llama_cpp": ensure_llama_cpp,
     "llama_swap": ensure_llama_swap,
     "nginx": ensure_nginx,
+    "firewall": ensure_firewall,
     "models": ensure_models,
 }
 

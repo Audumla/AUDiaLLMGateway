@@ -44,6 +44,9 @@ project:
     nginx:
       required: false
       default_enabled: false
+    firewall:
+      required: false
+      default_enabled: false
     vllm:
       required: false
       default_enabled: false
@@ -179,17 +182,12 @@ install:
   python_min_version: "3.11"
 
 network:
-  backend_bind_host: 127.0.0.1
-  public_host: 127.0.0.1
   services:
     llama_swap:
-      host: 127.0.0.1
       port: 41080
     litellm:
-      host: 127.0.0.1
       port: 4000
     nginx:
-      host: localhost
       port: 8080
 
 llama_swap:
