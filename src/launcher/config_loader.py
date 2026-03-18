@@ -783,9 +783,7 @@ def build_litellm_config(stack: StackConfig) -> dict[str, Any]:
 
     return {
         "model_list": model_list,
-        "litellm_settings": {
-            "master_key": f"os.environ/{stack.litellm.master_key_env}",
-        },
+        "litellm_settings": {},
         "general_settings": {
             "disable_spend_logs": True,
             "no_auth": True,
