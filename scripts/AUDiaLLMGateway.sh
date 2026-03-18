@@ -1,247 +1,110 @@
-#!/usr/bin/env bash
+#!/bin/bash
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 ACTION="${1:-help}"
 TARGET="${2:-}"
-if [ $# -gt 0 ]; then
-  shift
-fi
-if [ $# -gt 0 ] && [ -n "$TARGET" ]; then
-  shift
-fi
 
-python_cmd() {
-  if command -v python3 >/dev/null 2>&1; then
-    echo python3
-    return
+# --- Helper: Ensure Docker Compose is available ---
+docker_cmd() {
+  if command -v docker-compose >/dev/null 2>&1; then
+    echo "docker-compose"
+  elif docker compose version >/dev/null 2>&1; then
+    echo "docker compose"
+  else
+    echo "Error: docker-compose or 'docker compose' not found." >&2
+    exit 1
   fi
-  if command -v python >/dev/null 2>&1; then
-    echo python
-    return
-  fi
-  echo "Python was not found in PATH." >&2
-  exit 1
 }
+
+DOCKER_COMPOSE="$(docker_cmd)"
 
 show_usage() {
   cat <<'EOF'
+AUDia LLM Gateway - Docker Management Script
+
 Usage:
   ./scripts/AUDiaLLMGateway.sh <action> [target] [args...]
 
-Examples:
-  ./scripts/AUDiaLLMGateway.sh install
-  ./scripts/AUDiaLLMGateway.sh install stack
-  ./scripts/AUDiaLLMGateway.sh install llama_cpp
-  ./scripts/AUDiaLLMGateway.sh update
-  ./scripts/AUDiaLLMGateway.sh update stack
-  ./scripts/AUDiaLLMGateway.sh start
-  ./scripts/AUDiaLLMGateway.sh stop gateway
-  ./scripts/AUDiaLLMGateway.sh check
-  ./scripts/AUDiaLLMGateway.sh validate
-  ./scripts/AUDiaLLMGateway.sh test
-
 Actions:
-  install [release|stack|<component>]
-  update [release|stack|<component>]
-  start [stack|gateway|llamaswap]
-  stop [stack|gateway|llamaswap]
-  check [updates|status|health]
-  validate [configs]
-  test [routing]
-  generate [configs]
-  help
+  start [stack]     - Start the entire gateway stack (detached)
+  stop [stack]      - Stop and remove the gateway containers
+  restart [stack]   - Restart the gateway stack
+  update [stack]    - Pull latest images and rebuild local backends
+  generate [configs]- Force regeneration of all service configurations
+  check status      - Show running containers and their status
+  check health      - Probe API endpoints for LiteLLM and llama-swap
+  check logs [svc]  - View logs (e.g., ./scripts/AUDiaLLMGateway.sh check logs gateway)
+  test              - Run end-to-end routing tests
+  help              - Show this help message
 
-Defaults:
-  install   -> release
-  update    -> release
-  start     -> stack
-  stop      -> stack
-  check     -> updates
-  validate  -> configs
-  test      -> routing
-  generate  -> configs
+Examples:
+  ./scripts/AUDiaLLMGateway.sh start
+  ./scripts/AUDiaLLMGateway.sh update
+  ./scripts/AUDiaLLMGateway.sh check health
 EOF
-}
-
-PYTHON_BIN="$(python_cmd)"
-
-run_python_module() {
-  "$PYTHON_BIN" -m "$@"
-}
-
-ensure_venv_python() {
-  if [ -x "$ROOT_DIR/.venv/bin/python3" ]; then
-    echo "$ROOT_DIR/.venv/bin/python3"
-    return
-  fi
-  if [ -x "$ROOT_DIR/.venv/bin/python" ]; then
-    echo "$ROOT_DIR/.venv/bin/python"
-    return
-  fi
-  echo "Virtual environment not found. Run ./scripts/AUDiaLLMGateway.sh install stack first." >&2
-  exit 1
-}
-
-invoke_install_stack() {
-  if [ ! -d "$ROOT_DIR/.venv" ]; then
-    "$PYTHON_BIN" -m venv "$ROOT_DIR/.venv"
-  fi
-  local venv_python
-  venv_python="$(ensure_venv_python)"
-  (cd "$ROOT_DIR" && "$venv_python" -m pip install --upgrade pip)
-  (cd "$ROOT_DIR" && "$venv_python" -m pip install -r requirements.txt)
-  (cd "$ROOT_DIR" && "$venv_python" -m src.launcher.process_manager --root "$ROOT_DIR" generate-configs)
-}
-
-invoke_update_stack() {
-  local venv_python
-  venv_python="$(ensure_venv_python)"
-  (cd "$ROOT_DIR" && "$venv_python" -m pip install --upgrade pip)
-  (cd "$ROOT_DIR" && "$venv_python" -m pip install --upgrade -r requirements.txt)
-  (cd "$ROOT_DIR" && "$venv_python" -m src.launcher.process_manager --root "$ROOT_DIR" generate-configs)
-}
-
-invoke_release_installer() {
-  local subcommand="$1"
-  shift
-  local venv_python
-  venv_python="$(ensure_venv_python)"
-  (cd "$ROOT_DIR" && "$venv_python" -m src.installer.release_installer "$subcommand" "$@")
-}
-
-invoke_process_manager() {
-  local subcommand="$1"
-  shift
-  local venv_python
-  venv_python="$(ensure_venv_python)"
-  (cd "$ROOT_DIR" && "$venv_python" -m src.launcher.process_manager --root "$ROOT_DIR" "$subcommand" "$@")
 }
 
 case "$ACTION" in
   help)
     show_usage
     ;;
-  install)
-    case "${TARGET:-}" in
-      ""|release)
-        invoke_release_installer install-release "$@"
-        ;;
-      stack)
-        invoke_install_stack
-        ;;
-      components)
-        invoke_release_installer install-components --root "$ROOT_DIR" "$@"
-        ;;
-      firewall|nginx|llama_cpp|llama_swap|models|vllm)
-        invoke_release_installer install-components --root "$ROOT_DIR" --component "$TARGET" "$@"
-        ;;
-      *)
-        invoke_release_installer install-release --component "$TARGET" "$@"
-        ;;
-    esac
-    ;;
-  update)
-    case "${TARGET:-}" in
-      ""|release)
-        invoke_release_installer update-release --root "$ROOT_DIR" "$@"
-        ;;
-      stack)
-        invoke_update_stack
-        ;;
-      *)
-        invoke_release_installer update-release --root "$ROOT_DIR" --component "$TARGET" "$@"
-        ;;
-    esac
-    ;;
+
   start)
-    case "${TARGET:-}" in
-      ""|stack)
-        invoke_process_manager start-all "$@"
-        ;;
-      gateway)
-        invoke_process_manager start-gateway "$@"
-        ;;
-      llamaswap)
-        invoke_process_manager start-llama-swap "$@"
-        ;;
-      *)
-        echo "Unsupported start target '$TARGET'." >&2
-        exit 1
-        ;;
-    esac
+    echo ">>> Starting AUDia LLM Gateway stack..."
+    (cd "$ROOT_DIR" && $DOCKER_COMPOSE up -d)
     ;;
+
   stop)
-    case "${TARGET:-}" in
-      ""|stack)
-        invoke_process_manager stop-all "$@"
-        ;;
-      gateway)
-        invoke_process_manager stop-gateway "$@"
-        ;;
-      llamaswap)
-        invoke_process_manager stop-llama-swap "$@"
-        ;;
-      *)
-        echo "Unsupported stop target '$TARGET'." >&2
-        exit 1
-        ;;
-    esac
+    echo ">>> Stopping stack..."
+    (cd "$ROOT_DIR" && $DOCKER_COMPOSE down)
     ;;
+
+  restart)
+    echo ">>> Restarting stack..."
+    (cd "$ROOT_DIR" && $DOCKER_COMPOSE restart)
+    ;;
+
+  update)
+    echo ">>> Pulling latest images from Docker Hub..."
+    (cd "$ROOT_DIR" && $DOCKER_COMPOSE pull)
+    echo ">>> Rebuilding local backend images..."
+    (cd "$ROOT_DIR" && $DOCKER_COMPOSE build --pull)
+    echo ">>> Restarting updated stack..."
+    (cd "$ROOT_DIR" && $DOCKER_COMPOSE up -d)
+    ;;
+
+  generate)
+    echo ">>> Manually triggering configuration regeneration..."
+    (cd "$ROOT_DIR" && docker exec audia-gateway python3 -m src.launcher.process_manager --root . generate-configs)
+    ;;
+
   check)
     case "${TARGET:-}" in
-      ""|updates)
-        invoke_release_installer check-updates --root "$ROOT_DIR" "$@"
-        ;;
-      status)
-        invoke_process_manager status "$@"
+      status|"")
+        (cd "$ROOT_DIR" && $DOCKER_COMPOSE ps)
         ;;
       health)
-        (cd "$ROOT_DIR" && "$(ensure_venv_python)" -m src.launcher.health --root "$ROOT_DIR" "$@")
+        echo ">>> Probing internal health endpoints..."
+        (cd "$ROOT_DIR" && docker exec audia-gateway python3 -m src.launcher.health --root .)
+        ;;
+      logs)
+        shift 1 # Remove 'check'
+        shift 1 # Remove 'logs'
+        (cd "$ROOT_DIR" && $DOCKER_COMPOSE logs -f "$@")
         ;;
       *)
-        echo "Unsupported check target '$TARGET'." >&2
+        echo "Unsupported check target '$TARGET'. Try: status, health, logs" >&2
         exit 1
         ;;
     esac
     ;;
-  validate)
-    case "${TARGET:-}" in
-      ""|configs)
-        invoke_release_installer validate-configs --root "$ROOT_DIR" "$@"
-        ;;
-      *)
-        echo "Unsupported validate target '$TARGET'." >&2
-        exit 1
-        ;;
-    esac
-    ;;
-  generate)
-    case "${TARGET:-}" in
-      ""|configs)
-        invoke_process_manager generate-configs "$@"
-        ;;
-      *)
-        echo "Unsupported generate target '$TARGET'." >&2
-        exit 1
-        ;;
-    esac
-    ;;
+
   test)
-    case "${TARGET:-}" in
-      ""|routing)
-        if [[ " $* " == *" --all-models "* ]]; then
-          (cd "$ROOT_DIR" && "$(ensure_venv_python)" -m src.launcher.router_test --root "$ROOT_DIR" "$@")
-        else
-          (cd "$ROOT_DIR" && "$(ensure_venv_python)" -m src.launcher.router_test --root "$ROOT_DIR" --all-models "$@")
-        fi
-        ;;
-      *)
-        echo "Unsupported test target '$TARGET'." >&2
-        exit 1
-        ;;
-    esac
+    echo ">>> Running routing tests through the gateway..."
+    (cd "$ROOT_DIR" && docker exec audia-gateway python3 -m src.launcher.router_test --root . --all-models)
     ;;
+
   *)
     echo "Unknown action '$ACTION'. Run ./scripts/AUDiaLLMGateway.sh help for usage." >&2
     exit 1

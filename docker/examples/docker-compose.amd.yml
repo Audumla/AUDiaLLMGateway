@@ -1,0 +1,34 @@
+# Example: AMD-Optimized Stack
+# Use this if you only have AMD GPUs
+services:
+  gateway:
+    image: ${DOCKERHUB_USERNAME:-audiallmgateway}/audia-llm-gateway:latest
+    container_name: audia-gateway
+    ports:
+      - "4000:4000"
+    environment:
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
+    volumes:
+      - ./config:/app/config
+    depends_on:
+      - backend-swappable
+
+  backend-swappable:
+    image: ${DOCKERHUB_USERNAME:-audiallmgateway}/audia-llm-gateway-backend:latest
+    container_name: audia-llama-cpp
+    environment:
+      - LLAMA_BACKEND=rocm
+    volumes:
+      - ./models:/app/models:ro
+      - ./config/generated/llama-swap:/app/config:ro
+      - backend-runtime:/app/runtime
+    devices:
+      - /dev/kfd:/dev/kfd
+      - /dev/dri:/dev/dri
+    group_add:
+      - video
+      - render
+    restart: unless-stopped
+
+volumes:
+  backend-runtime:
