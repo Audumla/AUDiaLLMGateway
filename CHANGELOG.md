@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.2](https://github.com/example/AUDiaLLMGateway/compare/v0.5.1...v0.5.2) (2026-03-18)
+
+
+### Bug Fixes
+
+* updated documentation ([c3508f2](https://github.com/example/AUDiaLLMGateway/commit/c3508f2040f241205f5f696ce29aaa35af28b9e2))
+
 ## [0.5.1](https://github.com/example/AUDiaLLMGateway/compare/v0.5.0...v0.5.1) (2026-03-18)
 
 
