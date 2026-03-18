@@ -154,6 +154,40 @@ do
         || fail "NOT generated: $f"
 done
 
+# Verify nginx.conf injects the litellm auth header on proxied routes
+NGINX_CFG="$INSTALL_DIR/config/generated/nginx/nginx.conf"
+if [ -f "$NGINX_CFG" ]; then
+    AUTH_COUNT=$(grep -c 'proxy_set_header Authorization' "$NGINX_CFG" 2>/dev/null || echo 0)
+    [ "$AUTH_COUNT" -ge 4 ] \
+        && ok "nginx.conf injects Authorization header on $AUTH_COUNT litellm routes" \
+        || fail "nginx.conf is missing Authorization header injection (found $AUTH_COUNT, expected >=4)"
+
+    # Verify the injected key matches the one in config/local/env
+    ENV_KEY=$(grep 'LITELLM_MASTER_KEY=' "$INSTALL_DIR/config/local/env" 2>/dev/null | cut -d= -f2)
+    if [ -n "$ENV_KEY" ]; then
+        grep -q "Bearer $ENV_KEY" "$NGINX_CFG" \
+            && ok "nginx.conf uses correct key from config/local/env" \
+            || fail "nginx.conf key does not match config/local/env (expected Bearer $ENV_KEY)"
+    fi
+
+    # Verify no Windows-style backslash paths in llama-swap config
+    LLAMA_CFG="$INSTALL_DIR/config/generated/llama-swap/llama-swap.generated.yaml"
+    if [ -f "$LLAMA_CFG" ]; then
+        if python3 -c "
+import sys
+content = open('$LLAMA_CFG').read()
+# Look for backslash in model path context (between model-path macro and .gguf)
+import re
+bad = re.findall(r'\\\$\{(?:model|mmproj)-path\}\\\\', content)
+sys.exit(1 if bad else 0)
+" 2>/dev/null; then
+            ok "llama-swap config has no backslash model paths"
+        else
+            fail "llama-swap config contains backslash model paths"
+        fi
+    fi
+fi
+
 # ---------------------------------------------------------------------------
 # 6. Run generate independently to confirm it uses venv Python
 # ---------------------------------------------------------------------------
