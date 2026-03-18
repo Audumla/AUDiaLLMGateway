@@ -561,13 +561,15 @@ def _generated_llama_swap_models(stack: StackConfig, macros: dict[str, Any]) -> 
                 raise ValueError(f"Model catalog deployment '{profile_name}.{deployment_name}' does not define model_file")
             mmproj_file = str(deployment.get("mmproj_file", artifacts.get("mmproj_file", ""))).strip()
 
+            model_file = model_file.replace("\\", "/")
+            mmproj_file = mmproj_file.replace("\\", "/")
             lines = [
                 f"${{{executable_macro}}}",
                 f"${{{server_args_macro}}}",
-                f"${{{model_path_macro}}}\\{model_file}",
+                f"${{{model_path_macro}}}/{model_file}",
             ]
             if mmproj_file:
-                lines.append(f"${{{mmproj_path_macro}}}\\{mmproj_file}")
+                lines.append(f"${{{mmproj_path_macro}}}/{mmproj_file}")
             lines.append(_catalog_context_macro(catalog, context_name, macros, framework))
             lines.append(_catalog_named_macro(catalog, "gpu_profiles", gpu_name))
             for preset_name in runtime_presets:
