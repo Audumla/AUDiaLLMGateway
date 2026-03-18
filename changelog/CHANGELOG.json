@@ -907,5 +907,42 @@
       "Port management: watcher detects binding changes, restarts affected component, updates runtime-bindings.json; downstream configs regenerated automatically",
       "specifications/spec-001: updated Next Specs section to reference spec-002"
     ]
+  },
+  {
+    "id": "CHG-426a7074",
+    "agent": "claude",
+    "change_group": "audia-nginx-proxy-fix",
+    "plugin_version": "unreleased",
+    "date": "2026-03-18",
+    "recorded_at": "2026-03-18T07:54:20.749950Z",
+    "summary_tags": [
+      "Bug Fix"
+    ],
+    "summary": "Fixed nginx reverse proxy so all endpoints are reachable from external clients.",
+    "details": [
+      "build_nginx_landing_page used nginx_host (bind address) instead of public_host for link hrefs — links pointed to 127.0.0.1 and failed for remote clients.",
+      "nginx.conf server_name was 127.0.0.1 (rejected non-localhost Host headers) — changed to catch-all underscore.",
+      "stack.base.yaml had no explicit host for litellm/llama_swap services so _detect_local_ip() resolved to LAN IP; nginx upstreams targeted 10.10.x.x while services only listened on 127.0.0.1 causing 502s.",
+      "Added backend_bind_host: 127.0.0.1 and host: 127.0.0.1 for both backend services; all five endpoints now return 2xx through nginx on gpu-host (gpu-host.example:8080)."
+    ]
+  },
+  {
+    "id": "CHG-a8137e8a",
+    "agent": "claude",
+    "change_group": "audia-nginx-proxy-endpoints",
+    "plugin_version": "unreleased",
+    "date": "2026-03-18",
+    "recorded_at": "2026-03-18T08:14:58.276754Z",
+    "summary_tags": [
+      "Bug Fix"
+    ],
+    "summary": "Fixed all nginx-proxied endpoints to return correct data without requiring auth.",
+    "details": [
+      "/v1/models and /health returned 401 — added no_auth: true to LiteLLM general_settings.",
+      "H:/development/tools/Git/ui returned nginx 404 — added /ui/ location block proxying to litellm upstream with proxy_redirect to rewrite absolute redirects.",
+      "H:/development/tools/Git/llamaswap/ redirect pointed to /ui (nginx 404) — added proxy_redirect to rewrite upstream Location headers to /llamaswap/ prefix.",
+      "Added /ui/ link to nginx landing page.",
+      "All 13 endpoints verified: correct HTTP status, data matches direct upstream on /v1/models and /llamaswap/v1/models."
+    ]
   }
 ]

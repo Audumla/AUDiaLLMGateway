@@ -1,14 +1,5 @@
 # Changelog
 
-## [0.4.12](https://github.com/example/AUDiaLLMGateway/compare/v0.4.11...v0.4.12) (2026-03-18)
-
-
-### Bug Fixes
-
-* update configuration management ([7dc1df9](https://github.com/example/AUDiaLLMGateway/commit/7dc1df9dd7544693e0f747b2f06261be47f2d3b5))
-
-## Changelog
-
 ## Unreleased
 
 ### Scaffolded a native Windows local LLM gateway workspace in AUDiaLLMGateway. (New Feature)
@@ -282,5 +273,18 @@
 - Component selection: all components default_enabled true; interactive menu in bootstrap; persisted to config/local/components.yaml; package installs use platform-aware defaults
 - Port management: watcher detects binding changes, restarts affected component, updates runtime-bindings.json; downstream configs regenerated automatically
 - specifications/spec-001: updated Next Specs section to reference spec-002
+
+### Fixed nginx reverse proxy so all endpoints are reachable from external clients. (Bug Fix)
+- build_nginx_landing_page used nginx_host (bind address) instead of public_host for link hrefs — links pointed to 127.0.0.1 and failed for remote clients.
+- nginx.conf server_name was 127.0.0.1 (rejected non-localhost Host headers) — changed to catch-all underscore.
+- stack.base.yaml had no explicit host for litellm/llama_swap services so _detect_local_ip() resolved to LAN IP; nginx upstreams targeted 10.10.x.x while services only listened on 127.0.0.1 causing 502s.
+- Added backend_bind_host: 127.0.0.1 and host: 127.0.0.1 for both backend services; all five endpoints now return 2xx through nginx on gpu-host (gpu-host.example:8080).
+
+### Fixed all nginx-proxied endpoints to return correct data without requiring auth. (Bug Fix)
+- /v1/models and /health returned 401 — added no_auth: true to LiteLLM general_settings.
+- H:/development/tools/Git/ui returned nginx 404 — added /ui/ location block proxying to litellm upstream with proxy_redirect to rewrite absolute redirects.
+- H:/development/tools/Git/llamaswap/ redirect pointed to /ui (nginx 404) — added proxy_redirect to rewrite upstream Location headers to /llamaswap/ prefix.
+- Added /ui/ link to nginx landing page.
+- All 13 endpoints verified: correct HTTP status, data matches direct upstream on /v1/models and /llamaswap/v1/models.
 
 ---
