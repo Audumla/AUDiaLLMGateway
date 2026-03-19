@@ -47,13 +47,15 @@ Hardware-specific extras:
 
 ## Initial Setup
 
-### 1. Copy the environment file
+### 1. Set your API key
+
+Edit `.env` at the repo root (copy from `config/env.example` if it doesn't exist):
 
 ```bash
 cp config/env.example .env
 ```
 
-Edit `.env` and set at minimum:
+Set at minimum:
 
 ```dotenv
 # API authentication key — change this before exposing the gateway on a network
@@ -81,10 +83,33 @@ The path structure must match the `model_file` entries in
 `config/project/models.base.yaml`. Forward slashes are required — no Windows-style
 backslashes even on Windows hosts.
 
-### 3. Generate configs
+### 3. Start the stack
 
-The gateway container runs the config generator on startup, so no manual generation
-step is needed. If you want to pre-generate and inspect:
+```bash
+docker compose up -d
+```
+
+On first start the gateway container automatically seeds `config/local/` with
+commented template files if they do not already exist:
+
+| File | Purpose |
+| ---- | ------- |
+| `config/local/env` | Service-level env overrides (hint file — Docker reads `.env` at root) |
+| `config/local/stack.override.yaml` | Port, host, and service overrides |
+| `config/local/models.override.yaml` | Add or override model definitions |
+
+Then it generates `config/generated/` from `config/project/` + `config/local/` and
+starts LiteLLM. Subsequent restarts skip the seed step — your edits are never
+overwritten.
+
+To customise after first start, edit any file under `config/local/` and restart the
+gateway:
+
+```bash
+docker compose restart gateway
+```
+
+To force regeneration without restarting the full stack:
 
 ```bash
 ./scripts/AUDiaLLMGateway.sh generate
