@@ -90,7 +90,11 @@ case "$ACTION" in
     case "${TARGET:-}" in
       stack)
         echo ">>> Installing Python venv and dependencies..."
-        (cd "$ROOT_DIR" && "$PYTHON" -m src.installer.release_installer install-stack --root .)
+        # Bootstrap: create venv and install deps without importing project code
+        # (project modules are not importable until after pip install completes)
+        "$PYTHON" -m venv "$ROOT_DIR/.venv"
+        "$ROOT_DIR/.venv/bin/pip" install --upgrade pip
+        "$ROOT_DIR/.venv/bin/pip" install -r "$ROOT_DIR/requirements.txt"
         ;;
       components)
         echo ">>> Downloading llama-swap and llama.cpp binaries..."
