@@ -2,7 +2,7 @@
 
 ## Status
 
-Implemented (v0.5.x)
+Implemented (v0.6.x)
 
 ## Purpose
 
@@ -37,6 +37,11 @@ catalog.
 
 `docker-compose.yml` orchestrates the stack. Hardware detection and binary
 provisioning happen inside the backend container on first start.
+
+On first gateway container start, `docker/gateway-entrypoint.sh` auto-seeds
+`config/local/` with commented template files (`stack.override.yaml`,
+`models.override.yaml`, `env`) if they are absent, then runs `generate-configs`
+before starting LiteLLM. Subsequent restarts skip the seed step.
 
 Deployment profiles in `docker/examples/`:
 

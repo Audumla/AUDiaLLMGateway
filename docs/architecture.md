@@ -64,6 +64,8 @@ local overrides, then writes the generated layer.
 - machine-owned; managed by you
 - never overwritten by a release update
 - holds paths, local model additions, port overrides, optional component choices
+- **Docker**: seeded automatically on first gateway container start if files are absent
+- **Native**: seeded by `postinstall.sh` on package install
 
 **Generated layer** (`config/generated/`):
 
@@ -103,6 +105,26 @@ Bootstrap script
 - installed llama.cpp version, backend, and profile metadata
 - config validation warnings
 - last successful update time
+
+---
+
+## Script action routing
+
+`AUDiaLLMGateway.sh` (and `.ps1`) routes actions to either the Python layer or
+Docker Compose depending on the command — Docker is never required for native
+operations.
+
+| Action group | Commands | Requires Docker? |
+| ------------ | -------- | ---------------- |
+| Native install | `install stack` · `install components` · `install firewall` | No |
+| Config ops | `generate` · `validate` | No |
+| Native runtime | `start` · `stop` · `status` | No |
+| Docker ops | `docker start/stop/restart/update/status/health/logs` | Yes (lazy) |
+| Legacy aliases | `check status/health/logs` · `update` | Yes (lazy) |
+
+`docker_cmd()` is resolved lazily — it is only called when a Docker action is
+invoked. Native commands (`install`, `generate`, `validate`, `start`, `stop`,
+`status`) work in any environment without Docker present.
 
 ---
 

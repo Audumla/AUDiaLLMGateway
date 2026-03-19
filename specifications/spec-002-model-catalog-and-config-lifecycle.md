@@ -377,11 +377,19 @@ in `config/local/stack.override.yaml`.
 
 ### Seeded override file
 
-The package postinstall creates `config/local/stack.override.yaml` with all
-relevant port settings commented out and their project defaults shown as
-reference. Host values are omitted from the seed because they are auto-detected;
-users only need to add them if overriding the detected address. No sudo required
-(permissions: 666).
+`config/local/` is seeded with commented template files on first run. Both paths
+create the same three files if absent:
+
+| File | Seeded by |
+| ---- | --------- |
+| `config/local/stack.override.yaml` | `postinstall.sh` (native) · `gateway-entrypoint.sh` (Docker) |
+| `config/local/models.override.yaml` | `postinstall.sh` (native) · `gateway-entrypoint.sh` (Docker) |
+| `config/local/env` | `postinstall.sh` (native) · `gateway-entrypoint.sh` (Docker) |
+
+Port settings are commented out with project defaults shown as reference. Host
+values are omitted from the seed because they are auto-detected; users only need
+to add them if overriding the detected address. Files are only written if absent —
+user edits are never overwritten.
 
 ### Auto-propagation
 
