@@ -15,6 +15,7 @@
 - macOS Metal and CPU must be modelable as distinct profiles
 - sidecar runtime DLLs must be supportable for builds that require them
 - install state must record the chosen profile, version, backend, asset, install directory, and executable path
+- Docker runtime launch must ensure backend plugins (`libggml-*.so`) are present alongside the provisioned binaries on every container start, not only on first provision
 
 ## Configuration
 
@@ -31,3 +32,4 @@ Machine-local overrides may change:
 ## Integration
 
 - generated `llama-swap` config should be able to consume the installed `llama-server` path from install state when local overrides do not explicitly replace it
+- Docker entrypoints must refresh backend plugin symlinks before launch so persisted runtime volumes remain runnable after image updates or container recreation

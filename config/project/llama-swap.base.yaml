@@ -1,6 +1,8 @@
 # Base llama-swap substrate for generated runtime config.
-# The shared model catalog in config/project/models.base.yaml is the only
-# project model-definition source. Generated output owns models and groups.
+# Model definitions come from the merged catalog:
+#   config/project/models.base.yaml (scaffold/shared defaults)
+#   config/local/models.override.yaml (install-local definitions)
+# Generated output owns models and groups.
 
 healthCheckTimeout: 300
 logLevel: warn

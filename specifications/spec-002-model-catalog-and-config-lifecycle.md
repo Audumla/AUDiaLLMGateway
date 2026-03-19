@@ -49,7 +49,7 @@ config layer. It is the authoritative design guide for the next build-out phase.
 2. No automatic model file download triggered by config change (download remains
    a deliberate user action).
 3. No cloud-aware routing or multi-host orchestration.
-4. No breaking changes to the existing `models.base.yaml` schema — extensions only.
+4. No breaking changes to the merged catalog schema — extensions only.
 
 ---
 
@@ -57,7 +57,9 @@ config layer. It is the authoritative design guide for the next build-out phase.
 
 ### Existing structure (preserved)
 
-The current `models.base.yaml` schema is the foundation and is not replaced:
+The merged model catalog schema is the foundation and is not replaced. In the
+current layout, `config/project/models.base.yaml` provides the scaffold and
+`config/local/models.override.yaml` holds the install-local model definitions:
 
 - `frameworks` — framework capability declarations (`llama_cpp`, `vllm`)
 - `presets.contexts` — named context sizes (`32k`, `64k`, `96k`, `256k`)
@@ -101,7 +103,7 @@ model_profiles:
       vllm_primary:
         framework: vllm
         transport: direct      # vllm speaks directly to LiteLLM, no llama-swap
-        gpu_memory_utilization: 0.85
+        gpu_memory_utilization: 1.0
         max_model_len: 32768
         dtype: bfloat16
 
@@ -191,12 +193,12 @@ frameworks:
 
 ```
 config/project/stack.base.yaml          project defaults
-config/project/models.base.yaml         project model catalog
+config/project/models.base.yaml         project catalog scaffold / merge target
 config/project/llama-swap.base.yaml     llama-swap substrate defaults
 config/project/mcp.base.yaml            MCP scaffold
 
 config/local/stack.override.yaml        machine overrides (ports, hosts, flags)
-config/local/models.override.yaml       machine model additions or overrides
+config/local/models.override.yaml       machine-local model catalog and overrides
 config/local/llama-swap.override.yaml   machine llama-swap substrate overrides
 
 state/install-state.json               installed components and binary paths

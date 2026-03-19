@@ -30,7 +30,7 @@ The generated application configs then consume those values so you do not have t
 
 ## Shared model catalog
 
-The backend-agnostic source of truth for model behavior now lives in:
+The backend-agnostic model catalog now merges from:
 
 - `config/project/models.base.yaml`
 - `config/local/models.override.yaml`
@@ -52,7 +52,12 @@ GPU and runtime presets should also be expressed in the catalog as structured `l
 
 This is the current greenfield schema. The default project config no longer carries older compatibility forms for model exposure or context naming.
 
-This shared catalog is the authoritative model source. `llama-swap` project config is only backend substrate for executable/path primitives. Project model entries, load groups, and translated preset macros are generated from the shared catalog rather than shipped in a separate `llama-swap` inventory.
+`config/project/models.base.yaml` is an empty scaffold for shipped defaults.
+Install-specific frameworks, presets, model entries, exposures, and load groups
+belong in `config/local/models.override.yaml`. `llama-swap` project config is
+only backend substrate for executable/path primitives. Project model entries,
+load groups, and translated preset macros are generated from the merged catalog
+rather than shipped in a separate `llama-swap` inventory.
 
 Load groups should also be defined in the shared catalog. That allows an activity-oriented grouping such as `coding_active` or `reasoning_active` to be translated into backend-specific group mechanics like `llama-swap` persistence and swap behavior.
 

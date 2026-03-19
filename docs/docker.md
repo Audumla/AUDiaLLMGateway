@@ -66,6 +66,7 @@ HUGGING_FACE_HUB_TOKEN=hf_your_token_here
 
 # Path to your model directory (defaults to ./models)
 MODEL_ROOT=./models
+MODEL_HF_ROOT=./models-hf
 
 # Optional vLLM backend
 AUDIA_ENABLE_VLLM=false
@@ -90,7 +91,7 @@ models/
 ```
 
 The path structure must match the `model_file` entries in
-`config/project/models.base.yaml`. Forward slashes are required — no Windows-style
+`config/local/models.override.yaml`. Forward slashes are required — no Windows-style
 backslashes even on Windows hosts.
 
 ### 3. Start the stack
@@ -135,8 +136,8 @@ To force regeneration without restarting the full stack:
 ## Deployment Profiles
 
 Choose the compose file that matches your hardware. Each profile is self-contained.
-vLLM is available in all GPU-capable profiles as an optional add-on started with
-`AUDIA_ENABLE_VLLM=true` and `--profile vllm`.
+vLLM is available as an optional add-on, but the validated AMD path is the AMD
+compose profile rather than the root compose file.
 
 ### 1. Universal (auto-detect)
 
@@ -147,7 +148,7 @@ first start. Best choice for most home-lab deployments.
 # llama.cpp only (auto-detect GPU)
 docker compose up -d
 
-# With vLLM added
+# With vLLM added (root compose / NVIDIA-oriented path)
 AUDIA_ENABLE_VLLM=true docker compose --profile vllm up -d
 ```
 
@@ -229,6 +230,8 @@ volumes:
 ### 4. AMD / ROCm
 
 Profile for AMD GPUs using ROCm or Vulkan passthrough.
+The validated vLLM path on AMD uses the official `vllm/vllm-openai-rocm:latest`
+image in the AMD compose profile.
 
 **Prerequisite:** ROCm 5.6+ drivers. Verify with:
 
@@ -371,14 +374,15 @@ All variables read from `.env` at compose start time.
 | `LITELLM_MASTER_KEY` | No | `sk-local-dev` | API key for LiteLLM Admin UI and gateway auth. Set a strong value before exposing externally. |
 | `HUGGING_FACE_HUB_TOKEN` | No | — | HuggingFace token for gated model downloads. |
 | `MODEL_ROOT` | No | `./models` | Host path to model directory. Mounted read-only into the backend. |
+| `MODEL_HF_ROOT` | No | `./models-hf` | Host path for Hugging Face cache and raw tensor weights used by vLLM. |
 | `AUDIA_ENABLE_VLLM` | No | `false` | Enables vLLM-backed LiteLLM routes and watcher-managed vLLM restarts. Requires `--profile vllm`. |
 | `GATEWAY_PORT` | No | `4000` | Host port published for the LiteLLM gateway. |
 | `NGINX_PORT` | No | `8080` | Host port published for the nginx reverse proxy. |
 | `VLLM_MODEL` | No | `Qwen/Qwen2.5-0.5B-Instruct` | Model served by the vLLM backend (if used). |
 | `VLLM_PORT` | No | `41090` | Host port for the vLLM backend. |
-| `VLLM_GPU_MEM` | No | `0.85` | GPU memory utilization fraction for vLLM. |
+| `VLLM_GPU_MEM` | No | `1.0` | GPU memory utilization fraction for vLLM. |
 | `VLLM_MAX_LEN` | No | `4096` | Maximum context length for the vLLM backend. |
-| `VLLM_IMAGE` | No | `example/audia-llm-gateway-vllm:latest` | Override the vLLM image. The default wraps upstream vLLM with AUDia's generated-config entrypoint. |
+| `VLLM_IMAGE` | No | `example/audia-llm-gateway-vllm:latest` | Override the vLLM image. Use `vllm/vllm-openai-rocm:latest` with the AMD compose profile. |
 | `VLLM_MOCK_MODE` | No | `false` | Runs the mounted mock vLLM server instead of the real `vllm` process. Intended for Docker validation only. |
 | `LLAMA_BACKEND` | No | `auto` | Override llama.cpp backend detection: `auto`, `cuda`, `rocm`, `vulkan`, `cpu`. |
 | `LLAMA_VERSION` | No | `latest` | llama.cpp release tag to provision (e.g. `b4632`). |
@@ -392,7 +396,7 @@ Model files live outside containers and are bind-mounted read-only.
 The directory structure must match the `model_file` paths in the model catalog:
 
 ```text
-# config/project/models.base.yaml snippet:
+# config/local/models.override.yaml snippet:
 #   model_file: Qwen3.5-27B/Qwen3.5-27B-Q6_K.gguf
 
 models/
@@ -605,6 +609,8 @@ catalog so the gateway does not advertise dead vLLM aliases.
 
 When enabled, the generator writes `config/generated/vllm/vllm.config.json`, nginx
 adds `/vllm/` and `/vllm-health`, and the watcher restarts `backend-vllm` when the
-generated vLLM config or relevant env values change. The default `VLLM_IMAGE`
-already contains the AUDia vLLM entrypoint, so remote deployments do not need
-mounted helper scripts.
+generated vLLM config or relevant env values change. The Hugging Face cache mount
+should use `MODEL_HF_ROOT`, not `MODEL_ROOT`, so raw HF weights stay separate from
+GGUF files. On AMD hosts, use [`docker/examples/docker-compose.amd.yml`](../docker/examples/docker-compose.amd.yml),
+which runs the validated ROCm image (`vllm/vllm-openai-rocm:latest`) with
+`/dev/kfd`, `/dev/dri`, `ipc: host`, and `SYS_PTRACE`.

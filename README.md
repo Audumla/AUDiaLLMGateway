@@ -39,11 +39,15 @@ install without a git checkout.
 
 On first Docker start, LiteLLM Admin UI login defaults to username `admin` and password `sk-local-dev` unless you override `LITELLM_MASTER_KEY`.
 
-To add the optional `vLLM` backend, set `AUDIA_ENABLE_VLLM=true` in `.env` and start the profile:
+To add the optional `vLLM` backend, set `AUDIA_ENABLE_VLLM=true` in `.env` and start the profile.
+For NVIDIA hosts, the root compose profile is the direct path:
 
 ```bash
 docker compose --profile vllm up -d
 ```
+
+For AMD hosts, use the AMD compose profile from [docs/docker.md](docs/docker.md)
+rather than the root compose.
 
 See [docs/docker.md](docs/docker.md) for all deployment profiles (Universal, NVIDIA, AMD, External Proxy).
 
@@ -112,7 +116,7 @@ The system uses three config layers that merge at generation time:
 Project base files:
 
 - `config/project/stack.base.yaml` — services, network, components
-- `config/project/models.base.yaml` — model catalog (backend-agnostic)
+- `config/project/models.base.yaml` — shared catalog scaffold and empty defaults
 - `config/project/llama-swap.base.yaml` — llama-swap substrate
 - `config/project/mcp.base.yaml` — MCP scaffold
 
@@ -133,8 +137,9 @@ Generated outputs:
 
 ### Shared model catalog
 
-Models are defined once in `config/project/models.base.yaml` — no duplicating
-parameters into per-backend files. The catalog holds:
+Install-local model definitions live in `config/local/models.override.yaml` — no
+duplicating parameters into per-backend files. The shared project base now provides
+the scaffold and merge targets used by the local catalog. The catalog holds:
 
 - model profiles (artifacts, deployments per backend)
 - context presets (`32k`, `64k`, `96k`, `256k`)
