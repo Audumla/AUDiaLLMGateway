@@ -162,7 +162,7 @@ model_profiles:
         - nothink
         - coder
     artifacts:
-      model_file: Qwen3.5-27B/Qwen3.5-27B-Q6_K.gguf
+      model_file: qwen3.5-27B/Qwen3.5-27B-Q6_K.gguf
       revision: main
       source_page_url: https://huggingface.co/mradermacher/Qwen3.5-27B-GGUF
       model_filename: Qwen3.5-27B.Q6_K.gguf
