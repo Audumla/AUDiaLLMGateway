@@ -46,9 +46,8 @@ services:
     restart: unless-stopped
 
   # vLLM backend (ROCm) — start with --profile vllm
-  # Uses the official ROCm-enabled vLLM image.
   backend-vllm:
-    image: ${VLLM_IMAGE:-vllm/vllm-openai:latest}
+    image: ${VLLM_IMAGE:-audumla/audia-llm-gateway-vllm:latest}
     container_name: audia-vllm
     profiles:
       - vllm
@@ -61,9 +60,6 @@ services:
     volumes:
       - ${MODEL_ROOT:-./models}:/root/.cache/huggingface:rw
       - ./config/generated/vllm:/app/config/generated/vllm:ro
-      - ./docker/vllm-entrypoint.sh:/app/vllm-entrypoint.sh:ro
-      - ./docker/vllm-mock-server.py:/app/vllm-mock-server.py:ro
-    entrypoint: ["/bin/sh", "/app/vllm-entrypoint.sh"]
     devices:
       - /dev/kfd:/dev/kfd
       - /dev/dri:/dev/dri

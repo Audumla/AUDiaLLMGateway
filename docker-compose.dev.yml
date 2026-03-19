@@ -1,0 +1,10 @@
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.gateway
+
+  backend-swappable:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.unified-backend

@@ -33,6 +33,10 @@ cp config/env.example .env
 docker compose up -d
 ```
 
+The root [`docker-compose.yml`](docker-compose.yml) is deployment-oriented and
+pulls published images only, so a remote host can stay a clean Docker Compose
+install without a git checkout.
+
 On first Docker start, LiteLLM Admin UI login defaults to username `admin` and password `sk-local-dev` unless you override `LITELLM_MASTER_KEY`.
 
 To add the optional `vLLM` backend, set `AUDIA_ENABLE_VLLM=true` in `.env` and start the profile:
@@ -42,6 +46,12 @@ docker compose --profile vllm up -d
 ```
 
 See [docs/docker.md](docs/docker.md) for all deployment profiles (Universal, NVIDIA, AMD, External Proxy).
+
+For local source-based Docker development, use:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+```
 
 ### Native install
 

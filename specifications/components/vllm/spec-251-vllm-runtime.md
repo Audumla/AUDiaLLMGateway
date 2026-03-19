@@ -18,7 +18,7 @@
 component_settings:
   vllm:
     provider: docker
-    docker_image: vllm/vllm-openai:latest
+    docker_image: audumla/audia-llm-gateway-vllm:latest
 ```
 
 ### Model Catalog (`models.base.yaml`)
