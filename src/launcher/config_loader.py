@@ -296,12 +296,22 @@ def load_stack_config(root: str | Path) -> StackConfig:
     nginx_service = services_raw.get("nginx", {}) if isinstance(services_raw, dict) else {}
 
     _auto_ip = _detect_local_ip()
+    _is_docker = os.environ.get("AUDIA_DOCKER", "false").lower() == "true"
+    
+    _litellm_host = str(litellm_service.get("host") or litellm_raw.get("host") or _auto_ip)
+    _llamaswap_host = str(llamaswap_service.get("host") or llama_swap_raw.get("host") or _auto_ip)
+    
+    if _is_docker:
+        # In Docker, Nginx and LiteLLM talk to other containers via service names
+        _litellm_host = "audia-gateway"
+        _llamaswap_host = "audia-llama-cpp"
+
     network = NetworkConfig(
         backend_bind_host=str(network_raw.get("backend_bind_host") or _auto_ip),
         public_host=str(network_raw.get("public_host") or _auto_ip),
-        llamaswap_host=str(llamaswap_service.get("host") or llama_swap_raw.get("host") or _auto_ip),
+        llamaswap_host=_llamaswap_host,
         llamaswap_port=int(llamaswap_service.get("port", llama_swap_raw.get("port", 41080))),
-        litellm_host=str(litellm_service.get("host") or litellm_raw.get("host") or _auto_ip),
+        litellm_host=_litellm_host,
         litellm_port=int(litellm_service.get("port", litellm_raw.get("port", 4000))),
         nginx_host=str(nginx_service.get("host") or _auto_ip),
         nginx_port=int(nginx_service.get("port", 8080)),
@@ -751,7 +761,7 @@ def build_llama_swap_config(stack: StackConfig) -> dict[str, Any]:
 
 
 def build_litellm_config(stack: StackConfig) -> dict[str, Any]:
-    api_base = f"http://{stack.llama_swap.host}:{stack.llama_swap.port}/v1"
+    api_base = f"http://{stack.network.llamaswap_host}:{stack.network.llamaswap_port}/v1"
     model_list = []
     for model in stack.published_models:
         model_list.append(
