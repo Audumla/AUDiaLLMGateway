@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.10.1](https://github.com/Audumla/AUDiaLLMGateway/compare/v0.10.0...v0.10.1) (2026-03-19)
+
+
+### Bug Fixes
+
+* mount only config/local and config/generated, not entire config/ ([c10958f](https://github.com/Audumla/AUDiaLLMGateway/commit/c10958f76ddf3bcc18166282f64f6309790fca44))
+* updated ngnix config ([ac28065](https://github.com/Audumla/AUDiaLLMGateway/commit/ac28065eb261c1616f43ff532ea447fb0b6ab3fa))
+* use /health/liveliness for gateway healthcheck ([2beb80e](https://github.com/Audumla/AUDiaLLMGateway/commit/2beb80e356bbfba74c3f77f31e61843d6eb260b6))
+* use /tmp paths in generated nginx.conf ([a60424f](https://github.com/Audumla/AUDiaLLMGateway/commit/a60424f94cbfb1e8b010025c61c95e1e50d2eb9e))
+
 ## [0.10.0](https://github.com/Audumla/AUDiaLLMGateway/compare/v0.9.2...v0.10.0) (2026-03-19)
 
 
