@@ -150,7 +150,7 @@ Compose file: [`docker/examples/docker-compose.nvidia.yml`](../docker/examples/d
 # docker/examples/docker-compose.nvidia.yml
 services:
   gateway:
-    image: audiallmgateway/audia-llm-gateway:latest
+    image: example/audia-llm-gateway-orchestrator:latest
     container_name: audia-gateway
     ports:
       - "4000:4000"
@@ -162,7 +162,7 @@ services:
       - backend-swappable
 
   backend-swappable:
-    image: audiallmgateway/audia-llm-gateway-backend:latest
+    image: example/audia-llm-gateway-server:latest
     container_name: audia-llama-cpp
     environment:
       - LLAMA_BACKEND=cuda
@@ -205,7 +205,7 @@ Compose file: [`docker/examples/docker-compose.amd.yml`](../docker/examples/dock
 # docker/examples/docker-compose.amd.yml
 services:
   gateway:
-    image: audiallmgateway/audia-llm-gateway:latest
+    image: example/audia-llm-gateway-orchestrator:latest
     container_name: audia-gateway
     ports:
       - "4000:4000"
@@ -217,7 +217,7 @@ services:
       - backend-swappable
 
   backend-swappable:
-    image: audiallmgateway/audia-llm-gateway-backend:latest
+    image: example/audia-llm-gateway-server:latest
     container_name: audia-llama-cpp
     environment:
       - LLAMA_BACKEND=rocm
@@ -260,7 +260,7 @@ Compose file: [`docker/examples/docker-compose.external-proxy.yml`](../docker/ex
 # docker/examples/docker-compose.external-proxy.yml
 services:
   gateway:
-    image: audiallmgateway/audia-llm-gateway:latest
+    image: example/audia-llm-gateway-orchestrator:latest
     container_name: audia-gateway
     # No port mapping — proxied via the web-proxy network
     environment:
@@ -274,7 +274,7 @@ services:
       - internal
 
   backend-swappable:
-    image: audiallmgateway/audia-llm-gateway-backend:latest
+    image: example/audia-llm-gateway-server:latest
     container_name: audia-llama-cpp
     environment:
       - LLAMA_BACKEND=auto
@@ -437,7 +437,7 @@ To force a full re-provision of the backend runtime (e.g. after a llama.cpp vers
 change):
 
 ```bash
-docker volume rm audiallmgateway_backend-runtime
+docker volume rm example_backend-runtime
 docker compose up -d
 ```
 
