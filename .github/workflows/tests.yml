@@ -62,11 +62,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build smoke image (${{ matrix.distro }})
-        run: |
-          docker build --network=host \
-            -f tests/docker/Dockerfile.${{ matrix.distro }} \
-            -t audia-smoke-${{ matrix.distro }} .
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: tests/docker/Dockerfile.${{ matrix.distro }}
+          load: true
+          tags: audia-smoke-${{ matrix.distro }}
+          cache-from: type=gha,scope=smoke-${{ matrix.distro }}
+          cache-to: type=gha,mode=max,scope=smoke-${{ matrix.distro }}
 
       - name: Run smoke test (${{ matrix.distro }})
         run: docker run --rm audia-smoke-${{ matrix.distro }}
@@ -81,11 +88,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build e2e image
-        run: |
-          docker build --network=host \
-            -f tests/docker/Dockerfile.e2e \
-            -t audia-e2e .
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: tests/docker/Dockerfile.e2e
+          load: true
+          tags: audia-e2e
+          cache-from: type=gha,scope=e2e
+          cache-to: type=gha,mode=max,scope=e2e
 
       - name: Run e2e mock test
         run: docker run --rm audia-e2e
@@ -146,9 +160,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build ${{ matrix.image }} image
-        run: |
-          docker build --network=host \
-            -f ${{ matrix.dockerfile }} \
-            -t audia-${{ matrix.image }}-test \
-            .
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: false
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
