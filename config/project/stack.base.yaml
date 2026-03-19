@@ -218,8 +218,7 @@ litellm:
     - /health/liveliness
     - /health
     - /v1/models
-  extra_args:
-    - --detailed_debug
+  extra_args: []
 
 models:
   project_config_path: config/project/models.base.yaml
