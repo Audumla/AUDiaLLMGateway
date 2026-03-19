@@ -51,9 +51,14 @@ else
         fi
     fi
 
+    # Always provision Vulkan if any GPU is visible — allows switching between
+    # backends (e.g. ROCm + Vulkan on AMD) without reprovisioning
+    $HAS_NVIDIA && HAS_VULKAN=true
+    $HAS_AMD    && HAS_VULKAN=true
+
     echo "  NVIDIA (CUDA) detected: $HAS_NVIDIA"
     echo "  AMD (ROCm) detected:    $HAS_AMD"
-    echo "  Vulkan fallback:        $HAS_VULKAN"
+    echo "  Vulkan:                 $HAS_VULKAN"
 fi
 
 CURRENT_SIG="VERSION=${LLAMA_VERSION:-latest}|NV=$HAS_NVIDIA|AMD=$HAS_AMD|VK=$HAS_VULKAN|BACKEND=${LLAMA_BACKEND:-auto}"
@@ -65,7 +70,10 @@ if [ ! -f "$STATE_FILE" ] || [ "$(cat "$STATE_FILE")" != "$CURRENT_SIG" ]; then
     echo "--- Provisioning llama.cpp runtime ---"
     rm -rf "$BIN_DIR"/* "$LIB_DIR"/*
 
-    # Build ordered list of backends to provision — first entry becomes the default
+    # Build ordered list of backends to provision — first entry becomes the default.
+    # Vulkan is always included alongside CUDA/ROCm so users can switch backends
+    # (e.g. LLAMA_BACKEND=vulkan on an AMD system that also has ROCm) without
+    # needing to reprovision.
     BACKENDS=()
     $HAS_NVIDIA  && BACKENDS+=("cuda")
     $HAS_AMD     && BACKENDS+=("rocm")
