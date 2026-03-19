@@ -94,11 +94,11 @@ if [ ! -f "$STATE_FILE" ] || [ "$(cat "$STATE_FILE")" != "$CURRENT_SIG" ]; then
             rocm)
                 PATTERN="ubuntu-rocm.*x64\.(tar\.gz|zip)$"
                 SUFFIX="rocm"
-                # Install ROCm HIP runtime (lazy — only when AMD hardware is detected)
-                wget -qO - https://repo.radeon.com/rocm/rocm.gpg.key | gpg --dearmor -o /etc/apt/keyrings/rocm.gpg
-                echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/rocm/apt/6.0 jammy main" \
-                    > /etc/apt/sources.list.d/rocm.list
-                apt-get update -qq && apt-get install -y --no-install-recommends rocm-hip-runtime libvulkan1 mesa-vulkan-drivers \
+                # ROCm HIP runtime is provided by the host via /dev/kfd + /dev/dri passthrough.
+                # Do not try to install rocm-hip-runtime via apt — the package has version
+                # conflicts on Ubuntu 22.04 and the llama.cpp ROCm binary bundles what it needs.
+                # Only install Vulkan system libs (needed for the Vulkan backend on the same GPU).
+                apt-get update -qq && apt-get install -y --no-install-recommends libvulkan1 mesa-vulkan-drivers \
                     && rm -rf /var/lib/apt/lists/*
                 ;;
             cuda)
