@@ -17,8 +17,9 @@ deployment models, config system, and the scope of what has been built.
 Client / tool
   └─> nginx (optional, port 8080)
         └─> LiteLLM API gateway (port 4000)
-              └─> llama-swap model router (port 41080)
-                    └─> llama-server processes (llama.cpp)
+              ├─> llama-swap model router (port 41080)
+              │     └─> llama-server processes (llama.cpp)
+              └─> vLLM backend (optional, port 8000)
 ```
 
 All service ports are configured centrally under `network` in
@@ -135,7 +136,7 @@ deploy:
 | ------- | ------ | ---- |
 | Config watcher (auto-reload on file change) | Stub only (`src/launcher/watcher.py`) | spec-002 |
 | Selective component reload | Not implemented | spec-002 |
-| vLLM backend integration | Compose profile exists; Python generator not wired | — |
+| vLLM backend integration | Implemented in Docker with generated config, watcher restarts, and nginx `/vllm/` proxy | spec-251 |
 | Interactive component selection at install | Not implemented | spec-002 |
 
 The hot-reload workflow described in early drafts of this spec (inotify detection →

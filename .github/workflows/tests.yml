@@ -143,8 +143,10 @@ jobs:
         include:
           - image: gateway
             dockerfile: docker/Dockerfile.gateway
+            build_arg: GATEWAY_BASE_IMAGE=audia-gateway-base:test
           - image: backend
             dockerfile: docker/Dockerfile.unified-backend
+            build_arg: BACKEND_BASE_IMAGE=audia-backend-base:test
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -152,11 +154,33 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Build gateway base image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile.gateway-base
+          load: true
+          tags: audia-gateway-base:test
+          cache-from: type=gha,scope=gateway-base
+          cache-to: type=gha,mode=max,scope=gateway-base
+
+      - name: Build backend base image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile.backend-base
+          load: true
+          tags: audia-backend-base:test
+          cache-from: type=gha,scope=backend-base
+          cache-to: type=gha,mode=max,scope=backend-base
+
       - name: Build ${{ matrix.image }} image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ${{ matrix.dockerfile }}
+          build-args: |
+            ${{ matrix.build_arg }}
           push: false
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}

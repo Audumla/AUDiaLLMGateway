@@ -47,7 +47,7 @@ Hardware-specific extras:
 
 ## Initial Setup
 
-### 1. Set your API key
+### 1. Review the default API key
 
 Edit `.env` at the repo root (copy from `config/env.example` if it doesn't exist):
 
@@ -66,7 +66,17 @@ HUGGING_FACE_HUB_TOKEN=hf_your_token_here
 
 # Path to your model directory (defaults to ./models)
 MODEL_ROOT=./models
+
+# Optional vLLM backend
+AUDIA_ENABLE_VLLM=false
 ```
+
+If you do not change it, the Docker install defaults LiteLLM to:
+
+- Username: `admin`
+- Password: `sk-local-dev`
+
+That password is the LiteLLM `LITELLM_MASTER_KEY`. Change it before exposing the gateway on a network.
 
 ### 2. Place your model files
 
@@ -99,8 +109,9 @@ commented template files if they do not already exist:
 | `config/local/models.override.yaml` | Add or override model definitions |
 
 Then it generates `config/generated/` from `config/project/` + `config/local/` and
-starts LiteLLM. Subsequent restarts skip the seed step — your edits are never
-overwritten.
+starts LiteLLM. If `LITELLM_MASTER_KEY` is not already present in the container
+environment, the gateway reuses the seeded value from `config/local/env` on first
+run. Subsequent restarts skip the seed step — your edits are never overwritten.
 
 To customise after first start, edit any file under `config/local/` and restart the
 gateway:
@@ -120,7 +131,8 @@ To force regeneration without restarting the full stack:
 ## Deployment Profiles
 
 Choose the compose file that matches your hardware. Each profile is self-contained.
-vLLM is available in all profiles as an optional add-on started with `--profile vllm`.
+vLLM is available in all GPU-capable profiles as an optional add-on started with
+`AUDIA_ENABLE_VLLM=true` and `--profile vllm`.
 
 ### 1. Universal (auto-detect)
 
@@ -131,8 +143,8 @@ first start. Best choice for most home-lab deployments.
 # llama.cpp only (auto-detect GPU)
 docker compose up -d
 
-# With vLLM added (requires NVIDIA GPU)
-docker compose --profile vllm up -d
+# With vLLM added
+AUDIA_ENABLE_VLLM=true docker compose --profile vllm up -d
 ```
 
 This uses the root `docker-compose.yml`. On first start, the backend container
@@ -352,15 +364,18 @@ All variables read from `.env` at compose start time.
 
 | Variable | Required | Default | Description |
 | -------- | -------- | ------- | ----------- |
-| `LITELLM_MASTER_KEY` | Yes | — | API key for LiteLLM. Set a strong value before exposing externally. |
+| `LITELLM_MASTER_KEY` | No | `sk-local-dev` | API key for LiteLLM Admin UI and gateway auth. Set a strong value before exposing externally. |
 | `HUGGING_FACE_HUB_TOKEN` | No | — | HuggingFace token for gated model downloads. |
 | `MODEL_ROOT` | No | `./models` | Host path to model directory. Mounted read-only into the backend. |
+| `AUDIA_ENABLE_VLLM` | No | `false` | Enables vLLM-backed LiteLLM routes and watcher-managed vLLM restarts. Requires `--profile vllm`. |
 | `GATEWAY_PORT` | No | `4000` | Host port published for the LiteLLM gateway. |
 | `NGINX_PORT` | No | `8080` | Host port published for the nginx reverse proxy. |
 | `VLLM_MODEL` | No | `Qwen/Qwen2.5-0.5B-Instruct` | Model served by the vLLM backend (if used). |
 | `VLLM_PORT` | No | `41090` | Host port for the vLLM backend. |
 | `VLLM_GPU_MEM` | No | `0.85` | GPU memory utilization fraction for vLLM. |
 | `VLLM_MAX_LEN` | No | `4096` | Maximum context length for the vLLM backend. |
+| `VLLM_IMAGE` | No | `vllm/vllm-openai:latest` | Override the vLLM image, useful for testing with a mock container. |
+| `VLLM_MOCK_MODE` | No | `false` | Runs the mounted mock vLLM server instead of the real `vllm` process. Intended for Docker validation only. |
 | `LLAMA_BACKEND` | No | `auto` | Override llama.cpp backend detection: `auto`, `cuda`, `rocm`, `vulkan`, `cpu`. |
 | `LLAMA_VERSION` | No | `latest` | llama.cpp release tag to provision (e.g. `b4632`). |
 | `DOCKERHUB_USERNAME` | No | `example` | Override image registry username for self-hosted images. |
@@ -450,7 +465,31 @@ The update preserves:
 - `backend-runtime` volume — cached llama.cpp binaries
 - `.env` — your environment file
 
----
+## Building Images Locally
+
+The Docker Hub publish pipeline now uses reusable base images so final image builds
+and pushes only need to copy the repo code layered on top.
+
+Build the base images first:
+
+```bash
+docker build -f docker/Dockerfile.gateway-base -t audia-gateway-base:local .
+docker build -f docker/Dockerfile.backend-base -t audia-backend-base:local .
+```
+
+Then build the final images against those local base tags:
+
+```bash
+docker build -f docker/Dockerfile.gateway \
+  --build-arg GATEWAY_BASE_IMAGE=audia-gateway-base:local \
+  -t audia-llm-gateway .
+
+docker build -f docker/Dockerfile.unified-backend \
+  --build-arg BACKEND_BASE_IMAGE=audia-backend-base:local \
+  -t audia-llm-backend .
+```
+
+--- 
 
 ## Volumes and Persistence
 
@@ -497,7 +536,10 @@ docker compose logs backend-swappable
 Docker's bridge network has unreliable DNS on some Linux hosts. Build with host networking:
 
 ```bash
-docker build --network=host -f docker/Dockerfile.gateway -t audia-llm-gateway .
+docker build --network=host -f docker/Dockerfile.gateway-base -t audia-gateway-base:local .
+docker build --network=host -f docker/Dockerfile.gateway \
+  --build-arg GATEWAY_BASE_IMAGE=audia-gateway-base:local \
+  -t audia-llm-gateway .
 ```
 
 ### Models not found by llama-swap
@@ -535,3 +577,13 @@ curl http://localhost:4000/v1/models \
 ```
 
 The `LITELLM_MASTER_KEY` in `.env` must match what your client sends.
+
+### vLLM enablement
+
+vLLM routing is intentionally gated behind `AUDIA_ENABLE_VLLM=true`. Starting the
+`backend-vllm` profile without that flag leaves LiteLLM on the llama-swap-only
+catalog so the gateway does not advertise dead vLLM aliases.
+
+When enabled, the generator writes `config/generated/vllm/vllm.config.json`, nginx
+adds `/vllm/` and `/vllm-health`, and the watcher restarts `backend-vllm` when the
+generated vLLM config or relevant env values change.

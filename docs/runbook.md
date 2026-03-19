@@ -42,7 +42,7 @@ This catalog is intended to hold shared model semantics that can survive backend
 - runtime behavior presets
 - model artifacts
 - model source and download URLs
-- framework deployments such as `llama_cpp` now and `vllm` later
+- framework deployments such as `llama_cpp` and optional `vllm`
 - exposed LiteLLM aliases
 - load groups for activities like coding, reasoning, or vision
 

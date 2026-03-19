@@ -41,7 +41,12 @@ model_profiles:
 ## Integration
 
 ### Gateway Routing
-LiteLLM will communicate with `vLLM` using the Docker internal hostname `backend-vllm:8000`.
+LiteLLM communicates with `vLLM` using the Docker internal hostname `audia-vllm:8000`
+when `AUDIA_ENABLE_VLLM=true`. The generator emits direct LiteLLM routes for
+`framework: vllm` / `transport: direct` exposures and writes
+`config/generated/vllm/vllm.config.json` for the container entrypoint.
 
 ### Health Check
-The `audia-watcher` service monitors the `vLLM` readiness via its `/health` endpoint before signaling stack completion.
+The `audia-watcher` service restarts `backend-vllm` when the generated vLLM config
+or relevant env values change. nginx proxies `/vllm/` and `/vllm-health` directly
+to the backend when enabled.

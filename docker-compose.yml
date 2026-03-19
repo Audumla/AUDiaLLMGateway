@@ -27,6 +27,10 @@ services:
     environment:
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-local-dev}
       - AUDIA_DOCKER=true
+      - AUDIA_ENABLE_VLLM=${AUDIA_ENABLE_VLLM:-false}
+      - VLLM_MODEL=${VLLM_MODEL:-Qwen/Qwen2.5-0.5B-Instruct}
+      - VLLM_GPU_MEM=${VLLM_GPU_MEM:-0.85}
+      - VLLM_MAX_LEN=${VLLM_MAX_LEN:-4096}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4000/health/liveliness"]
       interval: 15s
@@ -72,7 +76,7 @@ services:
   # or downloaded from HuggingFace on first request.
   # Requires NVIDIA GPU with CUDA support.
   backend-vllm:
-    image: vllm/vllm-openai:latest
+    image: ${VLLM_IMAGE:-vllm/vllm-openai:latest}
     container_name: audia-vllm
     profiles:
       - vllm
@@ -80,13 +84,15 @@ services:
     ports:
       - "${VLLM_PORT:-41090}:8000"
     environment:
+      - AUDIA_ENABLE_VLLM=${AUDIA_ENABLE_VLLM:-false}
       - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN:-}
+      - VLLM_MOCK_MODE=${VLLM_MOCK_MODE:-false}
     volumes:
       - ${MODEL_ROOT:-./models}:/root/.cache/huggingface:rw
-    command: >
-      --model ${VLLM_MODEL:-Qwen/Qwen2.5-0.5B-Instruct}
-      --gpu-memory-utilization ${VLLM_GPU_MEM:-0.85}
-      --max-model-len ${VLLM_MAX_LEN:-4096}
+      - ./config/generated/vllm:/app/config/generated/vllm:ro
+      - ./docker/vllm-entrypoint.sh:/app/vllm-entrypoint.sh:ro
+      - ./docker/vllm-mock-server.py:/app/vllm-mock-server.py:ro
+    entrypoint: ["/bin/sh", "/app/vllm-entrypoint.sh"]
     deploy:
       resources:
         reservations:
@@ -96,15 +102,23 @@ services:
               capabilities: [gpu]
     restart: unless-stopped
 
-  # --- Hot-Reload Watcher (optional — not yet implemented) ---
-  # Watches config/local/ for changes and triggers generate + selective restart.
-  # Disabled by default until watcher.py is fully implemented.
+  # --- Hot-Reload Watcher (optional) ---
+  # Watches config/local/ for changes, regenerates configs, reloads nginx,
+  # and restarts the gateway when LiteLLM auth/config changes.
   watcher:
     image: example/audia-llm-gateway-orchestrator:latest
     container_name: audia-watcher
     profiles:
       - watcher
       - full
+    environment:
+      - AUDIA_DOCKER=true
+      - AUDIA_ENABLE_VLLM=${AUDIA_ENABLE_VLLM:-false}
+      - VLLM_MODEL=${VLLM_MODEL:-Qwen/Qwen2.5-0.5B-Instruct}
+      - VLLM_GPU_MEM=${VLLM_GPU_MEM:-0.85}
+      - VLLM_MAX_LEN=${VLLM_MAX_LEN:-4096}
+    healthcheck:
+      disable: true
     volumes:
       - ./config/local:/app/config/local:z
       - ./config/generated:/app/config/generated:z
