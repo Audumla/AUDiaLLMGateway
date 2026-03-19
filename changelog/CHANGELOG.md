@@ -336,4 +336,19 @@
 - Updated root and example compose files plus env/docs/specs to use AUDIA_ENABLE_VLLM and VLLM_* settings consistently.
 - Validated the end-to-end Docker flow with a mock audia-vllm container, including proxy parity and watcher-driven config regeneration/restart behavior.
 
+### Added an image-only Docker deployment flow, published the vLLM wrapper image, and verified a clean remote Compose install. (Build / Packaging, Documentation Update, Test Update)
+- Added docker/Dockerfile.vllm and docker-compose.dev.yml, converted the root deployment compose to image-only, and updated docs/workflows to match.
+- Synced only docker-compose.yml to the remote host at /opt/docker/services/llm_gateway, keeping the machine free of git checkouts or extra source files.
+- Validated nginx proxy parity against LiteLLM and llama-swap on 10.10.100.10 and verified watcher regeneration plus nginx reload after fixing SELinux access for the Docker socket.
+
+### Configured the remote gateway host to persistently expose the NTFS-backed model store to the llm_gateway Docker stack. (Configuration Cleanup)
+- Mounted NTFS volume UUID 681E56C51E568C46 at /mnt/stuff via /etc/fstab on 10.10.100.10.
+- Bound /mnt/stuff/development/llm-models onto /opt/docker/services/llm_gateway/models after verifying a host symlink did not surface model contents inside Docker.
+- Recreated audia-llama-cpp and verified /app/models contains the expected model directories.
+
+### Mounted the secondary NTFS partition persistently at /mnt/vault on the remote gateway host. (Configuration Cleanup)
+- Added UUID=F2CCA3DBCCA397FD /mnt/vault ntfs entry to /etc/fstab on 10.10.100.10.
+- Created /mnt/vault and mounted the volume immediately.
+- Verified mount with findmnt and directory listing.
+
 ---

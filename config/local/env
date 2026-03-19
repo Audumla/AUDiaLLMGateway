@@ -1,0 +1,5 @@
+# AUDia LLM Gateway — environment overrides.
+# Changes take effect on next container restart.
+#
+# REQUIRED: Set a strong key before exposing the gateway on a network.
+LITELLM_MASTER_KEY=sk-local-dev
