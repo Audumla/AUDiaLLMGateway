@@ -60,6 +60,8 @@ services:
       - LLAMA_VERSION=${LLAMA_VERSION:-latest}
       # Override auto-detection: auto | cuda | rocm | vulkan | cpu
       - LLAMA_BACKEND=${LLAMA_BACKEND:-auto}
+      # Optional: restrict Vulkan to specific ICD (e.g. /usr/share/vulkan/icd.d/radeon_icd.json for AMD)
+      - VK_ICD_FILENAMES=${VK_ICD_FILENAMES:-}
     volumes:
       - ${MODEL_ROOT:-./models}:/app/models:ro
       - ./config/generated/llama-swap:/app/config:ro
