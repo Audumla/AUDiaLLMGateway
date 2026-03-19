@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.11.1](https://github.com/example/AUDiaLLMGateway/compare/v0.11.0...v0.11.1) (2026-03-19)
+
+
+### Bug Fixes
+
+* backend-aware GPU device names and Docker-explicit binary/model paths ([8c88ddb](https://github.com/example/AUDiaLLMGateway/commit/8c88ddb626fa9aab229e4999353b131a2532c067))
+* correct qwen3.5-27B model directory casing on Linux ([4a64b16](https://github.com/example/AUDiaLLMGateway/commit/4a64b1605962c1a80d4c09a7d65b5a8eb11fb82a))
+* llamacpp fixes ([65ddfc4](https://github.com/example/AUDiaLLMGateway/commit/65ddfc41e46863c7245a5a307b9e4947ee8e22e8))
+* symlink ggml backend plugins into bin dir and auto-set AMD Vulkan ICD ([3d26a3e](https://github.com/example/AUDiaLLMGateway/commit/3d26a3e4a2ffd12c0bfb2c01a28f0444e986f11d))
+
+
+### Documentation
+
+* record changelog entries for GPU backend and config fixes ([061d7d1](https://github.com/example/AUDiaLLMGateway/commit/061d7d1a078f9d08e03ca2917ebd0b01fa2e47a7))
+
+## Changelog
+
 ## Unreleased
 
 ### Scaffolded a native Windows local LLM gateway workspace in AUDiaLLMGateway. (New Feature)
