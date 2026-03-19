@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.11.0](https://github.com/example/AUDiaLLMGateway/compare/v0.10.4...v0.11.0) (2026-03-19)
+
+
+### Features
+
+* add image-only docker deployment flow ([88f0f02](https://github.com/example/AUDiaLLMGateway/commit/88f0f025f1a17de4309c0118b6b792662e771161))
+* integrate docker watcher and vllm runtime flow ([5ab5a74](https://github.com/example/AUDiaLLMGateway/commit/5ab5a74596ff1ac0bd0a9190965e50315364599b))
+
+
+### Bug Fixes
+
+* config sync ([1ac2560](https://github.com/example/AUDiaLLMGateway/commit/1ac256021e9fadb4141500e0c30c734a1f51bf9e))
+* pass $http_host to upstream so LiteLLM builds correct redirect URLs ([f450079](https://github.com/example/AUDiaLLMGateway/commit/f450079ff0449f3f59e6828cd888031ed9a0cd50))
+
+## Changelog
+
 ## Unreleased
 
 ### Scaffolded a native Windows local LLM gateway workspace in AUDiaLLMGateway. (New Feature)
