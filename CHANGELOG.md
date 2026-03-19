@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.2](https://github.com/Audumla/AUDiaLLMGateway/compare/v0.7.1...v0.7.2) (2026-03-19)
+
+
+### Bug Fixes
+
+* remove GPU device requirements from root docker-compose.yml ([c91fe37](https://github.com/Audumla/AUDiaLLMGateway/commit/c91fe374c0807a0c3d174c215455d86ac150d7d8))
+
 ## [0.7.1](https://github.com/Audumla/AUDiaLLMGateway/compare/v0.7.0...v0.7.1) (2026-03-19)
 
 
