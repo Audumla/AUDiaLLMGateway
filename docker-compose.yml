@@ -24,6 +24,7 @@ services:
     environment:
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-local-dev}
       - AUDIA_DOCKER=true
+      - LLAMA_BACKEND=${LLAMA_BACKEND:-auto}
       - AUDIA_ENABLE_VLLM=${AUDIA_ENABLE_VLLM:-false}
       - VLLM_MODEL=${VLLM_MODEL:-Qwen/Qwen2.5-0.5B-Instruct}
       - VLLM_GPU_MEM=${VLLM_GPU_MEM:-0.85}
@@ -63,6 +64,12 @@ services:
       - ${MODEL_ROOT:-./models}:/app/models:ro
       - ./config/generated/llama-swap:/app/config:ro
       - backend-runtime:/app/runtime
+    devices:
+      - /dev/kfd:/dev/kfd
+      - /dev/dri:/dev/dri
+    group_add:
+      - "485" # render group GID on host gpu-host.example
+    privileged: true
     restart: unless-stopped
 
   # --- vLLM High-Performance Backend (optional — start with: docker compose --profile vllm up) ---
@@ -105,6 +112,7 @@ services:
       - full
     environment:
       - AUDIA_DOCKER=true
+      - LLAMA_BACKEND=${LLAMA_BACKEND:-auto}
       - AUDIA_ENABLE_VLLM=${AUDIA_ENABLE_VLLM:-false}
       - VLLM_MODEL=${VLLM_MODEL:-Qwen/Qwen2.5-0.5B-Instruct}
       - VLLM_GPU_MEM=${VLLM_GPU_MEM:-0.85}
