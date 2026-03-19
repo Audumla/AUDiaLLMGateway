@@ -18,9 +18,6 @@ services:
   # --- API Gateway / Traffic Orchestrator (always on) ---
   gateway:
     image: example/audia-llm-gateway-orchestrator:latest
-    build:
-      context: .
-      dockerfile: ./docker/Dockerfile.gateway
     container_name: audia-gateway
     ports:
       - "${GATEWAY_PORT:-4000}:4000"
@@ -57,9 +54,6 @@ services:
   #   AMD:    docker compose --project-directory . -f docker/examples/docker-compose.amd.yml up -d
   backend-swappable:
     image: example/audia-llm-gateway-server:latest
-    build:
-      context: .
-      dockerfile: ./docker/Dockerfile.unified-backend
     container_name: audia-llama-cpp
     environment:
       - LLAMA_VERSION=${LLAMA_VERSION:-latest}
@@ -72,11 +66,12 @@ services:
     restart: unless-stopped
 
   # --- vLLM High-Performance Backend (optional — start with: docker compose --profile vllm up) ---
-  # Uses the official vLLM image. Models are lazily loaded from the models directory
-  # or downloaded from HuggingFace on first request.
+  # Uses the AUDia vLLM wrapper image so deployment stays image-only even when
+  # config watching is enabled. Models are lazily loaded from the models
+  # directory or downloaded from HuggingFace on first request.
   # Requires NVIDIA GPU with CUDA support.
   backend-vllm:
-    image: ${VLLM_IMAGE:-vllm/vllm-openai:latest}
+    image: ${VLLM_IMAGE:-example/audia-llm-gateway-vllm:latest}
     container_name: audia-vllm
     profiles:
       - vllm
@@ -90,9 +85,6 @@ services:
     volumes:
       - ${MODEL_ROOT:-./models}:/root/.cache/huggingface:rw
       - ./config/generated/vllm:/app/config/generated/vllm:ro
-      - ./docker/vllm-entrypoint.sh:/app/vllm-entrypoint.sh:ro
-      - ./docker/vllm-mock-server.py:/app/vllm-mock-server.py:ro
-    entrypoint: ["/bin/sh", "/app/vllm-entrypoint.sh"]
     deploy:
       resources:
         reservations:
@@ -119,10 +111,12 @@ services:
       - VLLM_MAX_LEN=${VLLM_MAX_LEN:-4096}
     healthcheck:
       disable: true
+    security_opt:
+      - label=disable
     volumes:
       - ./config/local:/app/config/local:z
       - ./config/generated:/app/config/generated:z
-      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/run/docker.sock:/var/run/docker.sock:z
     entrypoint: ["python3", "src/launcher/watcher.py"]
     depends_on:
       - gateway

@@ -99,6 +99,10 @@ backslashes even on Windows hosts.
 docker compose up -d
 ```
 
+The root [`docker-compose.yml`](../docker-compose.yml) is image-only and safe to
+copy onto a clean host with just `.env`, `config/`, and `models/`. It does not
+require a git checkout or local Docker build context.
+
 On first start the gateway container automatically seeds `config/local/` with
 commented template files if they do not already exist:
 
@@ -374,7 +378,7 @@ All variables read from `.env` at compose start time.
 | `VLLM_PORT` | No | `41090` | Host port for the vLLM backend. |
 | `VLLM_GPU_MEM` | No | `0.85` | GPU memory utilization fraction for vLLM. |
 | `VLLM_MAX_LEN` | No | `4096` | Maximum context length for the vLLM backend. |
-| `VLLM_IMAGE` | No | `vllm/vllm-openai:latest` | Override the vLLM image, useful for testing with a mock container. |
+| `VLLM_IMAGE` | No | `example/audia-llm-gateway-vllm:latest` | Override the vLLM image. The default wraps upstream vLLM with AUDia's generated-config entrypoint. |
 | `VLLM_MOCK_MODE` | No | `false` | Runs the mounted mock vLLM server instead of the real `vllm` process. Intended for Docker validation only. |
 | `LLAMA_BACKEND` | No | `auto` | Override llama.cpp backend detection: `auto`, `cuda`, `rocm`, `vulkan`, `cpu`. |
 | `LLAMA_VERSION` | No | `latest` | llama.cpp release tag to provision (e.g. `b4632`). |
@@ -465,6 +469,13 @@ The update preserves:
 - `backend-runtime` volume — cached llama.cpp binaries
 - `.env` — your environment file
 
+On a clean remote host you only need:
+
+- `docker-compose.yml`
+- `.env`
+- `config/`
+- `models/`
+
 ## Building Images Locally
 
 The Docker Hub publish pipeline now uses reusable base images so final image builds
@@ -475,6 +486,7 @@ Build the base images first:
 ```bash
 docker build -f docker/Dockerfile.gateway-base -t audia-gateway-base:local .
 docker build -f docker/Dockerfile.backend-base -t audia-backend-base:local .
+docker build -f docker/Dockerfile.vllm -t audia-vllm:local .
 ```
 
 Then build the final images against those local base tags:
@@ -487,6 +499,13 @@ docker build -f docker/Dockerfile.gateway \
 docker build -f docker/Dockerfile.unified-backend \
   --build-arg BACKEND_BASE_IMAGE=audia-backend-base:local \
   -t audia-llm-backend .
+```
+
+For local source-driven iteration with Compose, layer the dev override on top of
+the deployment compose:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 ```
 
 --- 
@@ -586,4 +605,6 @@ catalog so the gateway does not advertise dead vLLM aliases.
 
 When enabled, the generator writes `config/generated/vllm/vllm.config.json`, nginx
 adds `/vllm/` and `/vllm-health`, and the watcher restarts `backend-vllm` when the
-generated vLLM config or relevant env values change.
+generated vLLM config or relevant env values change. The default `VLLM_IMAGE`
+already contains the AUDia vLLM entrypoint, so remote deployments do not need
+mounted helper scripts.
