@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/example/AUDiaLLMGateway/compare/v0.7.0...v0.7.1) (2026-03-19)
+
+
+### Bug Fixes
+
+* add --project-directory . to all example compose run commands ([d2f37c8](https://github.com/example/AUDiaLLMGateway/commit/d2f37c8c8866ee87b253d55639fe1a4635cdaf3b))
+
 ## [0.7.0](https://github.com/example/AUDiaLLMGateway/compare/v0.6.0...v0.7.0) (2026-03-19)
 
 
