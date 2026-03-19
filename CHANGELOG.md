@@ -1,21 +1,5 @@
 # Changelog
 
-## [0.11.0](https://github.com/example/AUDiaLLMGateway/compare/v0.10.4...v0.11.0) (2026-03-19)
-
-
-### Features
-
-* add image-only docker deployment flow ([88f0f02](https://github.com/example/AUDiaLLMGateway/commit/88f0f025f1a17de4309c0118b6b792662e771161))
-* integrate docker watcher and vllm runtime flow ([5ab5a74](https://github.com/example/AUDiaLLMGateway/commit/5ab5a74596ff1ac0bd0a9190965e50315364599b))
-
-
-### Bug Fixes
-
-* config sync ([1ac2560](https://github.com/example/AUDiaLLMGateway/commit/1ac256021e9fadb4141500e0c30c734a1f51bf9e))
-* pass $http_host to upstream so LiteLLM builds correct redirect URLs ([f450079](https://github.com/example/AUDiaLLMGateway/commit/f450079ff0449f3f59e6828cd888031ed9a0cd50))
-
-## Changelog
-
 ## Unreleased
 
 ### Scaffolded a native Windows local LLM gateway workspace in AUDiaLLMGateway. (New Feature)
@@ -366,5 +350,26 @@
 - Added UUID=F2CCA3DBCCA397FD /srv/llm-models ntfs entry to /etc/fstab on gpu-host.example.
 - Created /srv/llm-models and mounted the volume immediately.
 - Verified mount with findmnt and directory listing.
+
+### Published backend-swappable llama-swap port to the host for external testing. (Configuration Cleanup)
+- Patched /opt/docker/services/llm_gateway/docker-compose.yml on gpu-host.example to add ${LLAMA_SWAP_PORT:-41080}:41080 under backend-swappable.
+- Recreated audia-llama-cpp and verified compose now reports 0.0.0.0:41080->41080/tcp.
+- Confirmed host listener with ss and successful HTTP response from localhost:41080.
+
+### Disabled audia-gateway Docker health polling to stop repetitive /health/liveliness access logs. (Configuration Cleanup)
+- Patched /opt/docker/services/llm_gateway/docker-compose.yml on gpu-host.example: gateway healthcheck set to disable:true.
+- Adjusted nginx depends_on condition from service_healthy to service_started for compose compatibility without health checks.
+- Recreated audia-gateway and verified docker inspect reports Test=[NONE] and recent logs no longer contain the periodic liveliness GET entries.
+
+### Enabled AMD GPU device passthrough for backend-swappable on the remote Docker host. (Configuration Cleanup)
+- Patched /opt/docker/services/llm_gateway/docker-compose.yml backend-swappable with devices /dev/kfd and /dev/dri.
+- Added numeric group_add entries 482 and 485 after named groups failed under Docker.
+- Recreated audia-llama-cpp and verified HostConfig.Devices plus /dev/kfd and /dev/dri visibility inside the container.
+
+### Cleaned remote default config overrides and split GGUF model storage from vLLM/HuggingFace cache paths. (Configuration Cleanup)
+- Moved existing model directories into /srv/extra-storage/development/llm-models/gguf and added /srv/extra-storage/development/llm-models/hf-cache.
+- Updated /etc/fstab bind mounts to map /opt/docker/services/llm_gateway/models -> gguf and /opt/docker/services/llm_gateway/models-hf -> hf-cache.
+- Patched remote docker-compose to use MODEL_HF_ROOT for backend-vllm cache and repaired gateway service block after prior edits.
+- Reset config/local/models.override.yaml to a clean empty override template and regenerated configs with vLLM gpu_memory_utilization=1.0.
 
 ---
