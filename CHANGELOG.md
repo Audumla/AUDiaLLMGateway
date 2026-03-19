@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.8.0](https://github.com/example/AUDiaLLMGateway/compare/v0.7.2...v0.8.0) (2026-03-19)
+
+
+### Features
+
+* add detect-hardware.sh and provision Vulkan alongside all GPU backends ([2972d5b](https://github.com/example/AUDiaLLMGateway/commit/2972d5b578ec40254c6f6d4829237544311bf162))
+
+
+### Bug Fixes
+
+* add Vulkan auto-detection and proper Vulkan binary provisioning ([85803db](https://github.com/example/AUDiaLLMGateway/commit/85803db485f5919adc3a4bac1ec506fbcc3c27e6))
+
+
+### Documentation
+
+* document per-backend macro override pattern in llama-swap.base.yaml ([f88177f](https://github.com/example/AUDiaLLMGateway/commit/f88177f8c5c20501d0e67e88ee01b1f96616a259))
+
 ## [0.7.2](https://github.com/example/AUDiaLLMGateway/compare/v0.7.1...v0.7.2) (2026-03-19)
 
 
