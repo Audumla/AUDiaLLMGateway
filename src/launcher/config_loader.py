@@ -900,8 +900,8 @@ def _read_local_env_var(stack: StackConfig, var_name: str) -> str:
 def build_nginx_config(stack: StackConfig) -> str:
     litellm_key = _read_local_env_var(stack, stack.litellm.master_key_env)
     litellm_auth_header = f'\n            proxy_set_header Authorization "Bearer {litellm_key}";' if litellm_key else ""
-    return f"""pid .runtime/nginx.pid;
-error_log .runtime/logs/nginx-error.log warn;
+    return f"""pid /tmp/nginx.pid;
+error_log /tmp/nginx-error.log warn;
 
 worker_processes  1;
 
@@ -916,12 +916,12 @@ http {{
     tcp_nodelay   on;
     keepalive_timeout  65;
 
-    access_log             .runtime/logs/nginx-access.log;
-    client_body_temp_path  .runtime/temp/client_body;
-    proxy_temp_path        .runtime/temp/proxy;
-    fastcgi_temp_path      .runtime/temp/fastcgi;
-    uwsgi_temp_path        .runtime/temp/uwsgi;
-    scgi_temp_path         .runtime/temp/scgi;
+    access_log             /tmp/nginx-access.log;
+    client_body_temp_path  /tmp/nginx-client-body;
+    proxy_temp_path        /tmp/nginx-proxy;
+    fastcgi_temp_path      /tmp/nginx-fastcgi;
+    uwsgi_temp_path        /tmp/nginx-uwsgi;
+    scgi_temp_path         /tmp/nginx-scgi;
 
     upstream litellm_upstream {{
         server {stack.network.litellm_host}:{stack.network.litellm_port};
