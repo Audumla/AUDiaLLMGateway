@@ -62,6 +62,59 @@ EOF
     chmod 666 config/local/stack.override.yaml
 fi
 
+# Seed llama-swap substrate overrides
+if [ ! -f config/local/llama-swap.override.yaml ]; then
+    cat > config/local/llama-swap.override.yaml <<'EOF'
+# AUDia LLM Gateway — llama-swap substrate overrides.
+# Merged on top of config/project/llama-swap.base.yaml.
+# After editing run: ./scripts/AUDiaLLMGateway.sh generate
+#               then: systemctl restart audia-gateway
+#
+# --- Global settings ---
+#
+# healthCheckTimeout: 300   # seconds to wait for llama-server to start
+# logLevel: info            # debug | info | warn | error
+#
+# --- Backend binary macros ---
+# By default all macros resolve to the installed 'llama-server' binary.
+# Override to point at specific builds if you have multiple installed.
+# Use 'AUDiaLLMGateway.sh install components' to install binaries.
+#
+# macros:
+#   llama-server:        "llama-server"          # default (auto-detected)
+#   llama-server-cpu:    "llama-server-cpu"       # explicit CPU build
+#   llama-server-cuda:   "llama-server-cuda"      # explicit CUDA build
+#   llama-server-rocm:   "llama-server-rocm"      # explicit ROCm build
+#   llama-server-vulkan: "llama-server-vulkan"    # explicit Vulkan build
+#
+# --- Per-model backend selection ---
+# Set executable_macro in config/local/models.override.yaml to route
+# specific models to specific backends:
+#   executable_macro: llama-server-rocm     # run this model on ROCm
+#   executable_macro: llama-server-vulkan   # run this model on Vulkan
+EOF
+    chmod 666 config/local/llama-swap.override.yaml
+fi
+
+# Seed model overrides
+if [ ! -f config/local/models.override.yaml ]; then
+    cat > config/local/models.override.yaml <<'EOF'
+# AUDia LLM Gateway — local model overrides.
+# Add or override model definitions here.
+# After editing run: ./scripts/AUDiaLLMGateway.sh generate
+#               then: systemctl restart audia-gateway
+#
+# Example — add a local GGUF model:
+# models:
+#   - name: my-model
+#     model_file: MyModel/my-model-Q4_K_M.gguf
+#     context_size: 4096
+#     # Optional: pin to a specific backend binary
+#     # executable_macro: llama-server-rocm
+EOF
+    chmod 666 config/local/models.override.yaml
+fi
+
 # Install Python venv and pip dependencies (hard failure — nothing works without this)
 ./scripts/AUDiaLLMGateway.sh install stack \
     || { echo "[error] Python stack install failed"; exit 1; }

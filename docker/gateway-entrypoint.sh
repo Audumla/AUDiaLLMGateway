@@ -47,12 +47,51 @@ if [ ! -f "$CONFIG/local/models.override.yaml" ]; then
 # AUDia LLM Gateway — local model overrides.
 # Add entries here to expose local GGUF models through the gateway.
 # Model files must be placed in the models/ directory (or MODEL_ROOT).
+# After editing, restart the gateway: docker compose restart gateway
 #
-# Example:
+# Example — add a local GGUF model:
 # models:
 #   - name: my-model
 #     model_file: MyModel/my-model-Q4_K_M.gguf
 #     context_size: 4096
+#     # Optional: pin to a specific backend (see llama-swap.override.yaml)
+#     # executable_macro: llama-server-rocm
+EOF
+fi
+
+if [ ! -f "$CONFIG/local/llama-swap.override.yaml" ]; then
+    echo ">>> First run: seeding config/local/llama-swap.override.yaml"
+    cat > "$CONFIG/local/llama-swap.override.yaml" <<'EOF'
+# AUDia LLM Gateway — llama-swap substrate overrides.
+# Merged on top of config/project/llama-swap.base.yaml.
+# After editing, restart the gateway: docker compose restart gateway
+#
+# --- Global settings ---
+#
+# healthCheckTimeout: 300   # seconds to wait for llama-server to start
+# logLevel: info            # debug | info | warn | error
+#
+# --- Backend binary macros ---
+# By default all macros resolve to the auto-detected default 'llama-server'
+# binary. Override to run different backends per model simultaneously.
+# Binaries are provisioned by provision-runtime.sh at container start.
+#
+# macros:
+#   llama-server:        "/app/runtime/bin/llama-server"        # default
+#   llama-server-cpu:    "/app/runtime/bin/llama-server-cpu"
+#   llama-server-cuda:   "/app/runtime/bin/llama-server-cuda"
+#   llama-server-rocm:   "/app/runtime/bin/llama-server-rocm"
+#   llama-server-vulkan: "/app/runtime/bin/llama-server-vulkan"
+#
+# --- Running multiple backends simultaneously ---
+# Uncomment the macros above, then set executable_macro per model in
+# models.override.yaml to route each model to a specific backend:
+#
+#   executable_macro: llama-server-rocm     # run this model on ROCm
+#   executable_macro: llama-server-vulkan   # run this model on Vulkan
+#
+# llama-swap manages each as an independent process — backends are loaded
+# and unloaded on demand as requests arrive.
 EOF
 fi
 
