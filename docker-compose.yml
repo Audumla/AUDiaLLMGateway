@@ -46,7 +46,7 @@ services:
   # --- llama.cpp Inference Server (always on) ---
   # provision-runtime.sh auto-detects GPU at container start and downloads the
   # matching llama.cpp binary (CUDA, ROCm, Vulkan, or CPU). Binary is cached in
-  # backend-runtime so re-detection and re-download only happen on first start.
+  # BACKEND_RUNTIME_ROOT so re-detection and re-download only happen on first start.
   #
   # GPU device access is NOT requested here — this compose is for CPU or systems
   # where the Docker runtime already has GPU access configured (e.g. NVIDIA CDI).
@@ -65,7 +65,7 @@ services:
     volumes:
       - ${MODEL_ROOT:-./models}:/app/models:ro
       - ./config/generated/llama-swap:/app/config:ro
-      - backend-runtime:/app/runtime
+      - ${BACKEND_RUNTIME_ROOT:-./config/data/backend-runtime}:/app/runtime
     devices:
       - /dev/kfd:/dev/kfd
       - /dev/dri:/dev/dri
@@ -131,6 +131,3 @@ services:
     depends_on:
       - gateway
     restart: unless-stopped
-
-volumes:
-  backend-runtime:

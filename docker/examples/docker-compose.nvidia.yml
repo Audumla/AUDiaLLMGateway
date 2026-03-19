@@ -34,7 +34,7 @@ services:
     volumes:
       - ${MODEL_ROOT:-./models}:/app/models:ro
       - ./config/generated/llama-swap:/app/config:ro
-      - backend-runtime:/app/runtime
+      - ${BACKEND_RUNTIME_ROOT:-./config/data/backend-runtime}:/app/runtime
     deploy:
       resources:
         reservations:
@@ -67,6 +67,3 @@ services:
               count: all
               capabilities: [gpu]
     restart: unless-stopped
-
-volumes:
-  backend-runtime:

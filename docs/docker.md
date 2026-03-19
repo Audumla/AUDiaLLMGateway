@@ -67,6 +67,7 @@ HUGGING_FACE_HUB_TOKEN=hf_your_token_here
 # Path to your model directory (defaults to ./models)
 MODEL_ROOT=./models
 MODEL_HF_ROOT=./models-hf
+BACKEND_RUNTIME_ROOT=./config/data/backend-runtime
 
 # Optional vLLM backend
 AUDIA_ENABLE_VLLM=false
@@ -153,8 +154,9 @@ AUDIA_ENABLE_VLLM=true docker compose --profile vllm up -d
 ```
 
 This uses the root `docker-compose.yml`. On first start, the backend container
-downloads and caches the appropriate llama.cpp binary. Subsequent starts use the
-cached `backend-runtime` volume.
+downloads and caches the appropriate llama.cpp binary. Subsequent starts reuse the
+host-mounted runtime directory at `BACKEND_RUNTIME_ROOT` (default:
+`./config/data/backend-runtime`).
 
 Full compose definition: [`docker-compose.yml`](../docker-compose.yml)
 
@@ -211,7 +213,7 @@ services:
     volumes:
       - ./models:/app/models:ro
       - ./config/generated/llama-swap:/app/config:ro
-      - backend-runtime:/app/runtime
+      - ${BACKEND_RUNTIME_ROOT:-./config/data/backend-runtime}:/app/runtime
     deploy:
       resources:
         reservations:
@@ -221,8 +223,6 @@ services:
               capabilities: [gpu]
     restart: unless-stopped
 
-volumes:
-  backend-runtime:
 ```
 
 ---
@@ -268,7 +268,7 @@ services:
     volumes:
       - ./models:/app/models:ro
       - ./config/generated/llama-swap:/app/config:ro
-      - backend-runtime:/app/runtime
+      - ${BACKEND_RUNTIME_ROOT:-./config/data/backend-runtime}:/app/runtime
     devices:
       - /dev/kfd:/dev/kfd
       - /dev/dri:/dev/dri
@@ -277,8 +277,6 @@ services:
       - render
     restart: unless-stopped
 
-volumes:
-  backend-runtime:
 ```
 
 AMD device passthrough notes:
@@ -325,7 +323,7 @@ services:
     volumes:
       - ./models:/app/models:ro
       - ./config/generated/llama-swap:/app/config:ro
-      - backend-runtime:/app/runtime
+      - ${BACKEND_RUNTIME_ROOT:-./config/data/backend-runtime}:/app/runtime
     networks:
       - internal
     restart: unless-stopped
@@ -336,8 +334,6 @@ networks:
   internal:
     driver: bridge
 
-volumes:
-  backend-runtime:
 ```
 
 Point your external proxy to `audia-gateway:4000` on the `web-proxy` network.
@@ -375,6 +371,7 @@ All variables read from `.env` at compose start time.
 | `HUGGING_FACE_HUB_TOKEN` | No | — | HuggingFace token for gated model downloads. |
 | `MODEL_ROOT` | No | `./models` | Host path to model directory. Mounted read-only into the backend. |
 | `MODEL_HF_ROOT` | No | `./models-hf` | Host path for Hugging Face cache and raw tensor weights used by vLLM. |
+| `BACKEND_RUNTIME_ROOT` | No | `./config/data/backend-runtime` | Host path for the provisioned `llama.cpp` runtime (`/app/runtime`). |
 | `AUDIA_ENABLE_VLLM` | No | `false` | Enables vLLM-backed LiteLLM routes and watcher-managed vLLM restarts. Requires `--profile vllm`. |
 | `GATEWAY_PORT` | No | `4000` | Host port published for the LiteLLM gateway. |
 | `NGINX_PORT` | No | `8080` | Host port published for the nginx reverse proxy. |
@@ -470,7 +467,7 @@ The update preserves:
 
 - `config/local/` — your local overrides
 - `models/` — your model files
-- `backend-runtime` volume — cached llama.cpp binaries
+- `config/data/backend-runtime/` — cached llama.cpp binaries and backend plugins
 - `.env` — your environment file
 
 On a clean remote host you only need:
@@ -518,8 +515,9 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 
 | Volume / path | Contents | Managed by |
 | ------------- | -------- | ---------- |
-| `backend-runtime` (Docker volume) | Provisioned llama.cpp binaries (~500 MB) | Installer on first start |
+| `./config/data/backend-runtime` (bind mount) | Provisioned llama.cpp binaries and backend plugins (~500 MB) | Installer on first start |
 | `./models` (bind mount) | GGUF model files | You |
+| `./models-hf` (bind mount) | Hugging Face cache and raw tensor weights for vLLM | You / vLLM |
 | `./config/local/` (bind mount) | Machine-specific overrides | You |
 | `./config/generated/` (bind mount) | Generated configs | Gateway container on start |
 
@@ -527,7 +525,7 @@ To force a full re-provision of the backend runtime (e.g. after a llama.cpp vers
 change):
 
 ```bash
-docker volume rm example_backend-runtime
+rm -rf ./config/data/backend-runtime
 docker compose up -d
 ```
 

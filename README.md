@@ -33,6 +33,10 @@ cp config/env.example .env
 docker compose up -d
 ```
 
+The provisioned `llama.cpp` runtime is persisted on the host at
+`./config/data/backend-runtime` by default so you can inspect, back up, or repair
+the downloaded binaries and backend plugins directly.
+
 The root [`docker-compose.yml`](docker-compose.yml) is deployment-oriented and
 pulls published images only, so a remote host can stay a clean Docker Compose
 install without a git checkout.
