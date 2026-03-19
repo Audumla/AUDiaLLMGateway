@@ -1030,7 +1030,7 @@ http {{
         }}
 
         location = / {{
-            root config/generated/nginx;
+            root /app/static;
             try_files /index.html =404;
             default_type text/html;
         }}

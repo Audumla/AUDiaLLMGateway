@@ -9,6 +9,7 @@ services:
       - "${NGINX_PORT:-8080}:8080"
     volumes:
       - ./config/generated/nginx/nginx.conf:/etc/nginx/nginx.conf:ro,z
+      - ./config/generated/nginx:/app/static:ro,z
     depends_on:
       gateway:
         condition: service_healthy
