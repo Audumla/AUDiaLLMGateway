@@ -1,5 +1,76 @@
 # Changelog
 
+## [0.10.0](https://github.com/example/AUDiaLLMGateway/compare/v0.9.2...v0.10.0) (2026-03-19)
+
+
+### Features
+
+* add detect-hardware.sh and provision Vulkan alongside all GPU backends ([2972d5b](https://github.com/example/AUDiaLLMGateway/commit/2972d5b578ec40254c6f6d4829237544311bf162))
+* add vLLM profiles and CPU-only compose example to all Docker configurations ([2432343](https://github.com/example/AUDiaLLMGateway/commit/24323436dbab5724617099bbba66e3703410f593))
+* added linux distros into support ([d81951d](https://github.com/example/AUDiaLLMGateway/commit/d81951d6a0d8739293a58279dc1b58e40a929f0f))
+* added proper installs ([600da16](https://github.com/example/AUDiaLLMGateway/commit/600da163a34b36afc320bddf33744e28f69acc72))
+* auto-seed config/local/ on first Docker run ([df78353](https://github.com/example/AUDiaLLMGateway/commit/df783536c33eac7799235e0842c9d47ca38e1f15))
+* docker enabled ([11fe981](https://github.com/example/AUDiaLLMGateway/commit/11fe9810796725b212ee8cda906af1d8e56ea697))
+* initial implementation ([23d92d9](https://github.com/example/AUDiaLLMGateway/commit/23d92d9e2cebcf64ee46e3eb08b5b5f9287439c7))
+* seed llama-swap.override.yaml and models.override.yaml on install ([758c6dc](https://github.com/example/AUDiaLLMGateway/commit/758c6dca6ada640cbd69e6227a2aa70e5d2ad585))
+
+
+### Bug Fixes
+
+* add --project-directory . to all example compose run commands ([d2f37c8](https://github.com/example/AUDiaLLMGateway/commit/d2f37c8c8866ee87b253d55639fe1a4635cdaf3b))
+* add Vulkan auto-detection and proper Vulkan binary provisioning ([85803db](https://github.com/example/AUDiaLLMGateway/commit/85803db485f5919adc3a4bac1ec506fbcc3c27e6))
+* added llamacpp install ([c99ab35](https://github.com/example/AUDiaLLMGateway/commit/c99ab35b6c64808554d7582d651c93b642bce353))
+* agent release errors ([4977b4c](https://github.com/example/AUDiaLLMGateway/commit/4977b4cea7e9c5681eaf11d9418e6fdb2f44adb1))
+* agent syntax errors ([8a8be76](https://github.com/example/AUDiaLLMGateway/commit/8a8be76978ea359c4a09dc1eb685c4d6a8faa62a))
+* branch renaming ([ba46780](https://github.com/example/AUDiaLLMGateway/commit/ba467807e28fd85417858576ac638430ee33088f))
+* clean release ([6d51333](https://github.com/example/AUDiaLLMGateway/commit/6d51333e086d50188ca2e659bde887774dbc1f0b))
+* distro deployment fixes ([6d6a104](https://github.com/example/AUDiaLLMGateway/commit/6d6a1047d7c35e07dc38a66266c0cb106e848f21))
+* docker updates ([abe361f](https://github.com/example/AUDiaLLMGateway/commit/abe361ff3aa9303de3a70c2dcddee66748949e33))
+* download llamacpp versions ([7eb9782](https://github.com/example/AUDiaLLMGateway/commit/7eb9782e854594b6deb0db0f4556d39beb117db5))
+* explicit nfpm file list and workflow cleanup ([3b23fd7](https://github.com/example/AUDiaLLMGateway/commit/3b23fd76cdf0050152dea534ccecf139dd45b653))
+* expose all proxied endpoints without auth and fix redirect rewriting ([a8137e8](https://github.com/example/AUDiaLLMGateway/commit/a8137e8a372bb354215c0a39a1af3b48a0e0c31e))
+* force release please sync after manifest mismatch ([b0f3fbc](https://github.com/example/AUDiaLLMGateway/commit/b0f3fbce01b35d944d6619575ee1cfc9306f12cc))
+* include detect-hardware.sh in gateway image ([9c6d4c6](https://github.com/example/AUDiaLLMGateway/commit/9c6d4c6a1144f98de6d348788522b6b30bb38961))
+* inject litellm auth header in nginx and restore master_key config ([aed96a3](https://github.com/example/AUDiaLLMGateway/commit/aed96a3b433528dcb387bac60b2bae674835f5f7))
+* installation fixes ([2b46d50](https://github.com/example/AUDiaLLMGateway/commit/2b46d50cf7c6e195f576103f75c98354525a55ff))
+* lifecycle management updates ([c84ab38](https://github.com/example/AUDiaLLMGateway/commit/c84ab385e73956f73e57ffd8258223187ce3c0e4))
+* normalize model file paths to forward slashes for Linux compatibility ([7af3142](https://github.com/example/AUDiaLLMGateway/commit/7af3142f1a02a960495a3cc276498dc2ad0c9605))
+* pin backend service hosts to 127.0.0.1 in stack.base.yaml ([426a707](https://github.com/example/AUDiaLLMGateway/commit/426a7074007777b31c2fb17d95adea94052edeec))
+* release and install updates ([abefbfb](https://github.com/example/AUDiaLLMGateway/commit/abefbfbb66ab6f496a685295c0665b927c919bda))
+* release build for distro installation files ([e7e72f8](https://github.com/example/AUDiaLLMGateway/commit/e7e72f8c48c8fff7a31a009955f391ad9af9131f))
+* release issues ([d30bbbb](https://github.com/example/AUDiaLLMGateway/commit/d30bbbb8660b20b556279951b29e311818432371))
+* release issues ([c16189d](https://github.com/example/AUDiaLLMGateway/commit/c16189d066e9c963a5410e5b27c5b8b11a050741))
+* release issues ([a4c523a](https://github.com/example/AUDiaLLMGateway/commit/a4c523abc8625d85f811d6e16dac0058adc6da73))
+* release please added ([c772da7](https://github.com/example/AUDiaLLMGateway/commit/c772da779f6ae7d67a19b513e40b92f885ff23a8))
+* release please update ([6dde159](https://github.com/example/AUDiaLLMGateway/commit/6dde159b89ede2c3b5a5921f933f491e526005b2))
+* release problems ([d7eef0a](https://github.com/example/AUDiaLLMGateway/commit/d7eef0a1f255ef9fba8f2cdc94b7620204acec78))
+* release syntax error ([593a5fd](https://github.com/example/AUDiaLLMGateway/commit/593a5fd02e0ed6b45763d0cb9e6e3224b719702a))
+* release workflow indentation ([0b67664](https://github.com/example/AUDiaLLMGateway/commit/0b67664ebd008420bc5aead6a5f19448b2e5a09c))
+* released installation ([0dc5a85](https://github.com/example/AUDiaLLMGateway/commit/0dc5a85f295b56ef07a4b4e2beedb0ddd410977e))
+* remove GPU device requirements from root docker-compose.yml ([c91fe37](https://github.com/example/AUDiaLLMGateway/commit/c91fe374c0807a0c3d174c215455d86ac150d7d8))
+* remove master_key from litellm config to allow no_auth to take effect ([3a06c6c](https://github.com/example/AUDiaLLMGateway/commit/3a06c6c7eef06b30620ca8a4cca9243eb81716c2))
+* repair provision-runtime.sh and Dockerfile.gateway ([2432343](https://github.com/example/AUDiaLLMGateway/commit/24323436dbab5724617099bbba66e3703410f593))
+* restore native install commands and fix CI test failures ([a63cb82](https://github.com/example/AUDiaLLMGateway/commit/a63cb823f885d23823fd4e98d2cec00b59f54f47))
+* three Docker startup failures on AMD/SELinux systems ([27e4858](https://github.com/example/AUDiaLLMGateway/commit/27e485833ec7c947f1f0fdb4a3a876f94036a741))
+* update branch naming ([bd5bd95](https://github.com/example/AUDiaLLMGateway/commit/bd5bd95db812e49c21790e7549106cbdb3a4a1dc))
+* update changelog ([97fe2e7](https://github.com/example/AUDiaLLMGateway/commit/97fe2e736a0bd96d4f94f01a39410f63eee7f601))
+* update configuration management ([7dc1df9](https://github.com/example/AUDiaLLMGateway/commit/7dc1df9dd7544693e0f747b2f06261be47f2d3b5))
+* updated documentation ([c3508f2](https://github.com/example/AUDiaLLMGateway/commit/c3508f2040f241205f5f696ce29aaa35af28b9e2))
+* updated install logic ([9cb9c31](https://github.com/example/AUDiaLLMGateway/commit/9cb9c3119fd9da826230b7a3eceb5f43a8c59759))
+* updated install scripts ([aecfd52](https://github.com/example/AUDiaLLMGateway/commit/aecfd52c3b5c593445af193bad431ecc992a201d))
+* use direct venv bootstrap in install stack to avoid circular import ([c982ea3](https://github.com/example/AUDiaLLMGateway/commit/c982ea301abf414e445ae07aa2ab7a36c0d5d112))
+* use public_host for nginx landing page links ([729a741](https://github.com/example/AUDiaLLMGateway/commit/729a74142f44d9884ca6123bf1a0be02f7050dce))
+
+
+### Documentation
+
+* add missing GATEWAY_PORT, NGINX_PORT, VLLM_MAX_LEN env vars ([4cae4e5](https://github.com/example/AUDiaLLMGateway/commit/4cae4e53c3f88d0dc3cfa1de078255aa3e066ab4))
+* document per-backend macro override pattern in llama-swap.base.yaml ([f88177f](https://github.com/example/AUDiaLLMGateway/commit/f88177f8c5c20501d0e67e88ee01b1f96616a259))
+* fix Docker Hub image names in docker.md ([db59be6](https://github.com/example/AUDiaLLMGateway/commit/db59be611ca5e27e40c66a35d9c85828e18b7269))
+* revamp documentation and expand Docker deployment ([2432343](https://github.com/example/AUDiaLLMGateway/commit/24323436dbab5724617099bbba66e3703410f593))
+* update spec-002 and changelog for nginx proxy fixes ([55b3b8d](https://github.com/example/AUDiaLLMGateway/commit/55b3b8d156a5adb5eaa7e0e7e8a2dbe2c38e9020))
+* update specs and docs to reflect v0.6.x state ([3226c5c](https://github.com/example/AUDiaLLMGateway/commit/3226c5cf3a2918323f84eec6ab5530af1f76c2d8))
+
 ## [0.9.2](https://github.com/example/AUDiaLLMGateway/compare/v0.9.1...v0.9.2) (2026-03-19)
 
 
