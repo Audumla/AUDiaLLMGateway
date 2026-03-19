@@ -866,7 +866,10 @@ def build_litellm_config(stack: StackConfig) -> dict[str, Any]:
         "general_settings": {
             "disable_spend_logs": True,
         },
-        "router_settings": {},
+        "router_settings": {
+            "enable_pre_call_checks": False,
+            "model_group_alias_map": {},
+        },
     }
 
 
