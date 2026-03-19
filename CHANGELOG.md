@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.2](https://github.com/Audumla/AUDiaLLMGateway/compare/v0.9.1...v0.9.2) (2026-03-19)
+
+
+### Bug Fixes
+
+* three Docker startup failures on AMD/SELinux systems ([27e4858](https://github.com/Audumla/AUDiaLLMGateway/commit/27e485833ec7c947f1f0fdb4a3a876f94036a741))
+
 ## [0.9.1](https://github.com/Audumla/AUDiaLLMGateway/compare/v0.9.0...v0.9.1) (2026-03-19)
 
 
