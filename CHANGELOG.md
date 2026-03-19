@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.7.0](https://github.com/example/AUDiaLLMGateway/compare/v0.6.0...v0.7.0) (2026-03-19)
+
+
+### Features
+
+* auto-seed config/local/ on first Docker run ([df78353](https://github.com/example/AUDiaLLMGateway/commit/df783536c33eac7799235e0842c9d47ca38e1f15))
+
+
+### Documentation
+
+* add missing GATEWAY_PORT, NGINX_PORT, VLLM_MAX_LEN env vars ([4cae4e5](https://github.com/example/AUDiaLLMGateway/commit/4cae4e53c3f88d0dc3cfa1de078255aa3e066ab4))
+* fix Docker Hub image names in docker.md ([db59be6](https://github.com/example/AUDiaLLMGateway/commit/db59be611ca5e27e40c66a35d9c85828e18b7269))
+* update specs and docs to reflect v0.6.x state ([3226c5c](https://github.com/example/AUDiaLLMGateway/commit/3226c5cf3a2918323f84eec6ab5530af1f76c2d8))
+
 ## [0.6.0](https://github.com/example/AUDiaLLMGateway/compare/v0.5.2...v0.6.0) (2026-03-19)
 
 
