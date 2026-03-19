@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.4](https://github.com/example/AUDiaLLMGateway/compare/v0.10.3...v0.10.4) (2026-03-19)
+
+
+### Bug Fixes
+
+* proxy /litellm-asset-prefix/ through nginx for UI assets ([b5e99e9](https://github.com/example/AUDiaLLMGateway/commit/b5e99e91338e9d9d1e43aca9eb0f36c3e4fbbd04))
+* use relative hrefs in nginx landing page ([1baf2c5](https://github.com/example/AUDiaLLMGateway/commit/1baf2c5c66921efdf43c21ffe08ed6eadc71826f))
+
 ## [0.10.3](https://github.com/example/AUDiaLLMGateway/compare/v0.10.2...v0.10.3) (2026-03-19)
 
 
