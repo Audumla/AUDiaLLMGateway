@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.2](https://github.com/Audumla/AUDiaLLMGateway/compare/v0.10.1...v0.10.2) (2026-03-19)
+
+
+### Bug Fixes
+
+* rename component ([87cfa20](https://github.com/Audumla/AUDiaLLMGateway/commit/87cfa204611910751e68388184a640b0a328fc12))
+
 ## [0.10.1](https://github.com/Audumla/AUDiaLLMGateway/compare/v0.10.0...v0.10.1) (2026-03-19)
 
 
