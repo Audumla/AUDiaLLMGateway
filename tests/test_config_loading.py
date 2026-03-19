@@ -11,6 +11,7 @@ def test_load_stack_config_from_repo_fixture() -> None:
 
     assert config.llama_swap.port == 41080
     assert config.litellm.port == 4000
+    assert config.vllm.port == 8000
     assert config.network.nginx_port == 8080
     assert config.project.state_path == "state/install-state.json"
     assert config.component_settings["llama_cpp"]["default_profiles"]["windows"] == "windows-vulkan"
@@ -20,6 +21,17 @@ def test_load_stack_config_from_repo_fixture() -> None:
         "local/qwen27_fast",
         "local/qwen122_smart",
     ]
+
+
+def test_load_stack_config_includes_vllm_models_when_enabled(monkeypatch) -> None:
+    root = Path(__file__).resolve().parents[1]
+    monkeypatch.setenv("AUDIA_ENABLE_VLLM", "true")
+    monkeypatch.setenv("VLLM_MODEL", "Qwen/Qwen2.5-0.5B-Instruct")
+
+    config = load_stack_config(root)
+
+    assert config.vllm.enabled is True
+    assert any(model.stable_name == "local/vllm_default" for model in config.published_models)
 
 
 def test_load_layered_yaml_merges_project_and_local(tmp_path: Path) -> None:

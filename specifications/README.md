@@ -26,7 +26,7 @@ Legend: **Implemented** | *Draft / in progress* | Planned
 | `components/llama-swap/spec-201-llama-swap-integration.md` | Planned | llama-swap config generation and model routing |
 | `components/litellm/spec-301-litellm-gateway.md` | Planned | LiteLLM gateway config and alias mapping |
 | `components/nginx/spec-401-nginx-reverse-proxy.md` | Planned | nginx config generation and route layout |
-| `components/vllm/spec-251-vllm-runtime.md` | Planned | vLLM backend integration |
+| `components/vllm/spec-251-vllm-runtime.md` | **Implemented** | vLLM backend integration |
 | `components/mcp/spec-501-mcp-scaffolding.md` | Planned | MCP client and server scaffolding |
 
 ---

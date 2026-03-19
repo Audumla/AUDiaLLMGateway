@@ -1,0 +1,29 @@
+# Base image for the llama.cpp/llama-swap backend runtime.
+# Publish this separately so final image rebuilds only need to copy the entrypoint.
+
+FROM python:3.11-slim
+
+ENV DEBIAN_FRONTEND=noninteractive
+ARG TARGETARCH
+
+LABEL org.opencontainers.image.source="https://github.com/Audumla/AUDiaLLMGateway"
+LABEL org.opencontainers.image.description="AUDia LLM Gateway backend base image"
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl ca-certificates wget gnupg2 jq unzip procps libgomp1 pciutils \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN set -eux; \
+    case "${TARGETARCH:-amd64}" in \
+      amd64) LLAMA_SWAP_ASSET="llama-swap_*_linux_amd64.tar.gz" ;; \
+      arm64) LLAMA_SWAP_ASSET="llama-swap_*_linux_arm64.tar.gz" ;; \
+      *) echo "Unsupported TARGETARCH: ${TARGETARCH}"; exit 1 ;; \
+    esac; \
+    LLAMA_SWAP_URL="$(LLAMA_SWAP_ASSET="$LLAMA_SWAP_ASSET" python -c "import json, os, re, urllib.request; pattern=os.environ['LLAMA_SWAP_ASSET']; data=json.load(urllib.request.urlopen('https://api.github.com/repos/mostlygeek/llama-swap/releases/latest')); regex='^' + pattern.replace('*', '.*') + '$'; print(next(asset['browser_download_url'] for asset in data['assets'] if re.match(regex, asset['name'])))")"; \
+    curl -fL -o /tmp/llama-swap.tar.gz "$LLAMA_SWAP_URL"; \
+    tar -xzf /tmp/llama-swap.tar.gz -C /tmp; \
+    cp /tmp/llama-swap /usr/local/bin/llama-swap; \
+    chmod +x /usr/local/bin/llama-swap; \
+    rm -f /tmp/llama-swap /tmp/llama-swap.tar.gz
+
+WORKDIR /app

@@ -1,25 +1,8 @@
-# Stage 1: Builder — installs Python dependencies into /install
-FROM python:3.11-slim AS builder
-
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
-
-# Stage 2: Final — lean runtime image
-FROM python:3.11-slim
+ARG GATEWAY_BASE_IMAGE=audumla/audia-llm-gateway-orchestrator-base:latest
+FROM ${GATEWAY_BASE_IMAGE}
 
 LABEL org.opencontainers.image.source="https://github.com/Audumla/AUDiaLLMGateway"
 LABEL org.opencontainers.image.description="AUDia LLM Gateway Orchestrator (LiteLLM + config generator)"
-
-WORKDIR /app
-
-# curl is needed by the health check
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy pip-installed packages from builder stage into system Python paths
-COPY --from=builder /install /usr/local
 
 COPY src/ ./src/
 COPY config/project/ ./config/project/

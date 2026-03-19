@@ -253,6 +253,22 @@ model_profiles:
         llama_swap_model: ministral3b-vision
         backend_model_name: ministral3b-vision
 
+  vllm_default:
+    family: qwen2.5
+    purpose: Persistent high-throughput model served directly by the optional vLLM backend
+    defaults:
+      context_preset: 32k
+    artifacts:
+      revision: main
+      source_page_url: https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct
+      model_filename: ${VLLM_MODEL}
+      model_url: https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct
+    deployments:
+      vllm_primary:
+        framework: vllm
+        transport: direct
+        backend_model_name: ${VLLM_MODEL}
+
 exposures:
   - stable_name: local/qwen27_fast
     model_profile: qwen27_fast
@@ -272,6 +288,11 @@ exposures:
   - stable_name: local/ministral3b_vision
     model_profile: ministral3b_vision
     deployment: llamacpp_vulkan
+    mode: chat
+
+  - stable_name: local/vllm_default
+    model_profile: vllm_default
+    deployment: vllm_primary
     mode: chat
 
 load_groups:

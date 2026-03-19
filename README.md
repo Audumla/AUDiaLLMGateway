@@ -9,6 +9,7 @@ Provides an OpenAI-compatible API endpoint backed by local models:
 
 - `llama.cpp` as the inference runtime (versioned, managed component)
 - `llama-swap` as the local model router — load/unload models on demand
+- `vLLM` as an optional persistent high-throughput backend
 - `LiteLLM` as the OpenAI-compatible API gateway
 - `nginx` as an optional single front-door reverse proxy
 - Config generated from a shared model catalog — define a model once, target multiple backends
@@ -28,8 +29,16 @@ Provides an OpenAI-compatible API endpoint backed by local models:
 
 ```bash
 cp config/env.example .env
-# edit .env — set LITELLM_MASTER_KEY
+# optional: edit .env to replace the default LITELLM key before exposing the gateway
 docker compose up -d
+```
+
+On first Docker start, LiteLLM Admin UI login defaults to username `admin` and password `sk-local-dev` unless you override `LITELLM_MASTER_KEY`.
+
+To add the optional `vLLM` backend, set `AUDIA_ENABLE_VLLM=true` in `.env` and start the profile:
+
+```bash
+docker compose --profile vllm up -d
 ```
 
 See [docs/docker.md](docs/docker.md) for all deployment profiles (Universal, NVIDIA, AMD, External Proxy).
@@ -72,8 +81,9 @@ See [docs/runbook.md](docs/runbook.md) for the full native install and operation
 Client / tool
   └─> nginx (optional, port 8080)
         └─> LiteLLM (port 4000)
-              └─> llama-swap (port 41080)
-                    └─> llama-server processes (llama.cpp)
+              ├─> llama-swap (port 41080)
+              │     └─> llama-server processes (llama.cpp)
+              └─> vLLM (optional, port 8000)
 ```
 
 Clients speak the OpenAI API. LiteLLM translates model alias names to backend routes.
@@ -107,6 +117,7 @@ Generated outputs:
 
 - `config/generated/llama-swap/llama-swap.generated.yaml`
 - `config/generated/litellm/litellm.config.yaml`
+- `config/generated/vllm/vllm.config.json`
 - `config/generated/nginx/nginx.conf`
 - `config/generated/mcp/litellm.mcp.client.json`
 
@@ -244,7 +255,7 @@ Change aliases in `config/project/stack.base.yaml` or override in
 ## Reverse proxy
 
 Optional nginx is configured via code generation. See [docs/reverse-proxy.md](docs/reverse-proxy.md).
-Route layout: `/v1/` → LiteLLM, `/llamaswap/` → llama-swap, `/health` → status.
+Route layout: `/v1/` → LiteLLM, `/llamaswap/` → llama-swap, `/vllm/` → vLLM when enabled, `/health` → status.
 
 ---
 

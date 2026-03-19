@@ -16,7 +16,11 @@ services:
     ports:
       - "${GATEWAY_PORT:-4000}:4000"
     environment:
-      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-local-dev}
+      - AUDIA_ENABLE_VLLM=${AUDIA_ENABLE_VLLM:-false}
+      - VLLM_MODEL=${VLLM_MODEL:-Qwen/Qwen2.5-0.5B-Instruct}
+      - VLLM_GPU_MEM=${VLLM_GPU_MEM:-0.85}
+      - VLLM_MAX_LEN=${VLLM_MAX_LEN:-4096}
     volumes:
       - ./config:/app/config
     depends_on:
@@ -44,20 +48,22 @@ services:
   # vLLM backend (ROCm) — start with --profile vllm
   # Uses the official ROCm-enabled vLLM image.
   backend-vllm:
-    image: vllm/vllm-openai:latest
+    image: ${VLLM_IMAGE:-vllm/vllm-openai:latest}
     container_name: audia-vllm
     profiles:
       - vllm
     ports:
       - "${VLLM_PORT:-41090}:8000"
     environment:
+      - AUDIA_ENABLE_VLLM=${AUDIA_ENABLE_VLLM:-false}
       - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN:-}
+      - VLLM_MOCK_MODE=${VLLM_MOCK_MODE:-false}
     volumes:
       - ${MODEL_ROOT:-./models}:/root/.cache/huggingface:rw
-    command: >
-      --model ${VLLM_MODEL:-Qwen/Qwen2.5-0.5B-Instruct}
-      --gpu-memory-utilization ${VLLM_GPU_MEM:-0.85}
-      --max-model-len ${VLLM_MAX_LEN:-4096}
+      - ./config/generated/vllm:/app/config/generated/vllm:ro
+      - ./docker/vllm-entrypoint.sh:/app/vllm-entrypoint.sh:ro
+      - ./docker/vllm-mock-server.py:/app/vllm-mock-server.py:ro
+    entrypoint: ["/bin/sh", "/app/vllm-entrypoint.sh"]
     devices:
       - /dev/kfd:/dev/kfd
       - /dev/dri:/dev/dri

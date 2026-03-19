@@ -13,6 +13,10 @@ services:
       - "${GATEWAY_PORT:-4000}:4000"
     environment:
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-local-dev}
+      - AUDIA_ENABLE_VLLM=${AUDIA_ENABLE_VLLM:-false}
+      - VLLM_MODEL=${VLLM_MODEL:-Qwen/Qwen2.5-0.5B-Instruct}
+      - VLLM_GPU_MEM=${VLLM_GPU_MEM:-0.85}
+      - VLLM_MAX_LEN=${VLLM_MAX_LEN:-4096}
     volumes:
       - ./config:/app/config
     depends_on:

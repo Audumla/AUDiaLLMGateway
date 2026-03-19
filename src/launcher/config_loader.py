@@ -74,8 +74,20 @@ class LiteLLMRuntime:
 
 
 @dataclass(frozen=True)
+class VLLMRuntime:
+    enabled: bool
+    host: str
+    port: int
+    generated_config_path: str
+    health_paths: list[str]
+
+
+@dataclass(frozen=True)
 class PublishedModel:
     stable_name: str
+    framework: str
+    transport: str
+    api_base: str
     llama_swap_model: str
     backend_model_name: str
     purpose: str
@@ -133,6 +145,8 @@ class NetworkConfig:
     public_host: str
     llamaswap_host: str
     llamaswap_port: int
+    vllm_host: str
+    vllm_port: int
     litellm_host: str
     litellm_port: int
     nginx_host: str
@@ -147,6 +161,7 @@ class StackConfig:
     network: NetworkConfig
     llama_swap: LlamaSwapRuntime
     litellm: LiteLLMRuntime
+    vllm: VLLMRuntime
     published_models: list[PublishedModel]
     mcp: MCPConfig
     routing: dict[str, Any]
@@ -163,6 +178,12 @@ def _substitute_env(value: str) -> str:
         return os.environ.get(match.group(1), match.group(0))
 
     return ENV_PATTERN.sub(replace, value)
+
+
+def _fallback_env_placeholder(value: str, env_name: str, default: str) -> str:
+    if value == f"${{{env_name}}}":
+        return os.environ.get(env_name, default)
+    return value
 
 
 def _resolve_env(obj: Any) -> Any:
@@ -266,6 +287,7 @@ def load_stack_config(root: str | Path) -> StackConfig:
     )
 
     component_settings = project_raw.get("component_settings", {})
+    vllm_raw = component_settings.get("vllm", {}) if isinstance(component_settings, dict) else {}
     models_raw = raw.get("models", {})
 
     if not isinstance(models_raw, dict):
@@ -292,25 +314,34 @@ def load_stack_config(root: str | Path) -> StackConfig:
 
     services_raw = network_raw.get("services", {}) if isinstance(network_raw, dict) else {}
     llamaswap_service = services_raw.get("llama_swap", {}) if isinstance(services_raw, dict) else {}
+    vllm_service = services_raw.get("vllm", {}) if isinstance(services_raw, dict) else {}
     litellm_service = services_raw.get("litellm", {}) if isinstance(services_raw, dict) else {}
     nginx_service = services_raw.get("nginx", {}) if isinstance(services_raw, dict) else {}
 
     _auto_ip = _detect_local_ip()
     _is_docker = os.environ.get("AUDIA_DOCKER", "false").lower() == "true"
+    _vllm_enabled = (
+        os.environ.get("AUDIA_ENABLE_VLLM", "").strip().lower() in {"1", "true", "yes", "on"}
+        or bool(component_settings.get("vllm", {}).get("enabled", False))
+    )
     
     _litellm_host = str(litellm_service.get("host") or litellm_raw.get("host") or _auto_ip)
     _llamaswap_host = str(llamaswap_service.get("host") or llama_swap_raw.get("host") or _auto_ip)
+    _vllm_host = str(vllm_service.get("host") or _auto_ip)
     
     if _is_docker:
         # In Docker, Nginx and LiteLLM talk to other containers via service names
         _litellm_host = "audia-gateway"
         _llamaswap_host = "audia-llama-cpp"
+        _vllm_host = "audia-vllm"
 
     network = NetworkConfig(
         backend_bind_host=str(network_raw.get("backend_bind_host") or _auto_ip),
         public_host=str(network_raw.get("public_host") or _auto_ip),
         llamaswap_host=_llamaswap_host,
         llamaswap_port=int(llamaswap_service.get("port", llama_swap_raw.get("port", 41080))),
+        vllm_host=_vllm_host,
+        vllm_port=int(vllm_service.get("port", 8000)),
         litellm_host=_litellm_host,
         litellm_port=int(litellm_service.get("port", litellm_raw.get("port", 4000))),
         nginx_host=str(nginx_service.get("host") or _auto_ip),
@@ -372,6 +403,19 @@ def load_stack_config(root: str | Path) -> StackConfig:
         extra_args=[str(item) for item in litellm_raw.get("extra_args", [])],
     )
 
+    vllm = VLLMRuntime(
+        enabled=_vllm_enabled,
+        host=network.vllm_host,
+        port=network.vllm_port,
+        generated_config_path=str(
+            component_settings.get("vllm", {}).get("generated_config_path", "config/generated/vllm/vllm.config.json")
+        ),
+        health_paths=[
+            str(item)
+            for item in component_settings.get("vllm", {}).get("health_paths", ["/health", "/v1/models"])
+        ],
+    )
+
     mcp = MCPConfig(
         enabled=bool(mcp_raw.get("enabled", False)),
         project_config_path=str(mcp_raw.get("project_config_path", "config/project/mcp.base.yaml")),
@@ -389,6 +433,7 @@ def load_stack_config(root: str | Path) -> StackConfig:
             network=network,
             llama_swap=llama_swap,
             litellm=litellm,
+            vllm=vllm,
             published_models=[],
             mcp=mcp,
             routing=routing,
@@ -407,6 +452,7 @@ def load_stack_config(root: str | Path) -> StackConfig:
         network=network,
         llama_swap=llama_swap,
         litellm=litellm,
+        vllm=vllm,
         published_models=published_models,
         mcp=mcp,
         routing=routing,
@@ -663,8 +709,23 @@ def _catalog_published_models(stack: StackConfig) -> list[PublishedModel]:
         if not deployment_name or not deployment:
             raise ValueError(f"Model exposure '{exposure.get('stable_name', '<unknown>')}' references missing deployment '{profile_name}.{deployment_name}'")
 
-        backend_model_name = str(exposure.get("backend_model_name", deployment.get("backend_model_name", deployment.get("llama_swap_model", deployment_name))))
+        framework = str(deployment.get("framework", "llama_cpp"))
+        transport = str(deployment.get("transport", "llama-swap"))
+        if framework == "vllm" and not stack.vllm.enabled:
+            continue
+
         llama_swap_model = str(exposure.get("llama_swap_model", deployment.get("llama_swap_model", deployment_name)))
+        backend_model_name = str(exposure.get("backend_model_name", deployment.get("backend_model_name", llama_swap_model or deployment_name)))
+        if framework == "vllm":
+            backend_model_name = _fallback_env_placeholder(
+                backend_model_name,
+                "VLLM_MODEL",
+                "Qwen/Qwen2.5-0.5B-Instruct",
+            )
+        api_base = f"http://{stack.network.llamaswap_host}:{stack.network.llamaswap_port}/v1"
+        if framework == "vllm" and transport == "direct":
+            api_base = f"http://{stack.network.vllm_host}:{stack.network.vllm_port}/v1"
+
         purpose = str(exposure.get("purpose", profile.get("purpose", "")))
         model_load_groups = [
             str(group_name)
@@ -679,6 +740,9 @@ def _catalog_published_models(stack: StackConfig) -> list[PublishedModel]:
         result.append(
             PublishedModel(
                 stable_name=str(exposure["stable_name"]),
+                framework=framework,
+                transport=transport,
+                api_base=api_base,
                 llama_swap_model=llama_swap_model,
                 backend_model_name=backend_model_name,
                 purpose=purpose,
@@ -761,22 +825,25 @@ def build_llama_swap_config(stack: StackConfig) -> dict[str, Any]:
 
 
 def build_litellm_config(stack: StackConfig) -> dict[str, Any]:
-    api_base = f"http://{stack.network.llamaswap_host}:{stack.network.llamaswap_port}/v1"
     model_list = []
     for model in stack.published_models:
+        litellm_params = {
+            "model": f"openai/{model.backend_model_name}",
+            "api_base": model.api_base,
+            "api_key": model.api_key_placeholder,
+        }
+        if model.transport == "llama-swap" and model.llama_swap_model:
+            litellm_params["extra_headers"] = {
+                "X-LLAMA-SWAP-MODEL": model.llama_swap_model,
+            }
         model_list.append(
             {
                 "model_name": model.stable_name,
-                "litellm_params": {
-                    "model": f"openai/{model.backend_model_name}",
-                    "api_base": api_base,
-                    "api_key": model.api_key_placeholder,
-                    "extra_headers": {
-                        "X-LLAMA-SWAP-MODEL": model.llama_swap_model,
-                    },
-                },
+                "litellm_params": litellm_params,
                 "model_info": {
                     "mode": model.mode,
+                    "framework": model.framework,
+                    "transport": model.transport,
                     "llama_swap_model": model.llama_swap_model,
                     "purpose": model.purpose,
                     "revision": model.revision,
@@ -803,6 +870,44 @@ def build_litellm_config(stack: StackConfig) -> dict[str, Any]:
     }
 
 
+def build_vllm_config(stack: StackConfig) -> dict[str, Any]:
+    exposures = [
+        model
+        for model in stack.published_models
+        if model.framework == "vllm" and model.transport == "direct"
+    ]
+    backend_model_names = {model.backend_model_name for model in exposures}
+    if len(backend_model_names) > 1:
+        raise ValueError(
+            "Current Docker vLLM integration supports one backend model at a time; "
+            f"found multiple enabled vLLM backend models: {sorted(backend_model_names)}"
+        )
+
+    served_model = next(iter(backend_model_names), os.environ.get("VLLM_MODEL", "Qwen/Qwen2.5-0.5B-Instruct"))
+    return {
+        "enabled": stack.vllm.enabled,
+        "service": {
+            "host": stack.vllm.host,
+            "port": stack.vllm.port,
+            "api_base": f"http://{stack.vllm.host}:{stack.vllm.port}/v1",
+        },
+        "startup": {
+            "model": served_model,
+            "gpu_memory_utilization": float(os.environ.get("VLLM_GPU_MEM", "0.85")),
+            "max_model_len": int(os.environ.get("VLLM_MAX_LEN", "4096")),
+        },
+        "exposures": [
+            {
+                "stable_name": model.stable_name,
+                "backend_model_name": model.backend_model_name,
+                "api_base": model.api_base,
+                "mode": model.mode,
+            }
+            for model in exposures
+        ],
+    }
+
+
 def build_mcp_client_config(stack: StackConfig) -> dict[str, Any]:
     _, _, registry = load_mcp_registry(stack.root)
     return {
@@ -823,6 +928,20 @@ def build_mcp_client_config(stack: StackConfig) -> dict[str, Any]:
 
 def build_nginx_landing_page(stack: StackConfig) -> str:
     port = stack.network.nginx_port
+    vllm_rows = ""
+    if stack.vllm.enabled:
+        vllm_rows = f"""
+      <tr>
+        <td><a href="/vllm/">/vllm/</a></td>
+        <td>vLLM backend &mdash; direct backend access
+          (<code>{stack.network.vllm_host}:{stack.network.vllm_port}</code>)</td>
+        <td><span class="tag">Proxy</span></td>
+      </tr>
+      <tr>
+        <td><a href="/vllm-health">/vllm-health</a></td>
+        <td>vLLM health check</td>
+        <td><span class="tag">Health</span></td>
+      </tr>"""
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -881,6 +1000,7 @@ def build_nginx_landing_page(stack: StackConfig) -> str:
         <td>llama-swap health check</td>
         <td><span class="tag">Health</span></td>
       </tr>
+{vllm_rows}
     </tbody>
   </table>
 
@@ -908,6 +1028,38 @@ def _read_local_env_var(stack: StackConfig, var_name: str) -> str:
 def build_nginx_config(stack: StackConfig) -> str:
     litellm_key = _read_local_env_var(stack, stack.litellm.master_key_env)
     litellm_auth_header = f'\n            proxy_set_header Authorization "Bearer {litellm_key}";' if litellm_key else ""
+    vllm_upstream = ""
+    vllm_routes = ""
+    if stack.vllm.enabled:
+        vllm_upstream = f"""
+
+    upstream vllm_upstream {{
+        server {stack.network.vllm_host}:{stack.network.vllm_port};
+        keepalive 16;
+    }}"""
+        vllm_routes = """
+
+        location = /vllm {
+            return 301 /vllm/;
+        }
+
+        location /vllm/ {
+            rewrite ^/vllm/(.*)$ /$1 break;
+            proxy_pass http://vllm_upstream;
+            proxy_redirect off;
+            proxy_http_version 1.1;
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
+            proxy_buffering off;
+            proxy_request_buffering off;
+        }
+
+        location = /vllm-health {
+            proxy_pass http://vllm_upstream/health;
+        }"""
     return f"""pid /tmp/nginx.pid;
 error_log /tmp/nginx-error.log warn;
 
@@ -939,7 +1091,7 @@ http {{
     upstream llamaswap_upstream {{
         server {stack.network.llamaswap_host}:{stack.network.llamaswap_port};
         keepalive 16;
-    }}
+    }}{vllm_upstream}
 
     map $http_upgrade $connection_upgrade {{
         default upgrade;
@@ -1008,7 +1160,7 @@ http {{
 
         location = /llamaswap-health {{
             proxy_pass http://llamaswap_upstream/health;
-        }}
+        }}{vllm_routes}
 
         location = /ui {{
             return 301 /ui/;
@@ -1017,6 +1169,7 @@ http {{
         location /ui/ {{
             proxy_pass http://litellm_upstream;
             proxy_redirect http://{stack.network.litellm_host}:{stack.network.litellm_port}/ /;
+
             proxy_http_version 1.1;
             proxy_set_header Host $http_host;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -1101,6 +1254,15 @@ def write_litellm_config(root: str | Path) -> Path:
     return _write_yaml_with_header(output_path, header, payload)
 
 
+def write_vllm_config(root: str | Path) -> Path:
+    stack = load_stack_config(root)
+    output_path = stack.root / stack.vllm.generated_config_path
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w", encoding="utf-8") as handle:
+        json.dump(build_vllm_config(stack), handle, indent=2)
+    return output_path
+
+
 def write_mcp_client_config(root: str | Path) -> Path:
     stack = load_stack_config(root)
     output_path = stack.root / stack.mcp.generated_client_path
@@ -1163,6 +1325,7 @@ def write_generated_configs(root: str | Path) -> dict[str, Path]:
     return {
         "llama_swap": write_llama_swap_config(root),
         "litellm": write_litellm_config(root),
+        "vllm": write_vllm_config(root),
         "mcp_client": write_mcp_client_config(root),
         "nginx": write_nginx_config(root),
         "systemd": write_systemd_config(root),
