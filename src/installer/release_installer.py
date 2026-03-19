@@ -861,6 +861,12 @@ def main() -> int:
     validate_parser = subparsers.add_parser("validate-configs", help="Validate project and local config layering")
     validate_parser.add_argument("--root", default=".")
 
+    stack_parser = subparsers.add_parser("install-stack", help="Create Python venv and install pip dependencies")
+    stack_parser.add_argument("--root", default=".")
+
+    firewall_parser = subparsers.add_parser("install-firewall", help="Open gateway service ports in the system firewall")
+    firewall_parser.add_argument("--root", default=".")
+
     args = parser.parse_args()
 
     if args.command == "install-release":
@@ -882,6 +888,16 @@ def main() -> int:
         from src.launcher.config_loader import validate_layered_configs
 
         result = validate_layered_configs(args.root)
+    elif args.command == "install-stack":
+        root = Path(args.root).resolve()
+        from src.launcher.config_loader import load_stack_config
+
+        stack = load_stack_config(root)
+        runtime = ensure_python_runtime(root, stack.install.python_min_version)
+        deps = ensure_gateway_python_deps(root)
+        result = {**runtime, **deps}
+    elif args.command == "install-firewall":
+        result = ensure_firewall(Path(args.root).resolve())
     else:
         parser.error(f"Unsupported command: {args.command}")
     print(json.dumps(result, indent=2))

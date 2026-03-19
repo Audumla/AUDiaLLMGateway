@@ -940,7 +940,7 @@ http {{
 
     server {{
         listen       {stack.network.nginx_port};
-        server_name  _;
+        server_name  {stack.network.nginx_host};
 
         client_max_body_size 100m;
 
