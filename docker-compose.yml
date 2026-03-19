@@ -26,7 +26,9 @@ services:
     environment:
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-local-dev}
     volumes:
-      - ./config:/app/config:z
+      # Mount only user-editable and generated subdirs — leaves config/project/ from image intact
+      - ./config/local:/app/config/local:z
+      - ./config/generated:/app/config/generated:z
     depends_on:
       - backend-swappable
     restart: unless-stopped
@@ -96,7 +98,8 @@ services:
       - watcher
       - full
     volumes:
-      - ./config:/app/config
+      - ./config/local:/app/config/local:z
+      - ./config/generated:/app/config/generated:z
       - /var/run/docker.sock:/var/run/docker.sock
     entrypoint: ["python3", "src/launcher/watcher.py"]
     depends_on:
