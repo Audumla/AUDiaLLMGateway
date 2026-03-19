@@ -330,9 +330,12 @@ All variables read from `.env` at compose start time.
 | `LITELLM_MASTER_KEY` | Yes | — | API key for LiteLLM. Set a strong value before exposing externally. |
 | `HUGGING_FACE_HUB_TOKEN` | No | — | HuggingFace token for gated model downloads. |
 | `MODEL_ROOT` | No | `./models` | Host path to model directory. Mounted read-only into the backend. |
+| `GATEWAY_PORT` | No | `4000` | Host port published for the LiteLLM gateway. |
+| `NGINX_PORT` | No | `8080` | Host port published for the nginx reverse proxy. |
 | `VLLM_MODEL` | No | `Qwen/Qwen2.5-0.5B-Instruct` | Model served by the vLLM backend (if used). |
 | `VLLM_PORT` | No | `41090` | Host port for the vLLM backend. |
 | `VLLM_GPU_MEM` | No | `0.85` | GPU memory utilization fraction for vLLM. |
+| `VLLM_MAX_LEN` | No | `4096` | Maximum context length for the vLLM backend. |
 | `LLAMA_BACKEND` | No | `auto` | Override llama.cpp backend detection: `auto`, `cuda`, `rocm`, `vulkan`, `cpu`. |
 | `LLAMA_VERSION` | No | `latest` | llama.cpp release tag to provision (e.g. `b4632`). |
 | `DOCKERHUB_USERNAME` | No | `audumla` | Override image registry username for self-hosted images. |
