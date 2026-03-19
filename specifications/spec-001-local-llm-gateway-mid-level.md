@@ -93,9 +93,10 @@ Three layers merge at generation time:
 | Local overrides | `config/local/` | Machine-owned; never overwritten by updates |
 | Generated | `config/generated/` | Derived outputs; safe to regenerate |
 
-The shared model catalog (`config/project/models.base.yaml`) is the single source
-of truth for model definitions. The generator translates it to `llama-swap` and
-`LiteLLM` configs at generation time. See
+The merged model catalog comes from the project scaffold in
+`config/project/models.base.yaml` plus install-local definitions in
+`config/local/models.override.yaml`. The generator translates that merged catalog
+to `llama-swap` and `LiteLLM` configs at generation time. See
 [spec-002](spec-002-model-catalog-and-config-lifecycle.md) for the full catalog
 schema and generation lifecycle.
 

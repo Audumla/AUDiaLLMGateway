@@ -1,6 +1,6 @@
 # Example: AMD-Optimised Stack
 # Use this when you only have AMD GPUs (ROCm or Vulkan).
-# llama.cpp uses ROCm; vLLM is available as an optional profile (requires ROCm-capable vLLM build).
+# llama.cpp uses ROCm; vLLM uses the official ROCm image as an optional profile.
 #
 # Prerequisite: ROCm 5.6+ drivers installed, /dev/kfd accessible.
 #
@@ -19,7 +19,7 @@ services:
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-local-dev}
       - AUDIA_ENABLE_VLLM=${AUDIA_ENABLE_VLLM:-false}
       - VLLM_MODEL=${VLLM_MODEL:-Qwen/Qwen2.5-0.5B-Instruct}
-      - VLLM_GPU_MEM=${VLLM_GPU_MEM:-0.85}
+      - VLLM_GPU_MEM=${VLLM_GPU_MEM:-1.0}
       - VLLM_MAX_LEN=${VLLM_MAX_LEN:-4096}
     volumes:
       - ./config:/app/config
@@ -47,25 +47,34 @@ services:
 
   # vLLM backend (ROCm) — start with --profile vllm
   backend-vllm:
-    image: ${VLLM_IMAGE:-audumla/audia-llm-gateway-vllm:latest}
+    image: ${VLLM_IMAGE:-vllm/vllm-openai-rocm:latest}
     container_name: audia-vllm
     profiles:
       - vllm
+    command:
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --model
+      - ${VLLM_MODEL:-Qwen/Qwen3-0.6B}
     ports:
       - "${VLLM_PORT:-41090}:8000"
     environment:
-      - AUDIA_ENABLE_VLLM=${AUDIA_ENABLE_VLLM:-false}
       - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN:-}
-      - VLLM_MOCK_MODE=${VLLM_MOCK_MODE:-false}
     volumes:
-      - ${MODEL_ROOT:-./models}:/root/.cache/huggingface:rw
-      - ./config/generated/vllm:/app/config/generated/vllm:ro
+      - ${MODEL_HF_ROOT:-./models-hf}:/root/.cache/huggingface:rw
     devices:
       - /dev/kfd:/dev/kfd
       - /dev/dri:/dev/dri
     group_add:
       - video
       - render
+    ipc: host
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - seccomp=unconfined
     restart: unless-stopped
 
 volumes:

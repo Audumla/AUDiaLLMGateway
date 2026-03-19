@@ -9,6 +9,9 @@
 - **Deployment Mode**: Docker-only. The host should provide GPU passthrough (NVIDIA Toolkit or ROCm/Vulkan devices).
 - **Managed Lifecycle**: Orchestrated via `docker-compose.yml`. 
 - **Hot Reload**: LiteLLM configuration is updated when a `vLLM` model is added or changed in the catalog.
+- **Wrapper Runtime**: The entrypoint must work in images that provide `python3` but not `python`.
+- **Model Cache Layout**: Hugging Face weights must mount from a dedicated cache root (`MODEL_HF_ROOT`) separate from GGUF model storage.
+- **Default GPU Budget**: Docker defaults should use `VLLM_GPU_MEM=1.0` unless the operator overrides it.
 
 ## Configuration
 
@@ -45,6 +48,11 @@ LiteLLM communicates with `vLLM` using the Docker internal hostname `audia-vllm:
 when `AUDIA_ENABLE_VLLM=true`. The generator emits direct LiteLLM routes for
 `framework: vllm` / `transport: direct` exposures and writes
 `config/generated/vllm/vllm.config.json` for the container entrypoint.
+
+For AMD Docker deployments, the validated path is the AMD compose profile using
+the official ROCm image (`vllm/vllm-openai-rocm:latest`) with `/dev/kfd`,
+`/dev/dri`, `ipc: host`, and `SYS_PTRACE`. The root compose's `backend-vllm`
+section is NVIDIA-oriented unless explicitly overridden.
 
 ### Health Check
 The `audia-watcher` service restarts `backend-vllm` when the generated vLLM config

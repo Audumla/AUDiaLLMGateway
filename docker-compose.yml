@@ -27,7 +27,7 @@ services:
       - LLAMA_BACKEND=${LLAMA_BACKEND:-auto}
       - AUDIA_ENABLE_VLLM=${AUDIA_ENABLE_VLLM:-false}
       - VLLM_MODEL=${VLLM_MODEL:-Qwen/Qwen2.5-0.5B-Instruct}
-      - VLLM_GPU_MEM=${VLLM_GPU_MEM:-0.85}
+      - VLLM_GPU_MEM=${VLLM_GPU_MEM:-1.0}
       - VLLM_MAX_LEN=${VLLM_MAX_LEN:-4096}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4000/health/liveliness"]
@@ -92,7 +92,7 @@ services:
       - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN:-}
       - VLLM_MOCK_MODE=${VLLM_MOCK_MODE:-false}
     volumes:
-      - ${MODEL_ROOT:-./models}:/root/.cache/huggingface:rw
+      - ${MODEL_HF_ROOT:-./models-hf}:/root/.cache/huggingface:rw
       - ./config/generated/vllm:/app/config/generated/vllm:ro
     deploy:
       resources:
@@ -117,7 +117,7 @@ services:
       - LLAMA_BACKEND=${LLAMA_BACKEND:-auto}
       - AUDIA_ENABLE_VLLM=${AUDIA_ENABLE_VLLM:-false}
       - VLLM_MODEL=${VLLM_MODEL:-Qwen/Qwen2.5-0.5B-Instruct}
-      - VLLM_GPU_MEM=${VLLM_GPU_MEM:-0.85}
+      - VLLM_GPU_MEM=${VLLM_GPU_MEM:-1.0}
       - VLLM_MAX_LEN=${VLLM_MAX_LEN:-4096}
     healthcheck:
       disable: true
