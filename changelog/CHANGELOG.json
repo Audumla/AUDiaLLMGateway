@@ -1096,5 +1096,58 @@
       "Updated root and example compose files plus env/docs/specs to use AUDIA_ENABLE_VLLM and VLLM_* settings consistently.",
       "Validated the end-to-end Docker flow with a mock audia-vllm container, including proxy parity and watcher-driven config regeneration/restart behavior."
     ]
+  },
+  {
+    "id": "CHG-88f0f025",
+    "agent": "codex",
+    "change_group": "remote-compose-sync-and-image-only-deplo",
+    "plugin_version": "unreleased",
+    "date": "2026-03-19",
+    "recorded_at": "2026-03-19T10:47:35.884949Z",
+    "summary_tags": [
+      "Build / Packaging",
+      "Documentation Update",
+      "Test Update"
+    ],
+    "summary": "Added an image-only Docker deployment flow, published the vLLM wrapper image, and verified a clean remote Compose install.",
+    "details": [
+      "Added docker/Dockerfile.vllm and docker-compose.dev.yml, converted the root deployment compose to image-only, and updated docs/workflows to match.",
+      "Synced only docker-compose.yml to the remote host at /opt/docker/services/llm_gateway, keeping the machine free of git checkouts or extra source files.",
+      "Validated nginx proxy parity against LiteLLM and llama-swap on gpu-host.example and verified watcher regeneration plus nginx reload after fixing SELinux access for the Docker socket."
+    ]
+  },
+  {
+    "id": "CHG-88f0f025-1",
+    "agent": "codex",
+    "change_group": "remote-model-mount",
+    "plugin_version": "unreleased",
+    "date": "2026-03-19",
+    "recorded_at": "2026-03-19T10:51:46.834251Z",
+    "summary_tags": [
+      "Configuration Cleanup"
+    ],
+    "summary": "Configured the remote gateway host to persistently expose the NTFS-backed model store to the llm_gateway Docker stack.",
+    "details": [
+      "Mounted NTFS volume UUID 681E56C51E568C46 at /srv/extra-storage via /etc/fstab on gpu-host.example.",
+      "Bound /srv/extra-storage/development/llm-models onto /opt/docker/services/llm_gateway/models after verifying a host symlink did not surface model contents inside Docker.",
+      "Recreated audia-llama-cpp and verified /app/models contains the expected model directories."
+    ]
+  },
+  {
+    "id": "CHG-88f0f025-2",
+    "agent": "codex",
+    "change_group": "remote-vault-mount",
+    "plugin_version": "unreleased",
+    "date": "2026-03-19",
+    "recorded_at": "2026-03-19T10:56:06.911904Z",
+    "summary_tags": [
+      "Configuration Cleanup"
+    ],
+    "summary": "Mounted the secondary NTFS partition persistently at /srv/llm-models on the remote gateway host.",
+    "details": [
+      "Added UUID=F2CCA3DBCCA397FD /srv/llm-models ntfs entry to /etc/fstab on gpu-host.example.",
+      "Created /srv/llm-models and mounted the volume immediately.",
+      "Verified mount with findmnt and directory listing."
+    ]
   }
 ]
