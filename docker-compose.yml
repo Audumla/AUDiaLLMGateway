@@ -29,8 +29,15 @@ services:
     restart: unless-stopped
 
   # --- llama.cpp Inference Server (always on) ---
-  # Auto-detects NVIDIA/AMD on first start and downloads the matching llama.cpp binary.
-  # Results are cached in the backend-runtime volume — no re-download on restart.
+  # provision-runtime.sh auto-detects GPU at container start and downloads the
+  # matching llama.cpp binary (CUDA, ROCm, Vulkan, or CPU). Binary is cached in
+  # backend-runtime so re-detection and re-download only happen on first start.
+  #
+  # GPU device access is NOT requested here — this compose is for CPU or systems
+  # where the Docker runtime already has GPU access configured (e.g. NVIDIA CDI).
+  # For explicit GPU passthrough use the profiles in docker/examples/:
+  #   NVIDIA: docker compose --project-directory . -f docker/examples/docker-compose.nvidia.yml up -d
+  #   AMD:    docker compose --project-directory . -f docker/examples/docker-compose.amd.yml up -d
   backend-swappable:
     image: audumla/audia-llm-gateway-server:latest
     build:
@@ -45,17 +52,6 @@ services:
       - ${MODEL_ROOT:-./models}:/app/models:ro
       - ./config/generated/llama-swap:/app/config:ro
       - backend-runtime:/app/runtime
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    devices:
-      - /dev/kfd:/dev/kfd
-      - /dev/dri:/dev/dri
-    privileged: true
     restart: unless-stopped
 
   # --- vLLM High-Performance Backend (optional — start with: docker compose --profile vllm up) ---
