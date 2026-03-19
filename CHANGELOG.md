@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.3](https://github.com/example/AUDiaLLMGateway/compare/v0.10.2...v0.10.3) (2026-03-19)
+
+
+### Bug Fixes
+
+* serve nginx index.html from mounted /app/static volume ([37b7b94](https://github.com/example/AUDiaLLMGateway/commit/37b7b94284b521c477511b8c9a5bdd496ce2ebb1))
+
 ## [0.10.2](https://github.com/example/AUDiaLLMGateway/compare/v0.10.1...v0.10.2) (2026-03-19)
 
 
