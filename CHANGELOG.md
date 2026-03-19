@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.6.0](https://github.com/Audumla/AUDiaLLMGateway/compare/v0.5.2...v0.6.0) (2026-03-19)
+
+
+### Features
+
+* add vLLM profiles and CPU-only compose example to all Docker configurations ([2432343](https://github.com/Audumla/AUDiaLLMGateway/commit/24323436dbab5724617099bbba66e3703410f593))
+
+
+### Bug Fixes
+
+* repair provision-runtime.sh and Dockerfile.gateway ([2432343](https://github.com/Audumla/AUDiaLLMGateway/commit/24323436dbab5724617099bbba66e3703410f593))
+* restore native install commands and fix CI test failures ([a63cb82](https://github.com/Audumla/AUDiaLLMGateway/commit/a63cb823f885d23823fd4e98d2cec00b59f54f47))
+* use direct venv bootstrap in install stack to avoid circular import ([c982ea3](https://github.com/Audumla/AUDiaLLMGateway/commit/c982ea301abf414e445ae07aa2ab7a36c0d5d112))
+
+
+### Documentation
+
+* revamp documentation and expand Docker deployment ([2432343](https://github.com/Audumla/AUDiaLLMGateway/commit/24323436dbab5724617099bbba66e3703410f593))
+
+## Changelog
+
 ## Unreleased
 
 ### Scaffolded a native Windows local LLM gateway workspace in AUDiaLLMGateway. (New Feature)
