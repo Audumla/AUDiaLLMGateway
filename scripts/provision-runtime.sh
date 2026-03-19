@@ -30,6 +30,7 @@ if [ -n "$LLAMA_BACKEND" ] && [ "$LLAMA_BACKEND" != "auto" ]; then
         cuda)   HAS_NVIDIA=true ;;
         rocm)   HAS_AMD=true ;;
         vulkan) HAS_VULKAN=true ;;
+        cpu)    ;;
     esac
 else
     echo "--- Auto-detecting GPU hardware ---"
@@ -153,6 +154,20 @@ if [ ! -f "$STATE_FILE" ] || [ "$(cat "$STATE_FILE")" != "$CURRENT_SIG" ]; then
     ln -sf "$BIN_DIR/llama-server-${PRIMARY}" "$BIN_DIR/llama-server"
     echo "  Default: llama-server -> llama-server-${PRIMARY}"
 
+    # Symlink all backend plugin .so files into $BIN_DIR so that
+    # ggml_backend_load_all() can find them alongside the binary.
+    # ggml scans the executable's directory for libggml-*.so files;
+    # GGML_BACKEND_PATH is treated as a single-file path, not a directory.
+    for _so in "$LIB_DIR"/libggml-*.so; do
+        [ -f "$_so" ] || continue
+        _name=$(basename "$_so")
+        case "$_name" in
+            libggml.so|libggml-base.so) continue ;;   # core libs, not plugins
+        esac
+        ln -sf "$_so" "$BIN_DIR/$_name"
+    done
+    echo "  Backend plugins symlinked into $BIN_DIR"
+
     echo "$CURRENT_SIG" > "$STATE_FILE"
     echo "--- Provisioning complete ---"
 else
@@ -166,6 +181,17 @@ echo "$LIB_DIR" > /etc/ld.so.conf.d/llama-runtime.conf
 ldconfig
 export PATH="$BIN_DIR:$PATH"
 export LD_LIBRARY_PATH="$LIB_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
+# When VK_ICD_FILENAMES is not already set, restrict Vulkan to the AMD RADV ICD
+# if this is an AMD GPU system. Without this, all ICDs (intel, gfxstream, nouveau,
+# lvp, etc.) are loaded and the AMD GPU may not enumerate correctly.
+if [ -z "${VK_ICD_FILENAMES:-}" ] && $HAS_AMD; then
+    _RADEON_ICD="/usr/share/vulkan/icd.d/radeon_icd.json"
+    if [ -f "$_RADEON_ICD" ]; then
+        export VK_ICD_FILENAMES="$_RADEON_ICD"
+        echo "  AMD Vulkan: restricting to RADV ICD ($VK_ICD_FILENAMES)"
+    fi
+fi
 
 if [ "$#" -eq 0 ]; then
     if ! command -v llama-swap >/dev/null 2>&1; then
