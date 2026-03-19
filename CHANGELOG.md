@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.1](https://github.com/example/AUDiaLLMGateway/compare/v0.9.0...v0.9.1) (2026-03-19)
+
+
+### Bug Fixes
+
+* include detect-hardware.sh in gateway image ([9c6d4c6](https://github.com/example/AUDiaLLMGateway/commit/9c6d4c6a1144f98de6d348788522b6b30bb38961))
+
 ## [0.9.0](https://github.com/example/AUDiaLLMGateway/compare/v0.8.0...v0.9.0) (2026-03-19)
 
 
