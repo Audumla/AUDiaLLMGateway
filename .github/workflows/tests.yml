@@ -1,16 +1,6 @@
 name: Tests
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'src/**'
-      - 'tests/**'
-      - 'config/**'
-      - 'scripts/**'
-      - 'docker/**'
-      - 'docker-compose.yml'
-      - 'requirements.txt'
   schedule:
     - cron: '0 2 * * *'    # daily at 02:00 UTC — unit + smoke + e2e
     - cron: '0 3 * * 0'    # weekly on Sunday at 03:00 UTC — full integration
@@ -106,15 +96,14 @@ jobs:
 
   # --------------------------------------------------------------------------
   # Integration test — real llama.cpp inference with tiny model
-  # Runs: weekly (Sunday) + on manual dispatch with run_integration=true + on push to docker/
+  # Runs: weekly (Sunday) + on manual dispatch with run_integration=true
   # --------------------------------------------------------------------------
   integration:
     name: Integration test (real inference)
     runs-on: ubuntu-latest
     if: >
       github.event_name == 'workflow_dispatch' && inputs.run_integration == 'true' ||
-      github.event.schedule == '0 3 * * 0' ||
-      (github.event_name == 'push' && contains(github.event.head_commit.modified, 'docker/'))
+      github.event.schedule == '0 3 * * 0'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
