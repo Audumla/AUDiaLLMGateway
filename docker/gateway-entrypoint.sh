@@ -56,6 +56,15 @@ if [ ! -f "$CONFIG/local/models.override.yaml" ]; then
 EOF
 fi
 
+# --- Seed detect-hardware.sh into config/ for discoverability ---
+if [ ! -f "$CONFIG/detect-hardware.sh" ]; then
+    if [ -f /app/scripts/detect-hardware.sh ]; then
+        cp /app/scripts/detect-hardware.sh "$CONFIG/detect-hardware.sh"
+        chmod +x "$CONFIG/detect-hardware.sh"
+        echo ">>> First run: seeded config/detect-hardware.sh (run from repo root to detect GPU)"
+    fi
+fi
+
 # --- Generate all service configs from layered config ---
 python -m src.launcher.process_manager --root . generate-configs
 
