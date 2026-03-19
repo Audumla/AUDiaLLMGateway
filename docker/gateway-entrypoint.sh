@@ -2,6 +2,8 @@
 set -e
 
 CONFIG=/app/config
+LITELLM_CONFIG_PATH="$CONFIG/generated/litellm/litellm.config.yaml"
+LITELLM_CONFIG_WAIT_SECONDS="${LITELLM_CONFIG_WAIT_SECONDS:-30}"
 
 # --- Seed config/local/ on first run ---
 mkdir -p "$CONFIG/local"
@@ -15,6 +17,12 @@ if [ ! -f "$CONFIG/local/env" ]; then
 # REQUIRED: Set a strong key before exposing the gateway on a network.
 LITELLM_MASTER_KEY=sk-local-dev
 EOF
+fi
+
+if [ -z "${LITELLM_MASTER_KEY:-}" ] && [ -f "$CONFIG/local/env" ]; then
+    # Reuse the seeded first-run key unless Compose or the host already provided one.
+    LITELLM_MASTER_KEY="$(grep '^LITELLM_MASTER_KEY=' "$CONFIG/local/env" | tail -n 1 | cut -d= -f2-)"
+    export LITELLM_MASTER_KEY
 fi
 
 if [ ! -f "$CONFIG/local/stack.override.yaml" ]; then
@@ -107,4 +115,15 @@ fi
 # --- Generate all service configs from layered config ---
 python -m src.launcher.process_manager --root . generate-configs
 
-exec litellm --config "$CONFIG/generated/litellm/litellm.config.yaml" --port 4000
+echo ">>> Waiting for generated LiteLLM config at $LITELLM_CONFIG_PATH"
+waited=0
+while [ ! -s "$LITELLM_CONFIG_PATH" ]; do
+    if [ "$waited" -ge "$LITELLM_CONFIG_WAIT_SECONDS" ]; then
+        echo "ERROR: timed out waiting for LiteLLM config at $LITELLM_CONFIG_PATH"
+        exit 1
+    fi
+    sleep 1
+    waited=$((waited + 1))
+done
+
+exec litellm --config "$LITELLM_CONFIG_PATH" --port 4000

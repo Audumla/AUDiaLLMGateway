@@ -139,11 +139,12 @@ def stop_service(root: Path, service_name: str) -> bool:
 def llama_swap_command(root: Path, runtime: LlamaSwapRuntime) -> list[str]:
     config_path = str((root / runtime.generated_config_path).resolve())
     return [
-        runtime.executable,
-        "--config",
+        _resolve_exe(runtime.executable),
+        "-config",
         config_path,
-        "--listen",
+        "-listen",
         f"{runtime.host}:{runtime.port}",
+        "-watch-config",
         *runtime.extra_args,
     ]
 

@@ -9,6 +9,9 @@ RUNTIME_DIR="/app/runtime"
 BIN_DIR="$RUNTIME_DIR/bin"
 LIB_DIR="$RUNTIME_DIR/lib"
 STATE_FILE="$RUNTIME_DIR/.hw_signature"
+DEFAULT_SWAP_CONFIG="${LLAMA_SWAP_CONFIG_PATH:-/app/config/llama-swap.generated.yaml}"
+DEFAULT_SWAP_ADDR="${LLAMA_SWAP_LISTEN_ADDR:-0.0.0.0:41080}"
+DEFAULT_SWAP_WAIT_SECONDS="${LLAMA_SWAP_CONFIG_WAIT_SECONDS:-120}"
 
 mkdir -p "$BIN_DIR" "$LIB_DIR"
 
@@ -147,8 +150,8 @@ if [ ! -f "$STATE_FILE" ] || [ "$(cat "$STATE_FILE")" != "$CURRENT_SIG" ]; then
 
     # Symlink the primary backend as the default llama-server
     PRIMARY="${BACKENDS[0]}"
-    ln -sf "$BIN_DIR/llama-server-${SUFFIX}" "$BIN_DIR/llama-server"
-    echo "  Default: llama-server -> llama-server-${SUFFIX}"
+    ln -sf "$BIN_DIR/llama-server-${PRIMARY}" "$BIN_DIR/llama-server"
+    echo "  Default: llama-server -> llama-server-${PRIMARY}"
 
     echo "$CURRENT_SIG" > "$STATE_FILE"
     echo "--- Provisioning complete ---"
@@ -162,10 +165,27 @@ fi
 echo "$LIB_DIR" > /etc/ld.so.conf.d/llama-runtime.conf
 ldconfig
 export PATH="$BIN_DIR:$PATH"
+export LD_LIBRARY_PATH="$LIB_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
 if [ "$#" -eq 0 ]; then
-    echo "--- Standby mode: binaries available at $BIN_DIR ---"
-    exec sleep infinity
+    if ! command -v llama-swap >/dev/null 2>&1; then
+        echo "ERROR: llama-swap binary not found in PATH"
+        exit 1
+    fi
+
+    echo "--- Waiting for generated llama-swap config at $DEFAULT_SWAP_CONFIG ---"
+    waited=0
+    while [ ! -s "$DEFAULT_SWAP_CONFIG" ]; do
+        if [ "$waited" -ge "$DEFAULT_SWAP_WAIT_SECONDS" ]; then
+            echo "ERROR: timed out waiting for llama-swap config at $DEFAULT_SWAP_CONFIG"
+            exit 1
+        fi
+        sleep 1
+        waited=$((waited + 1))
+    done
+
+    echo "--- Starting llama-swap on $DEFAULT_SWAP_ADDR using $DEFAULT_SWAP_CONFIG ---"
+    exec llama-swap -config "$DEFAULT_SWAP_CONFIG" -listen "$DEFAULT_SWAP_ADDR" -watch-config
 fi
 
 exec "$@"

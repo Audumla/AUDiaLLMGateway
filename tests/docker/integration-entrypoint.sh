@@ -136,9 +136,10 @@ models:
 groups: {}
 YAML
 
-llama-swap serve \
-    --config "$SWAP_CONFIG_DIR/llama-swap.generated.yaml" \
-    --addr "127.0.0.1:${LLAMA_SWAP_PORT}" \
+llama-swap \
+    -config "$SWAP_CONFIG_DIR/llama-swap.generated.yaml" \
+    -listen "127.0.0.1:${LLAMA_SWAP_PORT}" \
+    -watch-config \
     > /tmp/llama-swap.log 2>&1 &
 SWAP_PID=$!
 

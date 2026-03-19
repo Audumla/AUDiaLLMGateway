@@ -1005,5 +1005,96 @@
       "Updated run-smoke-tests.sh to include integration target with model caching",
       "Rewrote tests.yml: added e2e-mock job, integration job (weekly + manual), docker-build validation job, --network=host for all builds"
     ]
+  },
+  {
+    "id": "CHG-f450079f",
+    "agent": "codex",
+    "change_group": "litellm-default-login",
+    "plugin_version": "unreleased",
+    "date": "2026-03-19",
+    "recorded_at": "2026-03-19T09:28:32.971854Z",
+    "summary_tags": [
+      "Build / Packaging"
+    ],
+    "summary": "Make Docker first-run LiteLLM admin login use the seeded default master key consistently.",
+    "details": [
+      "docker/gateway-entrypoint.sh: export LITELLM_MASTER_KEY from config/local/env when Compose or the host did not inject one, so first-run admin login works with the seeded key.",
+      "docker/examples/docker-compose.nvidia.yml, docker/examples/docker-compose.amd.yml, and docker/examples/docker-compose.external-proxy.yml: add sk-local-dev fallbacks to match the root compose behavior.",
+      "README.md and docs/docker.md: document the default admin login (admin / sk-local-dev) and clarify that LITELLM_MASTER_KEY defaults on Docker first install."
+    ]
+  },
+  {
+    "id": "CHG-f450079f-1",
+    "agent": "codex",
+    "change_group": "docker-base-images",
+    "plugin_version": "unreleased",
+    "date": "2026-03-19",
+    "recorded_at": "2026-03-19T09:46:29.778592Z",
+    "summary_tags": [
+      "Build / Packaging"
+    ],
+    "summary": "Add publishable Docker base images so gateway and backend rebuilds can reuse heavy layers in CI and Docker Hub.",
+    "details": [
+      "docker/Dockerfile.gateway-base and docker/Dockerfile.backend-base: add reusable base images for gateway Python dependencies and backend runtime prerequisites including llama-swap.",
+      "docker/Dockerfile.gateway and docker/Dockerfile.unified-backend: switch final images to ARG-driven FROM lines so release builds can pin published base image tags.",
+      ".github/workflows/release-please.yml and .github/workflows/tests.yml: build/push base images first, then build final images against those base tags for faster CI and Docker Hub publishing.",
+      "docs/docker.md: document the local build order for base images and final images."
+    ]
+  },
+  {
+    "id": "CHG-f450079f-2",
+    "agent": "codex",
+    "change_group": "config-loader-syntax-fix",
+    "plugin_version": "unreleased",
+    "date": "2026-03-19",
+    "recorded_at": "2026-03-19T09:48:48.644149Z",
+    "summary_tags": [
+      "Bug Fix"
+    ],
+    "summary": "Fix the nginx config f-string in config_loader so the Python module imports and tests run again.",
+    "details": [
+      "src/launcher/config_loader.py: escape the /ui/ location brace inside the generated nginx f-string so the file is valid Python.",
+      "tests/test_backend_runtime_startup.py: update the backend base-image assertion to match the new GitHub API-based llama-swap asset resolution.",
+      "Validated with py_compile plus pytest for the non-Docker test suite."
+    ]
+  },
+  {
+    "id": "CHG-f450079f-3",
+    "agent": "codex",
+    "change_group": "docker-watcher-proxy-validation",
+    "plugin_version": "unreleased",
+    "date": "2026-03-19",
+    "recorded_at": "2026-03-19T10:04:49.223410Z",
+    "summary_tags": [
+      "Bug Fix",
+      "Build / Packaging",
+      "Test Update"
+    ],
+    "summary": "Hardened Docker watcher reload behavior and verified proxy parity end to end.",
+    "details": [
+      "Switched the watcher to prefer a polling observer in Docker, added AUDIA_DOCKER=true on the watcher service, and disabled the inherited gateway healthcheck for the watcher container.",
+      "Added a LiteLLM config wait loop in docker/gateway-entrypoint.sh to avoid transient startup failures when generated config files are briefly absent during restarts.",
+      "Validated Docker builds, compose startup, watcher-driven config regeneration, and direct-versus-nginx endpoint parity for LiteLLM and llama-swap."
+    ]
+  },
+  {
+    "id": "CHG-f450079f-4",
+    "agent": "codex",
+    "change_group": "vllm-docker-watcher-integration",
+    "plugin_version": "unreleased",
+    "date": "2026-03-19",
+    "recorded_at": "2026-03-19T10:25:04.293963Z",
+    "summary_tags": [
+      "New Feature",
+      "Build / Packaging",
+      "Documentation Update",
+      "Test Update"
+    ],
+    "summary": "Integrated vLLM into generated routing, Docker runtime, watcher reloads, and project documentation.",
+    "details": [
+      "Added deployment-aware LiteLLM/vLLM config generation, nginx /vllm proxy routes, a vLLM runtime wrapper, and watcher-managed vLLM restarts.",
+      "Updated root and example compose files plus env/docs/specs to use AUDIA_ENABLE_VLLM and VLLM_* settings consistently.",
+      "Validated the end-to-end Docker flow with a mock audia-vllm container, including proxy parity and watcher-driven config regeneration/restart behavior."
+    ]
   }
 ]
