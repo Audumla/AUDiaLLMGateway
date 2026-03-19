@@ -1149,5 +1149,74 @@
       "Created /mnt/vault and mounted the volume immediately.",
       "Verified mount with findmnt and directory listing."
     ]
+  },
+  {
+    "id": "CHG-cd40554d",
+    "agent": "codex",
+    "change_group": "remote-expose-component-ports",
+    "plugin_version": "unreleased",
+    "date": "2026-03-19",
+    "recorded_at": "2026-03-19T11:48:44.430694Z",
+    "summary_tags": [
+      "Configuration Cleanup"
+    ],
+    "summary": "Published backend-swappable llama-swap port to the host for external testing.",
+    "details": [
+      "Patched /opt/docker/services/llm_gateway/docker-compose.yml on 10.10.100.10 to add ${LLAMA_SWAP_PORT:-41080}:41080 under backend-swappable.",
+      "Recreated audia-llama-cpp and verified compose now reports 0.0.0.0:41080->41080/tcp.",
+      "Confirmed host listener with ss and successful HTTP response from localhost:41080."
+    ]
+  },
+  {
+    "id": "CHG-cd40554d-1",
+    "agent": "codex",
+    "change_group": "remote-disable-gateway-healthcheck-logs",
+    "plugin_version": "unreleased",
+    "date": "2026-03-19",
+    "recorded_at": "2026-03-19T11:51:57.109351Z",
+    "summary_tags": [
+      "Configuration Cleanup"
+    ],
+    "summary": "Disabled audia-gateway Docker health polling to stop repetitive /health/liveliness access logs.",
+    "details": [
+      "Patched /opt/docker/services/llm_gateway/docker-compose.yml on 10.10.100.10: gateway healthcheck set to disable:true.",
+      "Adjusted nginx depends_on condition from service_healthy to service_started for compose compatibility without health checks.",
+      "Recreated audia-gateway and verified docker inspect reports Test=[NONE] and recent logs no longer contain the periodic liveliness GET entries."
+    ]
+  },
+  {
+    "id": "CHG-cd40554d-2",
+    "agent": "codex",
+    "change_group": "remote-enable-amd-gpu-passthrough",
+    "plugin_version": "unreleased",
+    "date": "2026-03-19",
+    "recorded_at": "2026-03-19T11:53:48.222737Z",
+    "summary_tags": [
+      "Configuration Cleanup"
+    ],
+    "summary": "Enabled AMD GPU device passthrough for backend-swappable on the remote Docker host.",
+    "details": [
+      "Patched /opt/docker/services/llm_gateway/docker-compose.yml backend-swappable with devices /dev/kfd and /dev/dri.",
+      "Added numeric group_add entries 482 and 485 after named groups failed under Docker.",
+      "Recreated audia-llama-cpp and verified HostConfig.Devices plus /dev/kfd and /dev/dri visibility inside the container."
+    ]
+  },
+  {
+    "id": "CHG-cd40554d-3",
+    "agent": "codex",
+    "change_group": "remote-model-layout-cleanup",
+    "plugin_version": "unreleased",
+    "date": "2026-03-19",
+    "recorded_at": "2026-03-19T12:07:09.435452Z",
+    "summary_tags": [
+      "Configuration Cleanup"
+    ],
+    "summary": "Cleaned remote default config overrides and split GGUF model storage from vLLM/HuggingFace cache paths.",
+    "details": [
+      "Moved existing model directories into /mnt/stuff/development/llm-models/gguf and added /mnt/stuff/development/llm-models/hf-cache.",
+      "Updated /etc/fstab bind mounts to map /opt/docker/services/llm_gateway/models -> gguf and /opt/docker/services/llm_gateway/models-hf -> hf-cache.",
+      "Patched remote docker-compose to use MODEL_HF_ROOT for backend-vllm cache and repaired gateway service block after prior edits.",
+      "Reset config/local/models.override.yaml to a clean empty override template and regenerated configs with vLLM gpu_memory_utilization=1.0."
+    ]
   }
 ]
