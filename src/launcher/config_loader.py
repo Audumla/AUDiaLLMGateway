@@ -822,9 +822,7 @@ def build_mcp_client_config(stack: StackConfig) -> dict[str, Any]:
 
 
 def build_nginx_landing_page(stack: StackConfig) -> str:
-    host = stack.network.public_host
     port = stack.network.nginx_port
-    base = f"http://{host}:{port}"
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -846,40 +844,40 @@ def build_nginx_landing_page(stack: StackConfig) -> str:
 </head>
 <body>
   <h1>AUDia LLM Gateway</h1>
-  <p class="sub">Running on <code>{host}:{port}</code></p>
+  <p class="sub">Port <code>{port}</code> &mdash; links are relative to this page</p>
 
   <table>
     <thead><tr><th>Endpoint</th><th>Description</th><th>Type</th></tr></thead>
     <tbody>
       <tr>
-        <td><a href="{base}/v1/models">/v1/models</a></td>
+        <td><a href="/v1/models">/v1/models</a></td>
         <td>OpenAI-compatible model list via LiteLLM</td>
         <td><span class="tag">API</span></td>
       </tr>
       <tr>
-        <td><a href="{base}/litellm/">/litellm/</a></td>
+        <td><a href="/litellm/">/litellm/</a></td>
         <td>LiteLLM gateway &mdash; full OpenAI-compatible API
           (<code>{stack.network.litellm_host}:{stack.network.litellm_port}</code>)</td>
         <td><span class="tag">Proxy</span></td>
       </tr>
       <tr>
-        <td><a href="{base}/llamaswap/">/llamaswap/</a></td>
+        <td><a href="/llamaswap/">/llamaswap/</a></td>
         <td>llama-swap model router &mdash; direct backend access
           (<code>{stack.network.llamaswap_host}:{stack.network.llamaswap_port}</code>)</td>
         <td><span class="tag">Proxy</span></td>
       </tr>
       <tr>
-        <td><a href="{base}/ui/">/ui/</a></td>
+        <td><a href="/ui/">/ui/</a></td>
         <td>LiteLLM admin UI</td>
         <td><span class="tag">UI</span></td>
       </tr>
       <tr>
-        <td><a href="{base}/health">/health</a></td>
+        <td><a href="/health">/health</a></td>
         <td>LiteLLM health check</td>
         <td><span class="tag">Health</span></td>
       </tr>
       <tr>
-        <td><a href="{base}/llamaswap-health">/llamaswap-health</a></td>
+        <td><a href="/llamaswap-health">/llamaswap-health</a></td>
         <td>llama-swap health check</td>
         <td><span class="tag">Health</span></td>
       </tr>
