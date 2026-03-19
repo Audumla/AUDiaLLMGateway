@@ -335,8 +335,12 @@ def load_stack_config(root: str | Path) -> StackConfig:
         _llamaswap_host = "audia-llama-cpp"
         _vllm_host = "audia-vllm"
 
+    _backend_bind_host = str(network_raw.get("backend_bind_host") or _auto_ip)
+    if _is_docker:
+        _backend_bind_host = "0.0.0.0"
+
     network = NetworkConfig(
-        backend_bind_host=str(network_raw.get("backend_bind_host") or _auto_ip),
+        backend_bind_host=_backend_bind_host,
         public_host=str(network_raw.get("public_host") or _auto_ip),
         llamaswap_host=_llamaswap_host,
         llamaswap_port=int(llamaswap_service.get("port", llama_swap_raw.get("port", 41080))),
@@ -549,9 +553,28 @@ def _format_llama_cpp_option_value(value: Any) -> str:
     return str(value)
 
 
-def _render_llama_cpp_options(options: dict[str, Any]) -> str:
+def _render_llama_cpp_options(options: dict[str, Any], backend: str = "auto") -> str:
     parts: list[str] = []
     for key, value in options.items():
+        # Handle 'device' flag specially for backend compatibility
+        if key == "device":
+            count = len(value) if isinstance(value, list) else 1
+            if backend == "vulkan":
+                # Vulkan expects --device Vulkan0,Vulkan1,… (names from models.base.yaml)
+                parts.append(f"--device {_format_llama_cpp_option_value(value)}")
+            elif backend == "rocm":
+                # ROCm/HIP uses HIP device names: HIP0, HIP1, HIP2, …
+                parts.append(f"--device {','.join(f'HIP{i}' for i in range(count))}")
+            elif backend == "cuda":
+                # CUDA uses CUDA device names: CUDA0, CUDA1, …
+                parts.append(f"--device {','.join(f'CUDA{i}' for i in range(count))}")
+            elif backend == "metal":
+                pass  # Metal selects GPU implicitly; --device not needed
+            else:
+                # auto/unknown — fall back to Vulkan names (most common GPU backend)
+                parts.append(f"--device {_format_llama_cpp_option_value(value)}")
+            continue
+
         flag = f"--{str(key).replace('_', '-')}"
         if isinstance(value, bool):
             if value:
@@ -561,7 +584,7 @@ def _render_llama_cpp_options(options: dict[str, Any]) -> str:
     return " ".join(parts)
 
 
-def _synthesize_catalog_macros(catalog: dict[str, Any], macros: dict[str, Any], local_macros: dict[str, Any]) -> None:
+def _synthesize_catalog_macros(catalog: dict[str, Any], macros: dict[str, Any], local_macros: dict[str, Any], backend: str = "auto") -> None:
     presets = catalog.get("presets", {})
     for section in ("gpu_profiles", "runtime_profiles"):
         for preset_name, preset in presets.get(section, {}).items():
@@ -575,7 +598,7 @@ def _synthesize_catalog_macros(catalog: dict[str, Any], macros: dict[str, Any], 
                 raise ValueError(
                     f"Model catalog preset '{section}.{preset_name}' must define llama_cpp_options to synthesize macro '{macro_name}'"
                 )
-            macros[macro_name] = _render_llama_cpp_options(options)
+            macros[macro_name] = _render_llama_cpp_options(options, backend=backend)
 
 
 def _generated_llama_swap_models(stack: StackConfig, macros: dict[str, Any]) -> dict[str, Any]:
@@ -809,6 +832,10 @@ def build_llama_swap_config(stack: StackConfig) -> dict[str, Any]:
     if rocm_executable_path and "llama-server-rocm" not in local_macros and "llama-server-rocm" not in macros:
         macros["llama-server-rocm"] = str(rocm_executable_path)
 
+    # Determine backend for macro synthesis
+    # Default to LLAMA_BACKEND if set, otherwise auto
+    _backend = os.environ.get("LLAMA_BACKEND", "auto").lower()
+
     models_state = install_state.get("component_results", {}).get("models", {})
     model_dir = models_state.get("model_dir", "")
     if model_dir:
@@ -816,7 +843,25 @@ def build_llama_swap_config(stack: StackConfig) -> dict[str, Any]:
             macros["model-path"] = f"--model {model_dir}"
         if "mmproj-path" not in local_macros:
             macros["mmproj-path"] = f"--mmproj {model_dir}"
-    _synthesize_catalog_macros(catalog, macros, local_macros)
+
+    # Docker-specific overrides — provision-runtime.sh places binaries at
+    # /app/runtime/bin/ with predictable names; models mount at /app/models.
+    # These override the base-yaml defaults (which use bare names / relative paths)
+    # so llama-swap finds the right binaries and model files without PATH tricks.
+    _is_docker = os.environ.get("AUDIA_DOCKER", "false").lower() == "true"
+    if _is_docker:
+        if "llama-server" not in local_macros:
+            macros["llama-server"] = "/app/runtime/bin/llama-server"
+        for _suffix in ("cpu", "rocm", "vulkan", "cuda"):
+            _macro = f"llama-server-{_suffix}"
+            if _macro not in local_macros:
+                macros[_macro] = f"/app/runtime/bin/llama-server-{_suffix}"
+        if "model-path" not in local_macros:
+            macros["model-path"] = "--model /app/models"
+        if "mmproj-path" not in local_macros:
+            macros["mmproj-path"] = "--mmproj /app/models"
+
+    _synthesize_catalog_macros(catalog, macros, local_macros, backend=_backend)
     generated_models = _generated_llama_swap_models(stack, macros)
     merged["models"] = {**merged.get("models", {}), **generated_models}
     generated_groups = _generated_llama_swap_groups(stack)
