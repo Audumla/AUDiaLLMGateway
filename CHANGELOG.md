@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.11.2](https://github.com/Audumla/AUDiaLLMGateway/compare/v0.11.1...v0.11.2) (2026-03-19)
+
+
+### Bug Fixes
+
+* downloads to docker configured locations ([695a9ad](https://github.com/Audumla/AUDiaLLMGateway/commit/695a9ad8c7d49797cf71df65e2321390d01c716a))
+
+## Changelog
+
 ## Unreleased
 
 ### Scaffolded a native Windows local LLM gateway workspace in AUDiaLLMGateway. (New Feature)
