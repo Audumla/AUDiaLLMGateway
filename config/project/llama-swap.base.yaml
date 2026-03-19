@@ -7,6 +7,23 @@ logLevel: info
 startPort: 41000
 
 macros:
+  # Default binary — symlink to whichever backend was auto-detected at provisioning time.
+  # Override individual macros in config/local/llama-swap.override.yaml to run specific
+  # backends per model (e.g. rocm for one model, vulkan for another simultaneously).
+  #
+  # Docker runtime paths (set by provision-runtime.sh):
+  #   /app/runtime/bin/llama-server-cuda
+  #   /app/runtime/bin/llama-server-rocm
+  #   /app/runtime/bin/llama-server-vulkan
+  #   /app/runtime/bin/llama-server-cpu
+  #
+  # Example — config/local/llama-swap.override.yaml:
+  #   macros:
+  #     llama-server-rocm:   "/app/runtime/bin/llama-server-rocm"
+  #     llama-server-vulkan: "/app/runtime/bin/llama-server-vulkan"
+  #
+  # Then per model in models.override.yaml set:
+  #   executable_macro: llama-server-rocm   # or -vulkan, -cuda, -cpu
   llama-server: "llama-server"
   llama-server-cpu: "llama-server"
   llama-server-rocm: "llama-server"
