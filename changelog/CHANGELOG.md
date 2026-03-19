@@ -406,4 +406,8 @@
 - Validated the official ROCm vLLM image on the AMD host and updated the AMD compose example/docs/spec to match the path that actually works end-to-end.
 - Confirmed the nginx proxy path for vLLM after reload and verified tiny GGUF inference again through LiteLLM and nginx after restoring runtime plugin symlinks and correcting the live model-root assumption.
 
+### Persist llama.cpp runtime to visible host paths via BACKEND_RUNTIME_ROOT and update Docker docs/examples. (Configuration Cleanup)
+- Replaced the opaque backend-runtime Docker volume with a bind mount rooted at ./config/data/backend-runtime across the main and example compose files.
+- Documented BACKEND_RUNTIME_ROOT and the visible persistence layout in README and docs/docker.md, and kept models-hf separate for vLLM caches.
+
 ---
