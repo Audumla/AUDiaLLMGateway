@@ -2,11 +2,11 @@
 # Use this when you already run a reverse proxy (Traefik, nginx, Caddy) on the host.
 # The gateway joins your existing proxy network instead of publishing a port.
 #
-# Start with llama.cpp only:
-#   docker compose -f docker/examples/docker-compose.external-proxy.yml up -d
+# Run from the repo root (--project-directory keeps ./config and ./models relative to root):
+#   docker compose --project-directory . -f docker/examples/docker-compose.external-proxy.yml up -d
 #
-# Start with vLLM added:
-#   docker compose -f docker/examples/docker-compose.external-proxy.yml --profile vllm up -d
+# With vLLM added:
+#   docker compose --project-directory . -f docker/examples/docker-compose.external-proxy.yml --profile vllm up -d
 services:
   gateway:
     image: audumla/audia-llm-gateway-orchestrator:latest

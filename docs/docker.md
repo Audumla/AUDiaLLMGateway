@@ -148,7 +148,7 @@ Full compose definition: [`docker-compose.yml`](../docker-compose.yml)
 For development, testing, or systems without a GPU.
 
 ```bash
-docker compose -f docker/examples/docker-compose.cpu.yml up -d
+docker compose --project-directory . -f docker/examples/docker-compose.cpu.yml up -d
 ```
 
 Compose file: [`docker/examples/docker-compose.cpu.yml`](../docker/examples/docker-compose.cpu.yml)
@@ -166,7 +166,7 @@ Minimal profile for systems with only NVIDIA GPUs.
 docker run --rm --gpus all nvidia/cuda:12.2.0-base-ubuntu22.04 nvidia-smi
 
 # Start the NVIDIA-optimised stack
-docker compose -f docker/examples/docker-compose.nvidia.yml up -d
+docker compose --project-directory . -f docker/examples/docker-compose.nvidia.yml up -d
 ```
 
 Compose file: [`docker/examples/docker-compose.nvidia.yml`](../docker/examples/docker-compose.nvidia.yml)
@@ -221,7 +221,7 @@ rocm-smi   # or: ls /dev/kfd
 ```
 
 ```bash
-docker compose -f docker/examples/docker-compose.amd.yml up -d
+docker compose --project-directory . -f docker/examples/docker-compose.amd.yml up -d
 ```
 
 Compose file: [`docker/examples/docker-compose.amd.yml`](../docker/examples/docker-compose.amd.yml)
@@ -276,7 +276,7 @@ Use this when you already run a reverse proxy (Traefik, nginx, Caddy) on the hos
 The gateway container joins your existing proxy network instead of publishing a port.
 
 ```bash
-docker compose -f docker/examples/docker-compose.external-proxy.yml up -d
+docker compose --project-directory . -f docker/examples/docker-compose.external-proxy.yml up -d
 ```
 
 Compose file: [`docker/examples/docker-compose.external-proxy.yml`](../docker/examples/docker-compose.external-proxy.yml)

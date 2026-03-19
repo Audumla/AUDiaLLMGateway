@@ -3,8 +3,8 @@
 # llama.cpp runs in CPU-only mode — slower but works anywhere.
 # vLLM is not included here as it requires a GPU to function.
 #
-# Start:
-#   docker compose -f docker/examples/docker-compose.cpu.yml up -d
+# Run from the repo root (--project-directory keeps ./config and ./models relative to root):
+#   docker compose --project-directory . -f docker/examples/docker-compose.cpu.yml up -d
 services:
   gateway:
     image: audumla/audia-llm-gateway-orchestrator:latest

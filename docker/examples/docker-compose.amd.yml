@@ -4,11 +4,11 @@
 #
 # Prerequisite: ROCm 5.6+ drivers installed, /dev/kfd accessible.
 #
-# Start with llama.cpp only:
-#   docker compose -f docker/examples/docker-compose.amd.yml up -d
+# Run from the repo root (--project-directory keeps ./config and ./models relative to root):
+#   docker compose --project-directory . -f docker/examples/docker-compose.amd.yml up -d
 #
-# Start with vLLM added:
-#   docker compose -f docker/examples/docker-compose.amd.yml --profile vllm up -d
+# With vLLM added:
+#   docker compose --project-directory . -f docker/examples/docker-compose.amd.yml --profile vllm up -d
 services:
   gateway:
     image: audumla/audia-llm-gateway-orchestrator:latest
