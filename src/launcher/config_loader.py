@@ -955,7 +955,7 @@ http {{
         location /v1/ {{
             proxy_pass http://litellm_upstream;
             proxy_http_version 1.1;
-            proxy_set_header Host $host;
+            proxy_set_header Host $http_host;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
             proxy_set_header Upgrade $http_upgrade;
@@ -972,7 +972,7 @@ http {{
             rewrite ^/litellm/(.*)$ /$1 break;
             proxy_pass http://litellm_upstream;
             proxy_http_version 1.1;
-            proxy_set_header Host $host;
+            proxy_set_header Host $http_host;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
             proxy_set_header Upgrade $http_upgrade;
@@ -991,7 +991,7 @@ http {{
             proxy_redirect ~^/(.+)$ /llamaswap/$1;
             proxy_redirect / /llamaswap/;
             proxy_http_version 1.1;
-            proxy_set_header Host $host;
+            proxy_set_header Host $http_host;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
             proxy_set_header Upgrade $http_upgrade;
@@ -1003,7 +1003,7 @@ http {{
         location = /health {{
             proxy_pass http://litellm_upstream/health;
             proxy_http_version 1.1;
-            proxy_set_header Host $host;{litellm_auth_header}
+            proxy_set_header Host $http_host;{litellm_auth_header}
         }}
 
         location = /llamaswap-health {{
@@ -1018,7 +1018,7 @@ http {{
             proxy_pass http://litellm_upstream;
             proxy_redirect http://{stack.network.litellm_host}:{stack.network.litellm_port}/ /;
             proxy_http_version 1.1;
-            proxy_set_header Host $host;
+            proxy_set_header Host $http_host;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
             proxy_set_header Upgrade $http_upgrade;
@@ -1030,7 +1030,7 @@ http {{
         location /litellm-asset-prefix/ {{
             proxy_pass http://litellm_upstream;
             proxy_http_version 1.1;
-            proxy_set_header Host $host;
+            proxy_set_header Host $http_host;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
             proxy_buffering off;
