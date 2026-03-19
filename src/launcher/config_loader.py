@@ -657,7 +657,10 @@ def _generated_llama_swap_models(stack: StackConfig, macros: dict[str, Any]) -> 
                 lines.append(f"${{{macro_ref}}}")
 
             model_id = str(deployment.get("llama_swap_model", deployment_name))
-            entry: dict[str, Any] = {"cmd": "\n".join(lines)}
+            # Keep command rendering single-line to avoid YAML multiline formatting
+            # that introduces visual blank lines in generated files.
+            cmd = " ".join(part.strip() for part in lines if part and part.strip())
+            entry: dict[str, Any] = {"cmd": cmd}
             concurrency_limit = deployment.get("concurrency_limit", defaults.get("concurrency_limit"))
             if concurrency_limit is not None:
                 entry["concurrencyLimit"] = int(concurrency_limit)
@@ -941,7 +944,7 @@ def build_vllm_config(stack: StackConfig) -> dict[str, Any]:
         },
         "startup": {
             "model": served_model,
-            "gpu_memory_utilization": float(os.environ.get("VLLM_GPU_MEM", "0.85")),
+            "gpu_memory_utilization": float(os.environ.get("VLLM_GPU_MEM", "1.0")),
             "max_model_len": int(os.environ.get("VLLM_MAX_LEN", "4096")),
         },
         "exposures": [

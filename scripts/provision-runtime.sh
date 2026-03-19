@@ -15,6 +15,20 @@ DEFAULT_SWAP_WAIT_SECONDS="${LLAMA_SWAP_CONFIG_WAIT_SECONDS:-120}"
 
 mkdir -p "$BIN_DIR" "$LIB_DIR"
 
+sync_backend_plugins() {
+    # ggml_backend_load_all() scans the executable directory for backend plugins.
+    # Re-sync them on every container start, not just after a fresh provision,
+    # so persisted runtime volumes stay runnable across image/container changes.
+    for _so in "$LIB_DIR"/libggml-*.so; do
+        [ -f "$_so" ] || continue
+        _name=$(basename "$_so")
+        case "$_name" in
+            libggml.so|libggml-base.so) continue ;;
+        esac
+        ln -sf "$_so" "$BIN_DIR/$_name"
+    done
+}
+
 # ---------------------------------------------------------------------------
 # 1. Hardware Detection
 #    LLAMA_BACKEND env var overrides auto-detection.
@@ -158,14 +172,7 @@ if [ ! -f "$STATE_FILE" ] || [ "$(cat "$STATE_FILE")" != "$CURRENT_SIG" ]; then
     # ggml_backend_load_all() can find them alongside the binary.
     # ggml scans the executable's directory for libggml-*.so files;
     # GGML_BACKEND_PATH is treated as a single-file path, not a directory.
-    for _so in "$LIB_DIR"/libggml-*.so; do
-        [ -f "$_so" ] || continue
-        _name=$(basename "$_so")
-        case "$_name" in
-            libggml.so|libggml-base.so) continue ;;   # core libs, not plugins
-        esac
-        ln -sf "$_so" "$BIN_DIR/$_name"
-    done
+    sync_backend_plugins
     echo "  Backend plugins symlinked into $BIN_DIR"
 
     echo "$CURRENT_SIG" > "$STATE_FILE"
@@ -181,6 +188,7 @@ echo "$LIB_DIR" > /etc/ld.so.conf.d/llama-runtime.conf
 ldconfig
 export PATH="$BIN_DIR:$PATH"
 export LD_LIBRARY_PATH="$LIB_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+sync_backend_plugins
 
 # When VK_ICD_FILENAMES is not already set, restrict Vulkan to the AMD RADV ICD
 # if this is an AMD GPU system. Without this, all ICDs (intel, gfxstream, nouveau,

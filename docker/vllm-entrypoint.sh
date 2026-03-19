@@ -16,15 +16,22 @@ while [ ! -s "$CONFIG_PATH" ]; do
 done
 
 if [ "${VLLM_MOCK_MODE:-false}" = "true" ]; then
-    exec python /app/vllm-mock-server.py "$CONFIG_PATH"
+    exec "${PYTHON_BIN:-python3}" /app/vllm-mock-server.py "$CONFIG_PATH"
 fi
 
-python - "$CONFIG_PATH" <<'PY'
+PYTHON_BIN="$(command -v python3 || command -v python || true)"
+if [ -z "$PYTHON_BIN" ]; then
+    echo "ERROR: neither python3 nor python was found in the vLLM container"
+    exit 1
+fi
+
+"$PYTHON_BIN" - "$CONFIG_PATH" "$PYTHON_BIN" <<'PY'
 import json
 import os
 import sys
 
 config_path = sys.argv[1]
+python_bin = sys.argv[2]
 with open(config_path, "r", encoding="utf-8") as handle:
     config = json.load(handle)
 
@@ -34,7 +41,7 @@ if not model:
     raise SystemExit("No vLLM model configured")
 
 args = [
-    "python",
+    python_bin,
     "-m",
     "vllm.entrypoints.openai.api_server",
     "--host",
@@ -44,7 +51,7 @@ args = [
     "--model",
     str(model),
     "--gpu-memory-utilization",
-    str(startup.get("gpu_memory_utilization", 0.85)),
+    str(startup.get("gpu_memory_utilization", 1.0)),
     "--max-model-len",
     str(startup.get("max_model_len", 4096)),
 ]

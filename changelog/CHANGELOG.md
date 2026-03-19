@@ -372,4 +372,38 @@
 - Patched remote docker-compose to use MODEL_HF_ROOT for backend-vllm cache and repaired gateway service block after prior edits.
 - Reset config/local/models.override.yaml to a clean empty override template and regenerated configs with vLLM gpu_memory_utilization=1.0.
 
+### Restored primary models bind root to llm-models and moved gguf/hf separation into MODEL_ROOT subpaths. (Configuration Cleanup)
+- Changed /etc/fstab so /opt/docker/services/llm_gateway/models binds to /srv/extra-storage/development/llm-models (primary root).
+- Set MODEL_ROOT=./models/gguf and MODEL_HF_ROOT=./models/hf-cache in remote .env to preserve separated storage layout without changing the primary link root.
+- Recreated backend/gateway/watcher and verified backend-swappable mount source /opt/docker/services/llm_gateway/models/gguf -> /app/models.
+
+### Promoted the full model catalog into local models.override.yaml for host-local editability. (Configuration Cleanup)
+- Backed up existing /opt/docker/services/llm_gateway/config/local/models.override.yaml and replaced it with model_profiles, exposures, and load_groups from the active base catalog in the gateway container.
+- Regenerated generated configs after promotion.
+- Verified local catalog now contains 5 model profiles, 5 exposures, and 4 load groups.
+
+### Shifted primary model definitions to local config and seeded a tiny downloadable GGUF test model. (Configuration Cleanup)
+- Created local empty-base catalog (frameworks/presets only, zero model declarations) and pointed stack override models.project_config_path to it.
+- Kept primary model definitions in config/local/models.override.yaml and added tiny_qwen25_test exposure/deployment.
+- Downloaded Qwen2.5-0.5B-Instruct-Q4_K_M.gguf (~380MB) into models/gguf and regenerated configs to confirm model wiring.
+
+### Moved model declarations out of project base catalog into local override. (Configuration Cleanup)
+- Removed concrete model profiles/exposures/load groups from config/project/models.base.yaml
+- Added full model declarations to config/local/models.override.yaml
+- Validated config generation after merge-layer changes
+
+### Moved remaining model catalog defaults from project base into local override. (Configuration Cleanup)
+- Set config/project/models.base.yaml to empty scaffold only
+- Moved frameworks and presets into config/local/models.override.yaml
+- Regenerated all generated configs successfully
+
+### Validated the live Docker stack end-to-end, fixed runtime/config drift, and updated docs for AMD/vLLM behavior. (Bug Fix)
+- Patched runtime provisioning to resync ggml backend plugins so persisted llama.cpp volumes stay runnable across container restarts.
+- Aligned model-catalog docs with install-local overrides and updated nginx/vLLM documentation to match the validated routing and cache layout.
+- Normalized vLLM defaults to MODEL_HF_ROOT plus VLLM_GPU_MEM=1.0 and added python3 fallback handling in the vLLM entrypoint.
+
+### Validated and documented the working AMD ROCm vLLM path, and repaired live llama.cpp runtime assumptions found during deep E2E testing. (Bug Fix)
+- Validated the official ROCm vLLM image on the AMD host and updated the AMD compose example/docs/spec to match the path that actually works end-to-end.
+- Confirmed the nginx proxy path for vLLM after reload and verified tiny GGUF inference again through LiteLLM and nginx after restoring runtime plugin symlinks and correcting the live model-root assumption.
+
 ---
