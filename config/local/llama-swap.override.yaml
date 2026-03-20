@@ -1,6 +1,6 @@
 macros:
-  llama-server-rocm: "/app/runtime/bin/llama-server-rocm"
-  llama-server-vulkan: "/app/runtime/bin/llama-server-vulkan"
+  llama-server-rocm: "env LD_LIBRARY_PATH=/app/runtime-root/rocm/lib:/opt/rocm/lib ROCBLAS_TENSILE_LIBPATH=/opt/rocm/lib/rocblas/library /app/runtime-root/rocm/bin/llama-server-rocm"
+  llama-server-vulkan: "env VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/radeon_icd.json LD_LIBRARY_PATH=/app/runtime-root/vulkan/lib /app/runtime-root/vulkan/bin/llama-server-vulkan"
   model-path: "--model /app/models/gguf"
   mmproj-path: "--mmproj /app/models/gguf"
 models: {}

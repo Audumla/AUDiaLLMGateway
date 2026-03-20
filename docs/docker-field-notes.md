@@ -59,8 +59,8 @@ Symptom:
 Resolution:
 
 - `BACKEND_RUNTIME_ROOT` is now treated as a visible base directory
-- startup resolves `/app/runtime` to a backend-specific subdirectory such as
-  `vulkan`, `rocm`, `cuda`, `cpu`, or `auto`
+- each backend now lives in its own sibling directory such as `vulkan/`,
+  `rocm/`, `cuda/`, or `cpu/`
 
 ### 3. Older Linux Vulkan builds failed on newer Qwen 3.5 GGUFs
 
@@ -251,10 +251,10 @@ docker compose up -d
 Check raw Vulkan device visibility inside the backend container:
 
 ```bash
-docker exec audia-llama-cpp /app/runtime/bin/llama-server-vulkan --list-devices
+docker exec audia-llama-cpp /app/runtime-root/vulkan/bin/llama-server-vulkan --list-devices
 ```
 - Mixed AMD `llama.cpp` deployments should keep `LLAMA_BACKEND=auto` so the
-  runtime provisions both ROCm and Vulkan in the same runtime namespace.
+  runtime provisions both ROCm and Vulkan into separate runtime directories.
 - On AMD Vulkan, force `VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/radeon_icd.json`
   so `llama-server-vulkan` consistently sees the RADV devices in-container.
 - On AMD ROCm, the `llama.cpp` backend needs ROCm shared libraries present in the
