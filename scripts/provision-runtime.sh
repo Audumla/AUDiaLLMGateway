@@ -26,6 +26,27 @@ sync_backend_plugins() {
     done
 }
 
+ensure_apt_packages() {
+    if [ "$#" -eq 0 ]; then
+        return
+    fi
+
+    MISSING_PACKAGES=""
+    for _pkg in "$@"; do
+        if ! dpkg -s "$_pkg" >/dev/null 2>&1; then
+            MISSING_PACKAGES="$MISSING_PACKAGES $_pkg"
+        fi
+    done
+
+    if [ -n "$MISSING_PACKAGES" ]; then
+        echo "  Installing runtime packages:$MISSING_PACKAGES"
+        apt-get update -qq
+        # shellcheck disable=SC2086
+        apt-get install -y --no-install-recommends $MISSING_PACKAGES
+        rm -rf /var/lib/apt/lists/*
+    fi
+}
+
 # ---------------------------------------------------------------------------
 # 1. Hardware Detection
 #    LLAMA_BACKEND env var overrides auto-detection.
@@ -77,6 +98,17 @@ else
 fi
 
 CURRENT_SIG="VERSION=${LLAMA_VERSION:-latest}|NV=$HAS_NVIDIA|AMD=$HAS_AMD|VK=$HAS_VULKAN|BACKEND=${LLAMA_BACKEND:-auto}"
+
+# ---------------------------------------------------------------------------
+# 1a. Ensure container-level runtime packages are present on every start.
+#     These live in the image/container filesystem, not the persisted runtime
+#     volume, so a container recreate must re-check them even when the runtime
+#     signature matches and provisioning is skipped.
+# ---------------------------------------------------------------------------
+RUNTIME_PACKAGES=()
+$HAS_AMD    && RUNTIME_PACKAGES+=(libnuma1)
+$HAS_VULKAN && RUNTIME_PACKAGES+=(libvulkan1 mesa-vulkan-drivers vulkan-tools)
+ensure_apt_packages "${RUNTIME_PACKAGES[@]}"
 
 # ---------------------------------------------------------------------------
 # 1b. Resolve backend-specific runtime directory and link it to /app/runtime
@@ -135,28 +167,14 @@ if [ ! -f "$STATE_FILE" ] || [ "$(cat "$STATE_FILE")" != "$CURRENT_SIG" ]; then
             rocm)
                 PATTERN="ubuntu-rocm.*x64\.(tar\.gz|zip)$"
                 SUFFIX="rocm"
-                # ROCm HIP runtime is provided by the host via /dev/kfd + /dev/dri passthrough.
-                # Do not try to install rocm-hip-runtime via apt — the package has version
-                # conflicts on Ubuntu 22.04 and the llama.cpp ROCm binary bundles what it needs.
-                # Only install Vulkan system libs (needed for the Vulkan backend on the same GPU).
-                apt-get update -qq && apt-get install -y --no-install-recommends libvulkan1 mesa-vulkan-drivers \
-                    && rm -rf /var/lib/apt/lists/*
                 ;;
             cuda)
                 PATTERN="ubuntu-x64\.(tar\.gz|zip)$"
                 SUFFIX="cuda"
-                # CUDA libs are injected by the NVIDIA Container Toolkit — no apt install needed
-                # Install Vulkan as well (NVIDIA supports Vulkan)
-                apt-get update -qq && apt-get install -y --no-install-recommends libvulkan1 mesa-vulkan-drivers \
-                    && rm -rf /var/lib/apt/lists/*
                 ;;
             vulkan)
                 PATTERN="ubuntu-vulkan.*x64\.(tar\.gz|zip)$"
                 SUFFIX="vulkan"
-                # Vulkan ICD loader and Mesa drivers (covers NVIDIA, AMD, Intel Vulkan)
-                apt-get update -qq && apt-get install -y --no-install-recommends \
-                    libvulkan1 mesa-vulkan-drivers vulkan-tools \
-                    && rm -rf /var/lib/apt/lists/*
                 ;;
             *)
                 PATTERN="ubuntu-x64\.(tar\.gz|zip)$"
@@ -207,10 +225,10 @@ fi
 # ---------------------------------------------------------------------------
 # 3. Launch
 # ---------------------------------------------------------------------------
-echo "$LIB_DIR" > /etc/ld.so.conf.d/llama-runtime.conf
+printf "%s\n%s\n" "$LIB_DIR" "/opt/rocm/lib" > /etc/ld.so.conf.d/llama-runtime.conf
 ldconfig
 export PATH="$BIN_DIR:$PATH"
-export LD_LIBRARY_PATH="$LIB_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export LD_LIBRARY_PATH="$LIB_DIR:/opt/rocm/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 sync_backend_plugins
 
 # When VK_ICD_FILENAMES is not already set, restrict Vulkan to the AMD RADV ICD

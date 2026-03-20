@@ -534,12 +534,24 @@ def _catalog_context_macro(catalog: dict[str, Any], context_name: str, macros: d
     return f"${{{macro_name}}}"
 
 
-def _catalog_named_macro(catalog: dict[str, Any], section: str, preset_name: str) -> str:
+def _backend_specific_macro_name(base_macro_name: str, backend: str) -> str:
+    normalized_backend = str(backend).strip().lower()
+    if not normalized_backend or normalized_backend == "auto":
+        return base_macro_name
+    if base_macro_name.endswith("-args"):
+        return f"{base_macro_name[:-5]}-{normalized_backend}-args"
+    return f"{base_macro_name}-{normalized_backend}"
+
+
+def _catalog_named_macro(catalog: dict[str, Any], section: str, preset_name: str, backend: str = "auto") -> str:
     presets = catalog.get("presets", {}).get(section, {})
     preset = presets.get(preset_name, {})
     macro_name = str(preset.get("llama_swap_macro", "")).strip()
     if not macro_name:
         raise ValueError(f"Model catalog preset '{section}.{preset_name}' does not define llama_swap_macro")
+    backend_options = preset.get("llama_cpp_options_by_backend", {})
+    if isinstance(backend_options, dict) and backend_options:
+        macro_name = _backend_specific_macro_name(macro_name, backend)
     return f"${{{macro_name}}}"
 
 
@@ -563,11 +575,16 @@ def _render_llama_cpp_options(options: dict[str, Any], backend: str = "auto") ->
                 # Vulkan expects --device Vulkan0,Vulkan1,… (names from models.base.yaml)
                 parts.append(f"--device {_format_llama_cpp_option_value(value)}")
             elif backend == "rocm":
-                # ROCm/HIP uses HIP device names: HIP0, HIP1, HIP2, …
-                parts.append(f"--device {','.join(f'HIP{i}' for i in range(count))}")
+                # Preserve explicitly mapped ROCm/HIP device names when provided.
+                if isinstance(value, str) and value.strip():
+                    parts.append(f"--device {value}")
+                else:
+                    parts.append(f"--device {','.join(f'HIP{i}' for i in range(count))}")
             elif backend == "cuda":
-                # CUDA uses CUDA device names: CUDA0, CUDA1, …
-                parts.append(f"--device {','.join(f'CUDA{i}' for i in range(count))}")
+                if isinstance(value, str) and value.strip():
+                    parts.append(f"--device {value}")
+                else:
+                    parts.append(f"--device {','.join(f'CUDA{i}' for i in range(count))}")
             elif backend == "metal":
                 pass  # Metal selects GPU implicitly; --device not needed
             else:
@@ -584,6 +601,14 @@ def _render_llama_cpp_options(options: dict[str, Any], backend: str = "auto") ->
     return " ".join(parts)
 
 
+def _infer_backend_from_deployment(deployment: dict[str, Any]) -> str:
+    executable_macro = str(deployment.get("executable_macro", "")).strip().lower()
+    for backend_name in ("rocm", "vulkan", "cuda", "metal", "cpu"):
+        if executable_macro.endswith(f"-{backend_name}"):
+            return backend_name
+    return os.environ.get("LLAMA_BACKEND", "auto").lower()
+
+
 def _synthesize_catalog_macros(catalog: dict[str, Any], macros: dict[str, Any], local_macros: dict[str, Any], backend: str = "auto") -> None:
     presets = catalog.get("presets", {})
     for section in ("gpu_profiles", "runtime_profiles"):
@@ -591,7 +616,24 @@ def _synthesize_catalog_macros(catalog: dict[str, Any], macros: dict[str, Any], 
             if not isinstance(preset, dict):
                 continue
             macro_name = str(preset.get("llama_swap_macro", "")).strip()
-            if not macro_name or macro_name in local_macros or macro_name in macros:
+            if not macro_name:
+                continue
+
+            backend_options = preset.get("llama_cpp_options_by_backend", {})
+            if isinstance(backend_options, dict) and backend_options:
+                for backend_name, options in backend_options.items():
+                    backend_macro_name = _backend_specific_macro_name(macro_name, str(backend_name))
+                    if backend_macro_name in local_macros or backend_macro_name in macros:
+                        continue
+                    if not isinstance(options, dict) or not options:
+                        raise ValueError(
+                            f"Model catalog preset '{section}.{preset_name}' must define non-empty "
+                            f"llama_cpp_options_by_backend.{backend_name} to synthesize macro '{backend_macro_name}'"
+                        )
+                    macros[backend_macro_name] = _render_llama_cpp_options(options, backend=str(backend_name))
+                continue
+
+            if macro_name in local_macros or macro_name in macros:
                 continue
             options = preset.get("llama_cpp_options", {})
             if not isinstance(options, dict) or not options:
@@ -625,6 +667,7 @@ def _generated_llama_swap_models(stack: StackConfig, macros: dict[str, Any]) -> 
             server_args_macro = str(framework.get("llama_swap", {}).get("server_args_macro", "server-args"))
             model_path_macro = str(framework.get("llama_swap", {}).get("model_path_macro", "model-path"))
             mmproj_path_macro = str(framework.get("llama_swap", {}).get("mmproj_path_macro", "mmproj-path"))
+            deployment_backend = _infer_backend_from_deployment(deployment)
 
             context_name = str(deployment.get("context_preset", defaults.get("context_preset", ""))).strip()
             gpu_name = str(deployment.get("gpu_preset", defaults.get("gpu_preset", ""))).strip()
@@ -650,9 +693,9 @@ def _generated_llama_swap_models(stack: StackConfig, macros: dict[str, Any]) -> 
             if mmproj_file:
                 lines.append(f"${{{mmproj_path_macro}}}/{mmproj_file}")
             lines.append(_catalog_context_macro(catalog, context_name, macros, framework))
-            lines.append(_catalog_named_macro(catalog, "gpu_profiles", gpu_name))
+            lines.append(_catalog_named_macro(catalog, "gpu_profiles", gpu_name, backend=deployment_backend))
             for preset_name in runtime_presets:
-                lines.append(_catalog_named_macro(catalog, "runtime_profiles", preset_name))
+                lines.append(_catalog_named_macro(catalog, "runtime_profiles", preset_name, backend=deployment_backend))
             for macro_ref in additional_macros:
                 lines.append(f"${{{macro_ref}}}")
 

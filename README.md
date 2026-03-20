@@ -62,10 +62,11 @@ For NVIDIA hosts, the root compose profile is the direct path:
 docker compose --profile vllm up -d
 ```
 
-For AMD hosts, use the AMD compose profile from [docs/docker.md](docs/docker.md)
-rather than the root compose.
+For AMD hosts, use the unified AMD compose profile from [docs/docker.md](docs/docker.md),
+set `LLAMA_BACKEND=auto`, and route individual `llama.cpp` models with explicit
+`executable_macro` values such as `llama-server-vulkan` and `llama-server-rocm`.
 
-See [docs/docker.md](docs/docker.md) for all deployment profiles (Universal, NVIDIA, AMD, External Proxy).
+See [docs/docker.md](docs/docker.md) for all deployment profiles (Universal, NVIDIA, AMD Vulkan/ROCm, External Proxy).
 
 For local source-based Docker development, use:
 

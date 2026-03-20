@@ -81,13 +81,19 @@ def test_build_llama_swap_config_contains_generated_catalog_models() -> None:
     config = build_llama_swap_config(stack)
 
     assert "InternVL3-5-GPT-OSS-20B@gpu2" not in config["models"]
-    assert config["macros"]["gpu1-args"] == "--device Vulkan0 --split-mode none --parallel 1 --gpu-layers all"
+    assert config["macros"]["gpu1-vulkan-args"] == "--device Vulkan0 --split-mode none --parallel 1 --gpu-layers all"
+    assert config["macros"]["gpu1-rocm-args"] == "--device ROCm1 --split-mode none --parallel 1 --gpu-layers all"
     assert config["macros"]["cache-q8-args"] == "--cache-type-k q8_0 --cache-type-v q8_0"
     assert config["macros"]["qwen-nothink-args"] == '--reasoning-budget 0 --reasoning-format none --chat-template-kwargs {"enable_thinking":false}'
     generated_qwen = config["models"]["qwen3.5-27b-(96k-Q6)"]["cmd"]
+    generated_qwen_vision = config["models"]["qwen3-5-4b-ud-q5-k-xl-vision"]["cmd"]
     assert "${context-96k-args}" in generated_qwen
     assert "${gpu1-args}" in generated_qwen
     assert "${coder_args}" in generated_qwen
+    assert generated_qwen_vision.startswith("${llama-server-vulkan} ")
+    assert "${gpu1-vulkan-args}" in generated_qwen_vision
+    assert config["models"]["tiny-qwen25-test"]["cmd"].startswith("${llama-server-rocm} ")
+    assert "${gpu1-rocm-args}" in config["models"]["tiny-qwen25-test"]["cmd"]
     assert "coding_active" in config["groups"]
     assert "qwen3.5-27b-(96k-Q6)" in config["groups"]["coding_active"]["members"]
 

@@ -253,3 +253,12 @@ Check raw Vulkan device visibility inside the backend container:
 ```bash
 docker exec audia-llama-cpp /app/runtime/bin/llama-server-vulkan --list-devices
 ```
+- Mixed AMD `llama.cpp` deployments should keep `LLAMA_BACKEND=auto` so the
+  runtime provisions both ROCm and Vulkan in the same runtime namespace.
+- On AMD Vulkan, force `VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/radeon_icd.json`
+  so `llama-server-vulkan` consistently sees the RADV devices in-container.
+- On AMD ROCm, the `llama.cpp` backend needs ROCm shared libraries present in the
+  backend image. The validated set comes from `/opt/rocm/lib` and includes
+  `libamdhip64`, `libhipblas`, `libhipblaslt`, `librocblas`, `librocsolver`,
+  `librocroller`, `librocprofiler-register`, `libroctx64`, `libhsa-runtime64`,
+  `libamd_comgr`, and `librocm-core`, plus `libnuma1` from Debian.

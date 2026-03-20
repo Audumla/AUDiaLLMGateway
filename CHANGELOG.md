@@ -1,14 +1,5 @@
 # Changelog
 
-## [0.11.6](https://github.com/Audumla/AUDiaLLMGateway/compare/v0.11.5...v0.11.6) (2026-03-20)
-
-
-### Bug Fixes
-
-* litellm db broken ([3374b1f](https://github.com/Audumla/AUDiaLLMGateway/commit/3374b1f0adbe035376fa813c875aa93342f8ec6e))
-
-## Changelog
-
 ## Unreleased
 
 ### Scaffolded a native Windows local LLM gateway workspace in AUDiaLLMGateway. (New Feature)
@@ -442,5 +433,14 @@
 ### Hardened the gateway DB-backed startup path so LiteLLM waits for PostgreSQL before Prisma migration. (Bug Fix)
 - Patched docker/gateway-entrypoint.sh to wait on DATABASE_URL reachability and launch LiteLLM with enforced Prisma migration checks.
 - Documented DATABASE_WAIT_SECONDS and DATABASE_WAIT_INTERVAL_SECONDS plus the Postgres init race in the Docker docs and field notes.
+
+### Unified the AMD Docker example so Vulkan and ROCm usage live in the same config. (Documentation Update)
+- Updated docker/examples/docker-compose.amd.yml to use LLAMA_BACKEND for Vulkan or ROCm while keeping vLLM ROCm-only.
+- Updated README, docs/docker.md, and spec-001 to point to the single AMD example and show both backend commands.
+
+### Added backend-aware GPU preset resolution and hardened llama.cpp runtime dependencies. (Bug Fix)
+- Generator now supports backend-specific GPU macro synthesis so logical presets like gpu1 can resolve differently for Vulkan and ROCm deployments.
+- Backend startup now re-checks container-level Vulkan and NUMA packages on every start instead of assuming persisted runtime volumes include system libraries.
+- Backend base image now carries the ROCm shared libraries needed for llama-server-rocm, and the AMD compose/docs were updated for mixed-backend auto provisioning.
 
 ---
