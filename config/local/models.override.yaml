@@ -25,53 +25,34 @@ presets:
       tokens: 98304
     256k:
       tokens: 262144
-  gpu_profiles:
-    gpu1:
-      llama_swap_macro: gpu1-args
-      llama_cpp_options_by_backend:
-        vulkan:
-          device: Vulkan0
-          split_mode: none
-          parallel: 1
-          gpu_layers: all
-        rocm:
-          device: ROCm1
-          split_mode: none
-          parallel: 1
-          gpu_layers: all
-    gpu2:
-      llama_swap_macro: gpu2-args
+  deployment_profiles:
+    llamacpp_vulkan_single_gpu1:
+      framework: llama_cpp
+      transport: llama-swap
+      executable_macro: llama-server-vulkan
       llama_cpp_options:
-        device: Vulkan1
+        device: Vulkan0
         split_mode: none
         parallel: 1
         gpu_layers: all
-    gpu_equal:
-      llama_swap_macro: gpu-equal-args
+    llamacpp_vulkan_split_gpu2:
+      framework: llama_cpp
+      transport: llama-swap
+      executable_macro: llama-server-vulkan
       llama_cpp_options:
         device:
           - Vulkan0
-          - Vulkan1
+          - Vulkan2
         split_mode: layer
-        tensor_split:
-          - 1
-          - 1
-        parallel: 1
-        gpu_layers: all
-    gpu_balanced:
-      llama_swap_macro: gpu-balanced-args
-      llama_cpp_options:
-        device:
-          - Vulkan0
-          - Vulkan1
-        split_mode: row
         tensor_split:
           - 1
           - 1
         gpu_layers: 99
         parallel: 1
-    gpu_balanced3:
-      llama_swap_macro: gpu-balanced3-args
+    llamacpp_vulkan_balanced_gpu3:
+      framework: llama_cpp
+      transport: llama-swap
+      executable_macro: llama-server-vulkan
       llama_cpp_options:
         device:
           - Vulkan0
@@ -79,11 +60,27 @@ presets:
           - Vulkan2
         split_mode: layer
         tensor_split:
-          - 24
-          - 16
-          - 24
+          - 23.8
+          - 15.9
+          - 24.4
         parallel: 1
         gpu_layers: all
+    llamacpp_rocm_single_gpu1:
+      framework: llama_cpp
+      transport: llama-swap
+      executable_macro: llama-server-rocm
+      llama_cpp_options:
+        device: ROCm1
+        split_mode: none
+        parallel: 1
+        gpu_layers: all
+    vllm_rocm_single_gpu1:
+      framework: vllm
+      transport: direct
+      vllm_backend: rocm
+      vllm:
+        tensor_parallel_size: 1
+        pipeline_parallel_size: 1
   runtime_profiles:
     jinja:
       llama_swap_macro: jinja-args
@@ -158,7 +155,6 @@ model_profiles:
     purpose: Fast coding, repo work, and tool-heavy local workflows
     defaults:
       context_preset: 96k
-      gpu_preset: gpu1
       runtime_presets:
         - jinja
         - nothink
@@ -171,9 +167,7 @@ model_profiles:
       model_url: https://huggingface.co/mradermacher/Qwen3.5-27B-GGUF/resolve/main/Qwen3.5-27B.Q6_K.gguf?download=true
     deployments:
       llamacpp_vulkan:
-        framework: llama_cpp
-        transport: llama-swap
-        executable_macro: llama-server-vulkan
+        profile: llamacpp_vulkan_split_gpu2
         llama_swap_model: qwen3.5-27b-(96k-Q6)
         backend_model_name: qwen3.5-27b-(96k-Q6)
   qwen122_smart:
@@ -181,7 +175,6 @@ model_profiles:
     purpose: Harder reasoning and larger-context local work
     defaults:
       context_preset: 32k
-      gpu_preset: gpu_balanced3
       concurrency_limit: 1
       runtime_presets:
         - jinja
@@ -198,9 +191,7 @@ model_profiles:
         - https://huggingface.co/unsloth/Qwen3.5-122B-A10B-GGUF/resolve/main/UD-IQ4_XS/Qwen3.5-122B-A10B-UD-IQ4_XS-00003-of-00003.gguf?download=true
     deployments:
       llamacpp_vulkan:
-        framework: llama_cpp
-        transport: llama-swap
-        executable_macro: llama-server-vulkan
+        profile: llamacpp_vulkan_balanced_gpu3
         llama_swap_model: qwen3.5-122b
         backend_model_name: qwen3.5-122b
   qwen4b_vision:
@@ -208,7 +199,6 @@ model_profiles:
     purpose: Small vision-capable model exposed through llama-swap
     defaults:
       context_preset: 64k
-      gpu_preset: gpu1
       concurrency_limit: 1
       runtime_presets:
         - vision
@@ -224,9 +214,7 @@ model_profiles:
       mmproj_url: https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/mmproj-F16.gguf?download=true
     deployments:
       llamacpp_vulkan:
-        framework: llama_cpp
-        transport: llama-swap
-        executable_macro: llama-server-vulkan
+        profile: llamacpp_vulkan_single_gpu1
         llama_swap_model: qwen3-5-4b-ud-q5-k-xl-vision
         backend_model_name: qwen3-5-4b-ud-q5-k-xl-vision
   ministral3b_vision:
@@ -234,7 +222,6 @@ model_profiles:
     purpose: Small 3B vision-capable model for quick tests and lightweight tasks
     defaults:
       context_preset: 64k
-      gpu_preset: gpu1
       concurrency_limit: 1
       runtime_presets:
         - vision
@@ -250,9 +237,7 @@ model_profiles:
       mmproj_url: https://huggingface.co/second-state/Ministral-3B-Instruct-GGUF/resolve/main/Ministral-3B-Instruct-Q4_K_M-mmproj-f16.gguf?download=true
     deployments:
       llamacpp_vulkan:
-        framework: llama_cpp
-        transport: llama-swap
-        executable_macro: llama-server-vulkan
+        profile: llamacpp_vulkan_single_gpu1
         llama_swap_model: ministral3b-vision
         backend_model_name: ministral3b-vision
   vllm_default:
@@ -260,6 +245,9 @@ model_profiles:
     purpose: Persistent high-throughput model served directly by the optional vLLM backend
     defaults:
       context_preset: 32k
+      vllm:
+        gpu_memory_utilization: ${VLLM_GPU_MEM}
+        max_model_len: ${VLLM_MAX_LEN}
     artifacts:
       revision: main
       source_page_url: https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct
@@ -267,15 +255,15 @@ model_profiles:
       model_url: https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct
     deployments:
       vllm_primary:
-        framework: vllm
-        transport: direct
+        profile: vllm_rocm_single_gpu1
         backend_model_name: ${VLLM_MODEL}
+        vllm:
+          visible_devices: ${VLLM_VISIBLE_DEVICES}
   tiny_qwen25_test:
     family: qwen2.5
     purpose: Tiny test model routed through explicit ROCm llama.cpp macros
     defaults:
       context_preset: 32k
-      gpu_preset: gpu1
       runtime_presets:
         - jinja
         - nothink
@@ -287,9 +275,7 @@ model_profiles:
       model_url: https://huggingface.co/bartowski/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf?download=true
     deployments:
       llamacpp_rocm:
-        framework: llama_cpp
-        transport: llama-swap
-        executable_macro: llama-server-rocm
+        profile: llamacpp_rocm_single_gpu1
         llama_swap_model: tiny-qwen25-test
         backend_model_name: tiny-qwen25-test
 exposures:

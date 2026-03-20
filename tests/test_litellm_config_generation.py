@@ -6,6 +6,7 @@ import yaml
 from src.launcher.config_loader import (
     build_llama_swap_config,
     build_litellm_config,
+    build_vllm_config,
     load_stack_config,
     write_generated_configs,
 )
@@ -41,6 +42,113 @@ def test_build_litellm_config_adds_vllm_routes_when_enabled(monkeypatch) -> None
     assert "extra_headers" not in vllm_entry["litellm_params"]
     assert vllm_entry["model_info"]["framework"] == "vllm"
     assert vllm_entry["model_info"]["transport"] == "direct"
+
+
+def test_build_vllm_config_uses_model_catalog_runtime_overrides(monkeypatch) -> None:
+    root = Path(__file__).resolve().parents[1]
+    monkeypatch.setenv("AUDIA_ENABLE_VLLM", "true")
+    monkeypatch.setenv("VLLM_MODEL", "Qwen/Qwen3-0.6B")
+    monkeypatch.setenv("VLLM_GPU_MEM", "0.91")
+    monkeypatch.setenv("VLLM_MAX_LEN", "8192")
+    monkeypatch.setenv("VLLM_TENSOR_PARALLEL_SIZE", "1")
+    monkeypatch.setenv("VLLM_PIPELINE_PARALLEL_SIZE", "1")
+    monkeypatch.setenv("VLLM_VISIBLE_DEVICES", "")
+
+    stack = load_stack_config(root)
+    config = build_vllm_config(stack)
+    startup = config["startup"]
+
+    assert startup["model"] == "Qwen/Qwen3-0.6B"
+    assert startup["gpu_memory_utilization"] == 0.91
+    assert startup["max_model_len"] == 8192
+    assert startup["tensor_parallel_size"] == 1
+    assert startup["pipeline_parallel_size"] == 1
+    assert "visible_devices" in startup
+    assert "extra_args" in startup
+
+
+def test_build_vllm_config_supports_vllm_preset(tmp_path: Path, monkeypatch) -> None:
+    source_root = Path(__file__).resolve().parents[1]
+    monkeypatch.setenv("AUDIA_ENABLE_VLLM", "true")
+    monkeypatch.setenv("VLLM_MODEL", "Qwen/Qwen3-0.6B")
+    for rel_path in [
+        "config/project/stack.base.yaml",
+        "config/project/llama-swap.base.yaml",
+        "config/project/models.base.yaml",
+        "config/project/mcp.base.yaml",
+        "config/local/stack.override.yaml",
+        "config/local/llama-swap.override.yaml",
+        "config/local/models.override.yaml",
+        "config/local/mcp.override.yaml",
+    ]:
+        source = source_root / rel_path
+        target = tmp_path / rel_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+
+    models_override = tmp_path / "config" / "local" / "models.override.yaml"
+    data = yaml.safe_load(models_override.read_text(encoding="utf-8"))
+    data.setdefault("presets", {}).setdefault("vllm_profiles", {})["dual_split"] = {
+        "tensor_parallel_size": 2,
+        "pipeline_parallel_size": 1,
+    }
+    data["model_profiles"]["vllm_default"]["deployments"]["vllm_primary"]["vllm_preset"] = "dual_split"
+    data["model_profiles"]["vllm_default"]["deployments"]["vllm_primary"]["vllm"] = {
+        "visible_devices": "0,1",
+    }
+    models_override.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+
+    stack = load_stack_config(tmp_path)
+    config = build_vllm_config(stack)
+    startup = config["startup"]
+
+    assert startup["tensor_parallel_size"] == 2
+    assert startup["pipeline_parallel_size"] == 1
+    assert startup["visible_devices"] == "0,1"
+
+
+def test_build_vllm_config_supports_gpu_profile_backend_block(tmp_path: Path, monkeypatch) -> None:
+    source_root = Path(__file__).resolve().parents[1]
+    monkeypatch.setenv("AUDIA_ENABLE_VLLM", "true")
+    monkeypatch.setenv("VLLM_MODEL", "Qwen/Qwen3-0.6B")
+    monkeypatch.setenv("VLLM_BACKEND", "rocm")
+    for rel_path in [
+        "config/project/stack.base.yaml",
+        "config/project/llama-swap.base.yaml",
+        "config/project/models.base.yaml",
+        "config/project/mcp.base.yaml",
+        "config/local/stack.override.yaml",
+        "config/local/llama-swap.override.yaml",
+        "config/local/models.override.yaml",
+        "config/local/mcp.override.yaml",
+    ]:
+        source = source_root / rel_path
+        target = tmp_path / rel_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+
+    models_override = tmp_path / "config" / "local" / "models.override.yaml"
+    data = yaml.safe_load(models_override.read_text(encoding="utf-8"))
+    data.setdefault("presets", {}).setdefault("deployment_profiles", {})["vllm_split_tp2"] = {
+        "framework": "vllm",
+        "transport": "direct",
+        "vllm_backend": "rocm",
+        "vllm": {
+            "tensor_parallel_size": 2,
+            "pipeline_parallel_size": 1,
+            "visible_devices": "0,1",
+        },
+    }
+    data["model_profiles"]["vllm_default"]["deployments"]["vllm_primary"]["profile"] = "vllm_split_tp2"
+    models_override.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+
+    stack = load_stack_config(tmp_path)
+    config = build_vllm_config(stack)
+    startup = config["startup"]
+
+    assert startup["tensor_parallel_size"] == 2
+    assert startup["pipeline_parallel_size"] == 1
+    assert startup["visible_devices"] == "0,1"
 
 
 def test_write_generated_configs_writes_yaml_and_json(tmp_path: Path) -> None:
@@ -81,19 +189,17 @@ def test_build_llama_swap_config_contains_generated_catalog_models() -> None:
     config = build_llama_swap_config(stack)
 
     assert "InternVL3-5-GPT-OSS-20B@gpu2" not in config["models"]
-    assert config["macros"]["gpu1-vulkan-args"] == "--device Vulkan0 --split-mode none --parallel 1 --gpu-layers all"
-    assert config["macros"]["gpu1-rocm-args"] == "--device ROCm1 --split-mode none --parallel 1 --gpu-layers all"
     assert config["macros"]["cache-q8-args"] == "--cache-type-k q8_0 --cache-type-v q8_0"
     assert config["macros"]["qwen-nothink-args"] == '--reasoning-budget 0 --reasoning-format none --chat-template-kwargs {"enable_thinking":false}'
     generated_qwen = config["models"]["qwen3.5-27b-(96k-Q6)"]["cmd"]
     generated_qwen_vision = config["models"]["qwen3-5-4b-ud-q5-k-xl-vision"]["cmd"]
     assert "${context-96k-args}" in generated_qwen
-    assert "${gpu1-vulkan-args}" in generated_qwen
+    assert "--device Vulkan0,Vulkan2" in generated_qwen
     assert "${coder_args}" in generated_qwen
     assert generated_qwen_vision.startswith("${llama-server-vulkan} ")
-    assert "${gpu1-vulkan-args}" in generated_qwen_vision
+    assert "--device Vulkan0" in generated_qwen_vision
     assert config["models"]["tiny-qwen25-test"]["cmd"].startswith("${llama-server-rocm} ")
-    assert "${gpu1-rocm-args}" in config["models"]["tiny-qwen25-test"]["cmd"]
+    assert "--device ROCm1" in config["models"]["tiny-qwen25-test"]["cmd"]
     assert "coding_active" in config["groups"]
     assert "qwen3.5-27b-(96k-Q6)" in config["groups"]["coding_active"]["members"]
 
