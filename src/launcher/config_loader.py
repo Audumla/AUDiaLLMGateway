@@ -792,7 +792,10 @@ def _resolve_model_deployment(
 def _generated_llama_swap_groups(stack: StackConfig) -> dict[str, Any]:
     _, _, catalog = load_model_catalog(stack.root)
 
-    # Build set of enabled llama-swap model IDs (disabled deployments must be excluded from groups)
+    # Build lookup for published llama-swap deployments:
+    #   label -> llama_swap_model_id
+    # and set of enabled llama-swap model IDs (disabled deployments excluded from groups).
+    label_to_model_id: dict[str, str] = {}
     enabled_model_ids: set[str] = set()
     for profile_name, profile in catalog.get("model_profiles", {}).items():
         for dep_name, dep in profile.get("deployments", {}).items():
@@ -801,8 +804,11 @@ def _generated_llama_swap_groups(stack: StackConfig) -> dict[str, Any]:
                 continue
             if str(resolved_dep.get("transport", "llama-swap")) != "llama-swap":
                 continue
-            model_id = str(resolved_dep.get("llama_swap_model", dep_name))
+            label = str(resolved_dep.get("label", "")).strip()
+            model_id = str(resolved_dep.get("llama_swap_model", label or dep_name))
             enabled_model_ids.add(model_id)
+            if label:
+                label_to_model_id[label] = model_id
 
     generated: dict[str, Any] = {}
 
@@ -810,20 +816,35 @@ def _generated_llama_swap_groups(stack: StackConfig) -> dict[str, Any]:
         members: list[str] = []
         for member in group.get("members", []):
             if isinstance(member, str):
-                members.append(member)
+                candidate = member.strip()
+                if not candidate:
+                    continue
+                # Primary schema: member string is a deployment label.
+                # Fallback: if already a llama-swap model id, allow direct pass-through.
+                model_id = label_to_model_id.get(candidate, candidate)
+                if model_id in enabled_model_ids:
+                    members.append(model_id)
                 continue
             if not isinstance(member, dict):
                 continue
+            if "label" in member:
+                label = str(member.get("label", "")).strip()
+                if not label:
+                    continue
+                model_id = label_to_model_id.get(label, "")
+                if model_id and model_id in enabled_model_ids:
+                    members.append(model_id)
+                continue
+            # Legacy dict style retained for non-breaking transitions.
             profile_name = str(member.get("model_profile", ""))
             deployment_name = str(member.get("deployment", ""))
+            if not profile_name or not deployment_name:
+                continue
             profile = catalog.get("model_profiles", {}).get(profile_name, {})
             raw_deployment = profile.get("deployments", {}).get(deployment_name, {})
-            deployment = (
-                _resolve_model_deployment(catalog, profile_name, deployment_name, raw_deployment)
-                if isinstance(raw_deployment, dict)
-                else {}
-            )
-            llama_swap_model = str(member.get("llama_swap_model", deployment.get("llama_swap_model", ""))).strip()
+            deployment = _resolve_model_deployment(catalog, profile_name, deployment_name, raw_deployment) if isinstance(raw_deployment, dict) else {}
+            label = str(deployment.get("label", "")).strip()
+            llama_swap_model = str(member.get("llama_swap_model", deployment.get("llama_swap_model", label or deployment_name))).strip()
             if llama_swap_model and llama_swap_model in enabled_model_ids:
                 members.append(llama_swap_model)
 
@@ -874,8 +895,8 @@ def _catalog_published_models(stack: StackConfig) -> list[PublishedModel]:
             if framework == "vllm" and not stack.vllm.enabled:
                 continue
 
-            llama_swap_model = str(deployment.get("llama_swap_model", deployment_name))
-            backend_model_name = str(deployment.get("backend_model_name", llama_swap_model or deployment_name))
+            llama_swap_model = str(deployment.get("llama_swap_model", label))
+            backend_model_name = str(deployment.get("backend_model_name", label))
             if framework == "vllm":
                 backend_model_name = _fallback_env_placeholder(
                     backend_model_name,
@@ -890,9 +911,19 @@ def _catalog_published_models(stack: StackConfig) -> list[PublishedModel]:
                 str(group_name)
                 for group_name, group in load_groups.items()
                 if any(
-                    isinstance(member, dict)
-                    and str(member.get("model_profile", "")) == str(profile_name)
-                    and str(member.get("deployment", "")) == str(deployment_name)
+                    (
+                        isinstance(member, str)
+                        and member.strip() == label
+                    )
+                    or (
+                        isinstance(member, dict)
+                        and str(member.get("label", "")).strip() == label
+                    )
+                    or (
+                        isinstance(member, dict)
+                        and str(member.get("model_profile", "")) == str(profile_name)
+                        and str(member.get("deployment", "")) == str(deployment_name)
+                    )
                     for member in group.get("members", [])
                 )
             ]
