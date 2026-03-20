@@ -28,6 +28,7 @@ COPY --from=rocm-runtime /opt/rocm/lib/librocprofiler64.so* /opt/rocm/lib/
 COPY --from=rocm-runtime /opt/rocm/lib/librocroller.so* /opt/rocm/lib/
 COPY --from=rocm-runtime /opt/rocm/lib/librocsolver.so* /opt/rocm/lib/
 COPY --from=rocm-runtime /opt/rocm/lib/libroctx64.so* /opt/rocm/lib/
+COPY --from=rocm-runtime /opt/rocm/lib/rocblas /opt/rocm/lib/rocblas
 
 RUN set -eux; \
     case "${TARGETARCH:-amd64}" in \
