@@ -1481,5 +1481,22 @@
       "Backend startup now re-checks container-level Vulkan and NUMA packages on every start instead of assuming persisted runtime volumes include system libraries.",
       "Backend base image now carries the ROCm shared libraries needed for llama-server-rocm, and the AMD compose/docs were updated for mixed-backend auto provisioning."
     ]
+  },
+  {
+    "id": "CHG-f81877c4",
+    "agent": "codex",
+    "change_group": "mixed-backend-llamaswap",
+    "plugin_version": "unreleased",
+    "date": "2026-03-20",
+    "recorded_at": "2026-03-20T07:06:51.739996Z",
+    "summary_tags": [
+      "Bug Fix"
+    ],
+    "summary": "Bundled rocBLAS data files into the backend image for durable ROCm startup.",
+    "details": [
+      "Backend base image now copies /opt/rocm/lib/rocblas so ROCm devices do not fail on missing TensileLibrary.dat after fresh deploys.",
+      "Runtime startup now exports ROCBLAS_TENSILE_LIBPATH by default to the bundled rocBLAS library directory.",
+      "Field notes now document the rocBLAS data requirement that caused gfx1100 startup failures."
+    ]
   }
 ]

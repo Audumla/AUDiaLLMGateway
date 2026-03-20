@@ -262,3 +262,6 @@ docker exec audia-llama-cpp /app/runtime/bin/llama-server-vulkan --list-devices
   `libamdhip64`, `libhipblas`, `libhipblaslt`, `librocblas`, `librocsolver`,
   `librocroller`, `librocprofiler-register`, `libroctx64`, `libhsa-runtime64`,
   `libamd_comgr`, and `librocm-core`, plus `libnuma1` from Debian.
+- ROCm also requires the `rocblas/library` data directory. Without it,
+  `llama-server-rocm` fails with missing `TensileLibrary.dat` / `Illegal seek`
+  errors for `gfx1100` devices.

@@ -229,6 +229,7 @@ printf "%s\n%s\n" "$LIB_DIR" "/opt/rocm/lib" > /etc/ld.so.conf.d/llama-runtime.c
 ldconfig
 export PATH="$BIN_DIR:$PATH"
 export LD_LIBRARY_PATH="$LIB_DIR:/opt/rocm/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export ROCBLAS_TENSILE_LIBPATH="${ROCBLAS_TENSILE_LIBPATH:-/opt/rocm/lib/rocblas/library}"
 sync_backend_plugins
 
 # When VK_ICD_FILENAMES is not already set, restrict Vulkan to the AMD RADV ICD
