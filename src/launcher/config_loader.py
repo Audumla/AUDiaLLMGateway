@@ -600,6 +600,9 @@ def _render_llama_cpp_options(options: dict[str, Any], backend: str = "auto") ->
             continue
 
         flag = f"--{str(key).replace('_', '-')}"
+        if key == "flash_attn" and isinstance(value, bool):
+            parts.append(f"{flag} {'on' if value else 'off'}")
+            continue
         if isinstance(value, bool):
             if value:
                 parts.append(flag)
