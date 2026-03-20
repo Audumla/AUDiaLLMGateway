@@ -2,5 +2,4 @@ version: 1
 frameworks: {}
 presets: {}
 model_profiles: {}
-exposures: []
 load_groups: {}
