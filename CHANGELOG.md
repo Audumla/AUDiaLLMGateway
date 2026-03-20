@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.5](https://github.com/example/AUDiaLLMGateway/compare/v0.11.4...v0.11.5) (2026-03-20)
+
+
+### Bug Fixes
+
+* added dependancy ([fae8f6c](https://github.com/example/AUDiaLLMGateway/commit/fae8f6ccca3768fe0a09f9d232129d385d27412c))
+
 ## [0.11.4](https://github.com/example/AUDiaLLMGateway/compare/v0.11.3...v0.11.4) (2026-03-20)
 
 
