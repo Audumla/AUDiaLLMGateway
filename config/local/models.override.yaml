@@ -301,8 +301,7 @@ load_groups:
     swap: false
     exclusive: false
     members:
-      - model_profile: qwen27_fast
-        deployment: llamacpp_vulkan
+      - local/qwen27_fast
   reasoning_active:
     purpose: Prefer the larger reasoning model when deeper analysis is the active task
     activities:
@@ -312,8 +311,7 @@ load_groups:
     swap: true
     exclusive: false
     members:
-      - model_profile: qwen122_smart
-        deployment: llamacpp_vulkan
+      - local/qwen122_smart
   vision_active:
     purpose: Keep the small vision-capable model available for image tasks
     activities:
@@ -323,8 +321,7 @@ load_groups:
     swap: true
     exclusive: true
     members:
-      - model_profile: qwen4b_vision
-        deployment: llamacpp_vulkan
+      - local/qwen4b_vision
   ministral_active:
     purpose: Lightweight vision model for quick test inference and small tasks
     activities:
@@ -334,8 +331,7 @@ load_groups:
     swap: true
     exclusive: false
     members:
-      - model_profile: ministral3b_vision
-        deployment: llamacpp_vulkan
+      - local/ministral3b_vision
   tiny_test_active:
     purpose: Keep a tiny ROCm-backed model available for smoke tests
     activities:
@@ -345,5 +341,4 @@ load_groups:
     swap: true
     exclusive: false
     members:
-      - model_profile: tiny_qwen25_test
-        deployment: llamacpp_rocm
+      - local/tiny_qwen25_test
