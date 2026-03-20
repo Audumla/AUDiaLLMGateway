@@ -88,16 +88,16 @@ if [ ! -f "$CONFIG/local/llama-swap.override.yaml" ]; then
 # Binaries are provisioned by provision-runtime.sh at container start.
 #
 # macros:
-#   llama-server:        "/app/runtime/bin/llama-server"        # default
-#   llama-server-cpu:    "/app/runtime/bin/llama-server-cpu"
-#   llama-server-cuda:   "/app/runtime/bin/llama-server-cuda"
-#   llama-server-rocm:   "/app/runtime/bin/llama-server-rocm"
-#   llama-server-vulkan: "/app/runtime/bin/llama-server-vulkan"
+#   llama-server-cpu:    "/app/runtime-root/cpu/bin/llama-server-cpu"
+#   llama-server-cuda:   "/app/runtime-root/cuda/bin/llama-server-cuda"
+#   llama-server-rocm:   "env LD_LIBRARY_PATH=/app/runtime-root/rocm/lib:/opt/rocm/lib /app/runtime-root/rocm/bin/llama-server-rocm"
+#   llama-server-vulkan: "env VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/radeon_icd.json LD_LIBRARY_PATH=/app/runtime-root/vulkan/lib /app/runtime-root/vulkan/bin/llama-server-vulkan"
 #   model-path:          "--model /app/models/gguf"
 #   mmproj-path:         "--mmproj /app/models/gguf"
 #
 # --- Running multiple backends simultaneously ---
-# Keep LLAMA_BACKEND=auto so the runtime provisions both ROCm and Vulkan, then set
+# Keep LLAMA_BACKEND=auto so the runtime provisions separate ROCm and Vulkan
+# directories, then set
 # executable_macro per model in
 # models.override.yaml to route each model to a specific backend:
 #

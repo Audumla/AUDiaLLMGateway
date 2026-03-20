@@ -88,7 +88,7 @@ def test_build_llama_swap_config_contains_generated_catalog_models() -> None:
     generated_qwen = config["models"]["qwen3.5-27b-(96k-Q6)"]["cmd"]
     generated_qwen_vision = config["models"]["qwen3-5-4b-ud-q5-k-xl-vision"]["cmd"]
     assert "${context-96k-args}" in generated_qwen
-    assert "${gpu1-args}" in generated_qwen
+    assert "${gpu1-vulkan-args}" in generated_qwen
     assert "${coder_args}" in generated_qwen
     assert generated_qwen_vision.startswith("${llama-server-vulkan} ")
     assert "${gpu1-vulkan-args}" in generated_qwen_vision

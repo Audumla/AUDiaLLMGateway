@@ -844,8 +844,8 @@ def build_llama_swap_config(stack: StackConfig) -> dict[str, Any]:
     macros = merged.setdefault("macros", {})
     if "server-args" not in local_macros:
         macros["server-args"] = f"--port ${{PORT}} --host {stack.network.backend_bind_host}"
-    # Generate per-backend macros from all installed variants
-    # e.g. llama-server-cpu, llama-server-rocm, llama-server-vulkan, llama-server-cuda
+    # Generate per-backend macros from all installed variants.
+    # Docker uses fixed backend-specific directories under /app/runtime-root/<backend>/.
     variants = llama_cpp_state.get("variants", {})
     for profile_name, info in variants.items():
         backend = str(info.get("backend", "")).strip() or profile_name
@@ -860,7 +860,7 @@ def build_llama_swap_config(stack: StackConfig) -> dict[str, Any]:
         if backend == "rocm" and "rocm_executable_path" not in llama_cpp_state:
             llama_cpp_state["rocm_executable_path"] = exe
 
-    # llama-server (default) — prefer the cpu variant, then primary executable_path
+    # llama-server (legacy fallback) — prefer cpu if present.
     executable_path = llama_cpp_state.get("executable_path")
     if "llama-server" not in local_macros:
         cpu_exe = next(
@@ -897,11 +897,21 @@ def build_llama_swap_config(stack: StackConfig) -> dict[str, Any]:
     _is_docker = os.environ.get("AUDIA_DOCKER", "false").lower() == "true"
     if _is_docker:
         if "llama-server" not in local_macros:
-            macros["llama-server"] = "/app/runtime/bin/llama-server"
-        for _suffix in ("cpu", "rocm", "vulkan", "cuda"):
+            macros["llama-server"] = "/app/runtime-root/cpu/bin/llama-server-cpu"
+        docker_backend_macros = {
+            "cpu": "/app/runtime-root/cpu/bin/llama-server-cpu",
+            "cuda": "/app/runtime-root/cuda/bin/llama-server-cuda",
+            "rocm": "env LD_LIBRARY_PATH=/app/runtime-root/rocm/lib:/opt/rocm/lib "
+                    "ROCBLAS_TENSILE_LIBPATH=/opt/rocm/lib/rocblas/library "
+                    "/app/runtime-root/rocm/bin/llama-server-rocm",
+            "vulkan": "env VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/radeon_icd.json "
+                      "LD_LIBRARY_PATH=/app/runtime-root/vulkan/lib "
+                      "/app/runtime-root/vulkan/bin/llama-server-vulkan",
+        }
+        for _suffix, _value in docker_backend_macros.items():
             _macro = f"llama-server-{_suffix}"
             if _macro not in local_macros:
-                macros[_macro] = f"/app/runtime/bin/llama-server-{_suffix}"
+                macros[_macro] = _value
         if "model-path" not in local_macros:
             macros["model-path"] = "--model /app/models"
         if "mmproj-path" not in local_macros:
