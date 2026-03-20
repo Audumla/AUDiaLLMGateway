@@ -108,8 +108,8 @@ models/
   Qwen3.5-27B/
     Qwen3.5-27B-Q6_K.gguf
   Ministral-3-3B/
-    Ministral-3-3B-Instruct-2512-Q4_K_M.gguf
-    mmproj-Ministral-3-3B-Instruct-2512-F16.gguf
+    Ministral-3B-Instruct-Q4_K_M.gguf
+    Ministral-3B-Instruct-Q4_K_M-mmproj-f16.gguf
 ```
 
 The path structure must match the `model_file` entries in

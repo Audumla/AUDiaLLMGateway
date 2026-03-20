@@ -199,7 +199,7 @@ def test_build_llama_swap_config_contains_generated_catalog_models() -> None:
     assert generated_qwen_vision.startswith("${llama-server-vulkan} ")
     assert "--device Vulkan0" in generated_qwen_vision
     assert config["models"]["tiny-qwen25-test"]["cmd"].startswith("${llama-server-rocm} ")
-    assert "--device ROCm1" in config["models"]["tiny-qwen25-test"]["cmd"]
+    assert "--device ROCm0" in config["models"]["tiny-qwen25-test"]["cmd"]
     assert "coding_active" in config["groups"]
     assert "qwen3.5-27b-(96k-Q6)" in config["groups"]["coding_active"]["members"]
 
