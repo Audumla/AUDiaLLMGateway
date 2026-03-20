@@ -1,6 +1,8 @@
 # Base image for the llama.cpp/llama-swap backend runtime.
 # Publish this separately so final image rebuilds only need to copy the entrypoint.
 
+FROM vllm/vllm-openai-rocm:latest AS rocm-runtime
+
 FROM python:3.11-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -10,8 +12,22 @@ LABEL org.opencontainers.image.source="https://github.com/example/AUDiaLLMGatewa
 LABEL org.opencontainers.image.description="AUDia LLM Gateway backend base image"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl ca-certificates wget gnupg2 jq unzip procps libgomp1 pciutils \
+    curl ca-certificates wget gnupg2 jq unzip procps libgomp1 pciutils libnuma1 \
     && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p /opt/rocm/lib
+COPY --from=rocm-runtime /opt/rocm/lib/libamd_comgr.so* /opt/rocm/lib/
+COPY --from=rocm-runtime /opt/rocm/lib/libamdhip64.so* /opt/rocm/lib/
+COPY --from=rocm-runtime /opt/rocm/lib/libhipblas.so* /opt/rocm/lib/
+COPY --from=rocm-runtime /opt/rocm/lib/libhipblaslt.so* /opt/rocm/lib/
+COPY --from=rocm-runtime /opt/rocm/lib/libhsa-runtime64.so* /opt/rocm/lib/
+COPY --from=rocm-runtime /opt/rocm/lib/librocblas.so* /opt/rocm/lib/
+COPY --from=rocm-runtime /opt/rocm/lib/librocm-core.so* /opt/rocm/lib/
+COPY --from=rocm-runtime /opt/rocm/lib/librocprofiler-register.so* /opt/rocm/lib/
+COPY --from=rocm-runtime /opt/rocm/lib/librocprofiler64.so* /opt/rocm/lib/
+COPY --from=rocm-runtime /opt/rocm/lib/librocroller.so* /opt/rocm/lib/
+COPY --from=rocm-runtime /opt/rocm/lib/librocsolver.so* /opt/rocm/lib/
+COPY --from=rocm-runtime /opt/rocm/lib/libroctx64.so* /opt/rocm/lib/
 
 RUN set -eux; \
     case "${TARGETARCH:-amd64}" in \

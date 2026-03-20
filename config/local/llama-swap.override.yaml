@@ -1,3 +1,7 @@
-macros: {}
+macros:
+  llama-server-rocm: "/app/runtime/bin/llama-server-rocm"
+  llama-server-vulkan: "/app/runtime/bin/llama-server-vulkan"
+  model-path: "--model /app/models/gguf"
+  mmproj-path: "--mmproj /app/models/gguf"
 models: {}
 groups: {}
