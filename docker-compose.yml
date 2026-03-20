@@ -1,4 +1,21 @@
 services:
+  llm-db-postgres:
+    image: postgres:16-alpine
+    container_name: audia-postgres
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-audia}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-audia-dev-password}
+      - POSTGRES_DB=${POSTGRES_DB:-litellm}
+    volumes:
+      - ${POSTGRES_DATA_ROOT:-./config/data/postgres}:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-audia} -d ${POSTGRES_DB:-litellm}"]
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 10
+    restart: unless-stopped
+
   # --- Reverse Proxy (always on) ---
   # nginx starts only after the gateway is healthy, which guarantees that
   # generate-configs has already written config/generated/nginx/nginx.conf.
@@ -23,6 +40,7 @@ services:
       - "${GATEWAY_PORT:-4000}:4000"
     environment:
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-local-dev}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://${POSTGRES_USER:-audia}:${POSTGRES_PASSWORD:-audia-dev-password}@llm-db-postgres:5432/${POSTGRES_DB:-litellm}}
       - AUDIA_DOCKER=true
       - LLAMA_BACKEND=${LLAMA_BACKEND:-auto}
       - AUDIA_ENABLE_VLLM=${AUDIA_ENABLE_VLLM:-false}
@@ -40,7 +58,10 @@ services:
       - ./config/local:/app/config/local:z
       - ./config/generated:/app/config/generated:z
     depends_on:
-      - llm-server-llamacpp
+      llm-db-postgres:
+        condition: service_healthy
+      llm-server-llamacpp:
+        condition: service_started
     restart: unless-stopped
 
   # --- llama.cpp Inference Server (always on) ---
@@ -115,6 +136,7 @@ services:
       - watcher
       - full
     environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql://${POSTGRES_USER:-audia}:${POSTGRES_PASSWORD:-audia-dev-password}@llm-db-postgres:5432/${POSTGRES_DB:-litellm}}
       - AUDIA_DOCKER=true
       - LLAMA_BACKEND=${LLAMA_BACKEND:-auto}
       - AUDIA_ENABLE_VLLM=${AUDIA_ENABLE_VLLM:-false}
@@ -131,5 +153,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:z
     entrypoint: ["python3", "src/launcher/watcher.py"]
     depends_on:
+      - llm-db-postgres
       - llm-gateway
     restart: unless-stopped

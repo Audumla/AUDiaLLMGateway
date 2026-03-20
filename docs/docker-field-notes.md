@@ -10,6 +10,7 @@ validation and the fixes that proved reliable.
 - AMD `vLLM`: `vllm/vllm-openai-rocm:latest`
   - Required `/dev/kfd`, `/dev/dri`, `ipc: host`, and `SYS_PTRACE`.
 - Docker default for `VLLM_GPU_MEM`: `1.0`
+- Default Docker LiteLLM UI path: PostgreSQL-backed via `DATABASE_URL`
 
 ## Proven Validation Order
 
@@ -153,6 +154,18 @@ Resolution:
 
 - warning is non-fatal on the current LiteLLM build
 - the proxy still comes up and serves requests
+
+### 11. LiteLLM UI login requires a DB-backed deployment
+
+Symptom:
+
+- direct `/ui/` login returned `Authentication Error, Not connected to DB!`
+
+Resolution:
+
+- the default root compose now includes PostgreSQL
+- the gateway receives `DATABASE_URL` by default
+- PostgreSQL data is persisted visibly under `POSTGRES_DATA_ROOT`
 
 ## First-Install Recommendations
 
