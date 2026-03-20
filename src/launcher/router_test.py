@@ -44,7 +44,7 @@ def run_tests(root: str | Path, all_models: bool, model_names: list[str], prompt
     base_url = f"http://{stack.litellm.host}:{stack.litellm.port}"
     api_key = os.environ.get(stack.litellm.master_key_env, "sk-local-dev")
 
-    selected = [model.stable_name for model in load_published_models(root)] if all_models else model_names
+    selected = [model.label for model in load_published_models(root)] if all_models else model_names
     results = []
     for model_name in selected:
         response = invoke_chat_completion(base_url, api_key, model_name, prompt)
@@ -56,7 +56,7 @@ def run_tests(root: str | Path, all_models: bool, model_names: list[str], prompt
 def main() -> int:
     parser = argparse.ArgumentParser(description="Send routing tests through the LiteLLM gateway.")
     parser.add_argument("--root", default=".", help="Repository root")
-    parser.add_argument("--model", action="append", default=[], help="Model stable name to test")
+    parser.add_argument("--model", action="append", default=[], help="Model label to test")
     parser.add_argument("--all-models", action="store_true", help="Test every configured model")
     parser.add_argument(
         "--prompt",

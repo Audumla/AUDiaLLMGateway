@@ -331,42 +331,37 @@ def test_context_alias_can_generate_macro_without_explicit_llama_swap_macro(tmp_
                             "tokens": 40960,
                         }
                     },
-                    "gpu_profiles": {
-                        "gpu1": {
-                            "llama_swap_macro": "gpu1-args",
+                    "deployment_profiles": {
+                        "llamacpp_vulkan_single": {
+                            "framework": "llama_cpp",
+                            "transport": "llama-swap",
+                            "executable_macro": "llama-server-vulkan",
                             "llama_cpp_options": {
                                 "device": "Vulkan0",
                                 "split_mode": "none",
                             },
-                        },
+                        }
                     },
                     "runtime_profiles": {},
                 },
                 "model_profiles": {
                     "alias_test": {
+                        "mode": "chat",
                         "defaults": {
                             "context_preset": "40k",
-                            "gpu_preset": "gpu1",
                         },
                         "artifacts": {
                             "model_file": "AliasTest\\alias-test.gguf",
                         },
                         "deployments": {
                             "llamacpp_vulkan": {
-                                "framework": "llama_cpp",
-                                "transport": "llama-swap",
+                                "label": "local/alias_test",
+                                "profile": "llamacpp_vulkan_single",
                                 "llama_swap_model": "alias-test-model",
                             }
                         },
                     }
                 },
-                "exposures": [
-                    {
-                        "stable_name": "local/alias_test",
-                        "model_profile": "alias_test",
-                        "deployment": "llamacpp_vulkan",
-                    }
-                ],
             }
         ),
         encoding="utf-8",
@@ -377,5 +372,5 @@ def test_context_alias_can_generate_macro_without_explicit_llama_swap_macro(tmp_
     config = build_llama_swap_config(stack)
 
     assert config["macros"]["context-40k-args"] == "--ctx-size 40960"
-    assert config["macros"]["gpu1-args"] == "--device Vulkan0 --split-mode none"
+    assert "--device Vulkan0 --split-mode none" in config["models"]["alias-test-model"]["cmd"]
     assert "${context-40k-args}" in config["models"]["alias-test-model"]["cmd"]

@@ -17,7 +17,7 @@ def test_load_stack_config_from_repo_fixture() -> None:
     assert config.component_settings["llama_cpp"]["default_profiles"]["windows"] == "windows-vulkan"
     assert "linux-rocm" in config.component_settings["llama_cpp"]["profiles"]
     assert "macos-metal" in config.component_settings["llama_cpp"]["profiles"]
-    assert [model.stable_name for model in config.published_models][:2] == [
+    assert [model.label for model in config.published_models][:2] == [
         "local/qwen27_fast",
         "local/qwen122_smart",
     ]
@@ -31,7 +31,7 @@ def test_load_stack_config_includes_vllm_models_when_enabled(monkeypatch) -> Non
     config = load_stack_config(root)
 
     assert config.vllm.enabled is True
-    assert any(model.stable_name == "local/vllm_default" for model in config.published_models)
+    assert any(model.label == "local/vllm_default" for model in config.published_models)
 
 
 def test_load_layered_yaml_merges_project_and_local(tmp_path: Path) -> None:
@@ -57,21 +57,16 @@ def test_load_layered_yaml_merges_project_and_local(tmp_path: Path) -> None:
             {
                 "model_profiles": {
                     "base": {
+                        "mode": "chat",
                         "deployments": {
                             "llamacpp": {
+                                "label": "local/base",
                                 "llama_swap_model": "base",
                                 "backend_model_name": "base",
                             }
                         }
                     }
-                },
-                "exposures": [
-                    {
-                        "stable_name": "local/base",
-                        "model_profile": "base",
-                        "deployment": "llamacpp",
-                    }
-                ],
+                }
             }
         ),
         encoding="utf-8",
@@ -98,7 +93,7 @@ def test_load_model_catalog_from_repo_fixture() -> None:
 
     assert "qwen27_fast" in catalog["model_profiles"]
     assert catalog["model_profiles"]["qwen27_fast"]["defaults"]["context_preset"] == "96k"
-    assert catalog["exposures"][0]["stable_name"] == "local/qwen27_fast"
+    assert catalog["model_profiles"]["qwen27_fast"]["deployments"]["llamacpp_vulkan"]["label"] == "local/qwen27_fast"
     assert "coding_active" in catalog["load_groups"]
     assert config.published_models[0].source_page_url == "https://huggingface.co/mradermacher/Qwen3.5-27B-GGUF"
     assert config.published_models[0].revision == "main"

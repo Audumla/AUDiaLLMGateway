@@ -543,10 +543,10 @@ def ensure_firewall(root: Path) -> dict[str, Any]:
 def ensure_models(root: Path, model_names: list[str] | None = None) -> dict[str, Any]:
     """Download model files to workspace/models/ based on the model catalog.
 
-    Each model exposure that matches ``model_names`` (or all exposures when
-    ``model_names`` is ``None``) is downloaded using the URLs declared in the
-    model catalog's ``artifacts`` section.  Files are skipped when they already
-    exist so re-runs only fetch missing files.
+    Each labeled model deployment that matches ``model_names`` (or all labeled
+    deployments when ``model_names`` is ``None``) is downloaded using the URLs
+    declared in the model catalog's ``artifacts`` section. Files are skipped
+    when they already exist so re-runs only fetch missing files.
 
     The returned dict includes ``model_dir`` (the absolute path of the models
     root directory) which ``build_llama_swap_config`` reads to inject the
@@ -560,16 +560,26 @@ def ensure_models(root: Path, model_names: list[str] | None = None) -> dict[str,
     models_root.mkdir(parents=True, exist_ok=True)
 
     _, _, catalog = load_model_catalog(root)
-    exposures = catalog.get("exposures", [])
     profiles = catalog.get("model_profiles", {})
 
     results: dict[str, Any] = {}
-    for exposure in exposures:
-        stable_name = str(exposure.get("stable_name", ""))
-        if model_names is not None and stable_name not in model_names:
+    for _, profile in profiles.items():
+        if not isinstance(profile, dict):
             continue
-        profile_name = str(exposure.get("model_profile", ""))
-        profile = profiles.get(profile_name, {})
+        deployments = profile.get("deployments", {})
+        if not isinstance(deployments, dict):
+            continue
+        labels = [
+            str(deployment.get("label", "")).strip()
+            for deployment in deployments.values()
+            if isinstance(deployment, dict)
+        ]
+        labels = [label for label in labels if label]
+        if not labels:
+            continue
+        if model_names is not None and not any(label in model_names for label in labels):
+            continue
+
         artifacts = profile.get("artifacts", {})
         model_file = str(artifacts.get("model_file", "")).replace("\\", "/")
         model_url = str(artifacts.get("model_url", ""))
@@ -590,7 +600,9 @@ def ensure_models(root: Path, model_names: list[str] | None = None) -> dict[str,
                 download_file(mmproj_url, dest)
             entry["mmproj_path"] = str(dest)
         if entry:
-            results[stable_name] = entry
+            for label in labels:
+                if model_names is None or label in model_names:
+                    results[label] = entry
 
     return {"model_dir": str(models_root), "models": results}
 
