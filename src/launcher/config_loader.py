@@ -550,7 +550,14 @@ def _catalog_named_macro(catalog: dict[str, Any], section: str, preset_name: str
     if not macro_name:
         raise ValueError(f"Model catalog preset '{section}.{preset_name}' does not define llama_swap_macro")
     backend_options = preset.get("llama_cpp_options_by_backend", {})
-    if isinstance(backend_options, dict) and backend_options:
+    has_backend_specific = (
+        isinstance(backend_options, dict)
+        and bool(backend_options)
+    ) or any(
+        isinstance(key, str) and key.startswith("llamacpp-")
+        for key in preset.keys()
+    )
+    if has_backend_specific:
         macro_name = _backend_specific_macro_name(macro_name, backend)
     return f"${{{macro_name}}}"
 
@@ -619,6 +626,31 @@ def _synthesize_catalog_macros(catalog: dict[str, Any], macros: dict[str, Any], 
             if not macro_name:
                 continue
 
+            # New backend-keyed schema:
+            #   llamacpp-vulkan: { ... }
+            #   llamacpp-rocm:   { ... }
+            new_backend_blocks = {
+                str(key)[len("llamacpp-"):]: value
+                for key, value in preset.items()
+                if isinstance(key, str) and key.startswith("llamacpp-")
+            }
+            if new_backend_blocks:
+                for backend_name, options in new_backend_blocks.items():
+                    backend_macro_name = _backend_specific_macro_name(macro_name, str(backend_name))
+                    if backend_macro_name in local_macros or backend_macro_name in macros:
+                        continue
+                    if not isinstance(options, dict) or not options:
+                        raise ValueError(
+                            f"Model catalog preset '{section}.{preset_name}' must define non-empty "
+                            f"llamacpp-{backend_name} options to synthesize macro '{backend_macro_name}'"
+                        )
+                    macros[backend_macro_name] = _render_llama_cpp_options(options, backend=str(backend_name))
+                continue
+
+            # Legacy backend-specific schema:
+            #   llama_cpp_options_by_backend:
+            #     vulkan: { ... }
+            #     rocm:   { ... }
             backend_options = preset.get("llama_cpp_options_by_backend", {})
             if isinstance(backend_options, dict) and backend_options:
                 for backend_name, options in backend_options.items():
@@ -654,34 +686,46 @@ def _generated_llama_swap_models(stack: StackConfig, macros: dict[str, Any]) -> 
         artifacts = profile.get("artifacts", {})
         deployments = profile.get("deployments", {})
         for deployment_name, deployment in deployments.items():
-            if not deployment.get("enabled", True):
+            resolved_deployment = _resolve_model_deployment(catalog, str(profile_name), str(deployment_name), deployment)
+            if not resolved_deployment.get("enabled", True):
                 continue
-            if str(deployment.get("transport", "llama-swap")) != "llama-swap":
+            if str(resolved_deployment.get("transport", "llama-swap")) != "llama-swap":
                 continue
-            framework_name = str(deployment.get("framework", "llama_cpp"))
+            framework_name = str(resolved_deployment.get("framework", "llama_cpp"))
             if framework_name != "llama_cpp":
                 continue
 
             framework = frameworks.get(framework_name, {})
-            executable_macro = str(deployment.get("executable_macro", framework.get("llama_swap", {}).get("executable_macro", "llama-server")))
+            executable_macro = str(
+                resolved_deployment.get(
+                    "executable_macro",
+                    framework.get("llama_swap", {}).get("executable_macro", "llama-server"),
+                )
+            )
             server_args_macro = str(framework.get("llama_swap", {}).get("server_args_macro", "server-args"))
             model_path_macro = str(framework.get("llama_swap", {}).get("model_path_macro", "model-path"))
             mmproj_path_macro = str(framework.get("llama_swap", {}).get("mmproj_path_macro", "mmproj-path"))
-            deployment_backend = _infer_backend_from_deployment(deployment)
+            deployment_backend = _infer_backend_from_deployment(resolved_deployment)
 
-            context_name = str(deployment.get("context_preset", defaults.get("context_preset", ""))).strip()
-            gpu_name = str(deployment.get("gpu_preset", defaults.get("gpu_preset", ""))).strip()
+            context_name = str(resolved_deployment.get("context_preset", defaults.get("context_preset", ""))).strip()
+            gpu_name = str(resolved_deployment.get("gpu_preset", defaults.get("gpu_preset", ""))).strip()
             runtime_presets = [str(item) for item in defaults.get("runtime_presets", [])]
-            runtime_presets.extend([str(item) for item in deployment.get("runtime_presets", [])])
-            additional_macros = [str(item) for item in deployment.get("additional_macro_refs", [])]
+            runtime_presets.extend([str(item) for item in resolved_deployment.get("runtime_presets", [])])
+            additional_macros = [str(item) for item in resolved_deployment.get("additional_macro_refs", [])]
+            llama_cpp_options = resolved_deployment.get("llama_cpp_options", {})
 
-            if not context_name or not gpu_name:
-                raise ValueError(f"Model catalog deployment '{profile_name}.{deployment_name}' requires context_preset and gpu_preset")
+            if not context_name:
+                raise ValueError(f"Model catalog deployment '{profile_name}.{deployment_name}' requires context_preset")
+            if not gpu_name and not (isinstance(llama_cpp_options, dict) and llama_cpp_options):
+                raise ValueError(
+                    f"Model catalog deployment '{profile_name}.{deployment_name}' requires gpu_preset "
+                    "or llama_cpp_options"
+                )
 
-            model_file = str(deployment.get("model_file", artifacts.get("model_file", ""))).strip()
+            model_file = str(resolved_deployment.get("model_file", artifacts.get("model_file", ""))).strip()
             if not model_file:
                 raise ValueError(f"Model catalog deployment '{profile_name}.{deployment_name}' does not define model_file")
-            mmproj_file = str(deployment.get("mmproj_file", artifacts.get("mmproj_file", ""))).strip()
+            mmproj_file = str(resolved_deployment.get("mmproj_file", artifacts.get("mmproj_file", ""))).strip()
 
             model_file = model_file.replace("\\", "/")
             mmproj_file = mmproj_file.replace("\\", "/")
@@ -693,18 +737,21 @@ def _generated_llama_swap_models(stack: StackConfig, macros: dict[str, Any]) -> 
             if mmproj_file:
                 lines.append(f"${{{mmproj_path_macro}}}/{mmproj_file}")
             lines.append(_catalog_context_macro(catalog, context_name, macros, framework))
-            lines.append(_catalog_named_macro(catalog, "gpu_profiles", gpu_name, backend=deployment_backend))
+            if gpu_name:
+                lines.append(_catalog_named_macro(catalog, "gpu_profiles", gpu_name, backend=deployment_backend))
+            elif isinstance(llama_cpp_options, dict) and llama_cpp_options:
+                lines.append(_render_llama_cpp_options(llama_cpp_options, backend=deployment_backend))
             for preset_name in runtime_presets:
                 lines.append(_catalog_named_macro(catalog, "runtime_profiles", preset_name, backend=deployment_backend))
             for macro_ref in additional_macros:
                 lines.append(f"${{{macro_ref}}}")
 
-            model_id = str(deployment.get("llama_swap_model", deployment_name))
+            model_id = str(resolved_deployment.get("llama_swap_model", deployment_name))
             # Keep command rendering single-line to avoid YAML multiline formatting
             # that introduces visual blank lines in generated files.
             cmd = " ".join(part.strip() for part in lines if part and part.strip())
             entry: dict[str, Any] = {"cmd": cmd}
-            concurrency_limit = deployment.get("concurrency_limit", defaults.get("concurrency_limit"))
+            concurrency_limit = resolved_deployment.get("concurrency_limit", defaults.get("concurrency_limit"))
             if concurrency_limit is not None:
                 entry["concurrencyLimit"] = int(concurrency_limit)
             generated[model_id] = entry
@@ -719,19 +766,42 @@ def _catalog_deployment_map(catalog: dict[str, Any]) -> dict[tuple[str, str], di
     return deployments
 
 
+def _resolve_deployment_profile(catalog: dict[str, Any], deployment: dict[str, Any]) -> dict[str, Any]:
+    profile_name = str(deployment.get("profile", deployment.get("deployment_profile", ""))).strip()
+    if not profile_name:
+        return {}
+    profiles = catalog.get("presets", {}).get("deployment_profiles", {})
+    resolved = profiles.get(profile_name, {})
+    if not isinstance(resolved, dict) or not resolved:
+        raise ValueError(f"Model catalog deployment profile '{profile_name}' is not defined")
+    return resolved
+
+
+def _resolve_model_deployment(
+    catalog: dict[str, Any],
+    profile_name: str,
+    deployment_name: str,
+    deployment: dict[str, Any],
+) -> dict[str, Any]:
+    if not isinstance(deployment, dict):
+        raise ValueError(f"Model catalog deployment '{profile_name}.{deployment_name}' must be a mapping")
+    profile_data = _resolve_deployment_profile(catalog, deployment)
+    return deep_merge(profile_data, deployment)
+
+
 def _generated_llama_swap_groups(stack: StackConfig) -> dict[str, Any]:
     _, _, catalog = load_model_catalog(stack.root)
-    deployment_map = _catalog_deployment_map(catalog)
 
     # Build set of enabled llama-swap model IDs (disabled deployments must be excluded from groups)
     enabled_model_ids: set[str] = set()
     for profile_name, profile in catalog.get("model_profiles", {}).items():
         for dep_name, dep in profile.get("deployments", {}).items():
-            if not dep.get("enabled", True):
+            resolved_dep = _resolve_model_deployment(catalog, str(profile_name), str(dep_name), dep)
+            if not resolved_dep.get("enabled", True):
                 continue
-            if str(dep.get("transport", "llama-swap")) != "llama-swap":
+            if str(resolved_dep.get("transport", "llama-swap")) != "llama-swap":
                 continue
-            model_id = str(dep.get("llama_swap_model", dep_name))
+            model_id = str(resolved_dep.get("llama_swap_model", dep_name))
             enabled_model_ids.add(model_id)
 
     generated: dict[str, Any] = {}
@@ -746,7 +816,13 @@ def _generated_llama_swap_groups(stack: StackConfig) -> dict[str, Any]:
                 continue
             profile_name = str(member.get("model_profile", ""))
             deployment_name = str(member.get("deployment", ""))
-            deployment = deployment_map.get((profile_name, deployment_name), {})
+            profile = catalog.get("model_profiles", {}).get(profile_name, {})
+            raw_deployment = profile.get("deployments", {}).get(deployment_name, {})
+            deployment = (
+                _resolve_model_deployment(catalog, profile_name, deployment_name, raw_deployment)
+                if isinstance(raw_deployment, dict)
+                else {}
+            )
             llama_swap_model = str(member.get("llama_swap_model", deployment.get("llama_swap_model", ""))).strip()
             if llama_swap_model and llama_swap_model in enabled_model_ids:
                 members.append(llama_swap_model)
@@ -774,7 +850,12 @@ def _catalog_published_models(stack: StackConfig) -> list[PublishedModel]:
         profile_name = str(exposure["model_profile"])
         profile = profiles.get(profile_name, {})
         deployment_name = str(exposure.get("deployment", ""))
-        deployment = profile.get("deployments", {}).get(deployment_name, {})
+        raw_deployment = profile.get("deployments", {}).get(deployment_name, {})
+        deployment = (
+            _resolve_model_deployment(catalog, profile_name, deployment_name, raw_deployment)
+            if isinstance(raw_deployment, dict)
+            else {}
+        )
         if not deployment_name or not deployment:
             raise ValueError(f"Model exposure '{exposure.get('stable_name', '<unknown>')}' references missing deployment '{profile_name}.{deployment_name}'")
 
@@ -974,6 +1055,154 @@ def build_litellm_config(stack: StackConfig) -> dict[str, Any]:
 
 
 def build_vllm_config(stack: StackConfig) -> dict[str, Any]:
+    def _blank_if_unresolved_env(value: Any) -> Any:
+        if isinstance(value, str):
+            token = value.strip()
+            match = ENV_PATTERN.fullmatch(token)
+            if match:
+                return os.environ.get(match.group(1), "")
+        return value
+
+    def _as_int(value: Any, default: int) -> int:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return default
+
+    def _as_float(value: Any, default: float) -> float:
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return default
+
+    def _as_bool(value: Any, default: bool = False) -> bool:
+        if isinstance(value, bool):
+            return value
+        if value is None:
+            return default
+        if isinstance(value, (int, float)):
+            return bool(value)
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"1", "true", "yes", "on"}:
+                return True
+            if normalized in {"0", "false", "no", "off"}:
+                return False
+        return default
+
+    def _resolve_vllm_startup_overrides() -> dict[str, Any]:
+        _, _, catalog = load_model_catalog(stack.root)
+        profiles = catalog.get("model_profiles", {})
+        presets = catalog.get("presets", {}) if isinstance(catalog.get("presets"), dict) else {}
+        gpu_profiles = presets.get("gpu_profiles", {}) if isinstance(presets.get("gpu_profiles"), dict) else {}
+        vllm_profiles = presets.get("vllm_profiles", {}) if isinstance(presets.get("vllm_profiles"), dict) else {}
+        startup_overrides: dict[str, Any] = {}
+        vllm_backend = str(os.environ.get("VLLM_BACKEND", "rocm")).strip().lower() or "rocm"
+
+        def _iter_preset_names(container: dict[str, Any]) -> list[str]:
+            names: list[str] = []
+            single = container.get("vllm_preset")
+            if isinstance(single, str) and single.strip():
+                names.append(single.strip())
+            many = container.get("vllm_presets")
+            if isinstance(many, list):
+                names.extend(str(item).strip() for item in many if str(item).strip())
+            return names
+
+        def _iter_gpu_preset_names(container: dict[str, Any]) -> list[str]:
+            names: list[str] = []
+            single = container.get("gpu_preset")
+            if isinstance(single, str) and single.strip():
+                names.append(single.strip())
+            many = container.get("gpu_presets")
+            if isinstance(many, list):
+                names.extend(str(item).strip() for item in many if str(item).strip())
+            return names
+
+        def _apply_container(container: dict[str, Any]) -> None:
+            nonlocal startup_overrides, vllm_backend
+
+            def _clean_section(value: Any) -> Any:
+                if isinstance(value, dict):
+                    cleaned: dict[str, Any] = {}
+                    for key, child in value.items():
+                        cleaned_child = _clean_section(child)
+                        if cleaned_child is None:
+                            continue
+                        cleaned[key] = cleaned_child
+                    return cleaned
+                if isinstance(value, list):
+                    return value
+                normalized = _blank_if_unresolved_env(value)
+                if isinstance(normalized, str) and not normalized.strip():
+                    return None
+                return normalized
+
+            backend_value = container.get("vllm_backend")
+            if isinstance(backend_value, str) and backend_value.strip():
+                vllm_backend = backend_value.strip().lower()
+
+            for preset_name in _iter_gpu_preset_names(container):
+                preset = gpu_profiles.get(preset_name)
+                if not isinstance(preset, dict):
+                    raise ValueError(f"Model catalog gpu preset '{preset_name}' is not defined")
+                backend_key = f"vllm-{vllm_backend}"
+                backend_options = preset.get(backend_key)
+                if backend_options is None:
+                    backend_options = preset.get("vllm")
+                if isinstance(backend_options, dict):
+                    startup_overrides = deep_merge(startup_overrides, backend_options)
+
+            for preset_name in _iter_preset_names(container):
+                preset = vllm_profiles.get(preset_name)
+                if not isinstance(preset, dict):
+                    raise ValueError(f"Model catalog vLLM preset '{preset_name}' is not defined")
+                startup_overrides = deep_merge(startup_overrides, preset)
+            section = container.get("vllm", {})
+            if isinstance(section, dict):
+                cleaned_section = _clean_section(section)
+                if isinstance(cleaned_section, dict) and cleaned_section:
+                    startup_overrides = deep_merge(startup_overrides, cleaned_section)
+
+        for exposure in catalog.get("exposures", []):
+            profile_name = str(exposure.get("model_profile", ""))
+            deployment_name = str(exposure.get("deployment", ""))
+            profile = profiles.get(profile_name, {})
+            raw_deployment = profile.get("deployments", {}).get(deployment_name, {})
+            if not isinstance(raw_deployment, dict):
+                continue
+            deployment_profile = _resolve_deployment_profile(catalog, raw_deployment)
+            framework_name = str(
+                raw_deployment.get(
+                    "framework",
+                    deployment_profile.get("framework", "llama_cpp"),
+                )
+            )
+            transport_name = str(
+                raw_deployment.get(
+                    "transport",
+                    deployment_profile.get("transport", "llama-swap"),
+                )
+            )
+            enabled = raw_deployment.get("enabled", deployment_profile.get("enabled", True))
+            if not enabled:
+                continue
+            if framework_name != "vllm":
+                continue
+            if transport_name != "direct":
+                continue
+
+            defaults = profile.get("defaults", {}) if isinstance(profile.get("defaults"), dict) else {}
+            # Allow vLLM startup options at profile defaults, deployment-profile defaults,
+            # deployment overrides, and exposure overrides.
+            # Precedence: defaults < deployment_profile < deployment < exposure.
+            for section in (defaults, deployment_profile, raw_deployment, exposure):
+                if isinstance(section, dict):
+                    _apply_container(section)
+            break
+
+        return startup_overrides
+
     exposures = [
         model
         for model in stack.published_models
@@ -987,6 +1216,15 @@ def build_vllm_config(stack: StackConfig) -> dict[str, Any]:
         )
 
     served_model = next(iter(backend_model_names), os.environ.get("VLLM_MODEL", "Qwen/Qwen2.5-0.5B-Instruct"))
+    startup_overrides = _resolve_vllm_startup_overrides()
+
+    visible_devices = _blank_if_unresolved_env(
+        startup_overrides.get("visible_devices", os.environ.get("VLLM_VISIBLE_DEVICES", ""))
+    )
+    extra_args = startup_overrides.get("extra_args", [])
+    if not isinstance(extra_args, list):
+        extra_args = []
+
     return {
         "enabled": stack.vllm.enabled,
         "service": {
@@ -996,8 +1234,39 @@ def build_vllm_config(stack: StackConfig) -> dict[str, Any]:
         },
         "startup": {
             "model": served_model,
-            "gpu_memory_utilization": float(os.environ.get("VLLM_GPU_MEM", "1.0")),
-            "max_model_len": int(os.environ.get("VLLM_MAX_LEN", "4096")),
+            "gpu_memory_utilization": _as_float(
+                startup_overrides.get("gpu_memory_utilization", os.environ.get("VLLM_GPU_MEM", "1.0")),
+                1.0,
+            ),
+            "max_model_len": _as_int(
+                startup_overrides.get("max_model_len", os.environ.get("VLLM_MAX_LEN", "4096")),
+                4096,
+            ),
+            "tensor_parallel_size": _as_int(
+                startup_overrides.get("tensor_parallel_size", os.environ.get("VLLM_TENSOR_PARALLEL_SIZE", "1")),
+                1,
+            ),
+            "pipeline_parallel_size": _as_int(
+                startup_overrides.get("pipeline_parallel_size", os.environ.get("VLLM_PIPELINE_PARALLEL_SIZE", "1")),
+                1,
+            ),
+            "dtype": str(
+                _blank_if_unresolved_env(startup_overrides.get("dtype", os.environ.get("VLLM_DTYPE", "")))
+            ).strip(),
+            "max_num_seqs": _as_int(
+                startup_overrides.get("max_num_seqs", os.environ.get("VLLM_MAX_NUM_SEQS", "0")),
+                0,
+            ),
+            "enforce_eager": _as_bool(
+                startup_overrides.get("enforce_eager", os.environ.get("VLLM_ENFORCE_EAGER", "")),
+                False,
+            ),
+            "trust_remote_code": _as_bool(
+                startup_overrides.get("trust_remote_code", os.environ.get("VLLM_TRUST_REMOTE_CODE", "")),
+                False,
+            ),
+            "visible_devices": str(visible_devices).strip(),
+            "extra_args": [str(item) for item in extra_args if str(item).strip()],
         },
         "exposures": [
             {
