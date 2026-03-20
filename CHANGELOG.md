@@ -1,14 +1,5 @@
 # Changelog
 
-## [0.11.2](https://github.com/Audumla/AUDiaLLMGateway/compare/v0.11.1...v0.11.2) (2026-03-19)
-
-
-### Bug Fixes
-
-* downloads to docker configured locations ([695a9ad](https://github.com/Audumla/AUDiaLLMGateway/commit/695a9ad8c7d49797cf71df65e2321390d01c716a))
-
-## Changelog
-
 ## Unreleased
 
 ### Scaffolded a native Windows local LLM gateway workspace in AUDiaLLMGateway. (New Feature)
@@ -418,5 +409,21 @@
 ### Persist llama.cpp runtime to visible host paths via BACKEND_RUNTIME_ROOT and update Docker docs/examples. (Configuration Cleanup)
 - Replaced the opaque backend-runtime Docker volume with a bind mount rooted at ./config/data/backend-runtime across the main and example compose files.
 - Documented BACKEND_RUNTIME_ROOT and the visible persistence layout in README and docs/docker.md, and kept models-hf separate for vLLM caches.
+
+### Auto-resolve backend-specific llama.cpp runtime subdirectories under BACKEND_RUNTIME_ROOT and update Docker docs/examples. (Configuration Cleanup)
+- Changed the backend provisioner to mount a runtime base path at /app/runtime-root and symlink /app/runtime to a backend-specific subdirectory such as vulkan, rocm, cpu, or auto.
+- Updated compose files and docs so BACKEND_RUNTIME_ROOT is treated as a visible base directory instead of a single shared runtime path.
+
+### Align compose examples, generated Docker hostnames, and docs with the llm-gateway / llm-server-* naming convention. (Configuration Cleanup)
+- Renamed compose services to llm-gateway, llm-server-llamacpp, llm-server-vllm, and llm-config-watcher while keeping the existing audia-* container_name values.
+- Updated Docker-specific hostnames in config generation plus the docs/specs/commands so examples and generated routing use the same service names.
+
+### Add guided Docker setup, capture resolved deployment issues in field notes, and harden the generic Docker install path. (Configuration Cleanup)
+- Added scripts/docker-setup.sh and AUDiaLLMGateway.sh docker setup to detect hardware, prompt for Docker settings, write .env, and create visible runtime/model/cache directories.
+- Documented the resolved AMD/Linux Docker failure modes, validated versions, backend-specific runtime layout, and bottom-up debugging path in docs/docker-field-notes.md while removing a host-specific GID from the generic compose.
+
+### Suppress successful gateway liveliness access logs while preserving failed health probes and normal request logging. (Configuration Cleanup)
+- Added a custom uvicorn access-log filter and log-config JSON, then wired the gateway entrypoint to launch LiteLLM with that log config.
+- Successful GET /health/liveliness 200 probes are now suppressed, while non-200 health responses and all non-health requests still appear in the logs.
 
 ---

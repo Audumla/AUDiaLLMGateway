@@ -50,6 +50,7 @@ Native (non-Docker) actions:
   status                - Show runtime process status (native)
 
 Docker actions:
+  docker setup          - Detect hardware, prompt for Docker settings, and write .env
   docker start [stack]  - Start the entire gateway stack via Docker Compose (detached)
   docker stop [stack]   - Stop and remove the gateway containers
   docker restart        - Restart the gateway stack
@@ -72,6 +73,7 @@ Examples:
   ./scripts/AUDiaLLMGateway.sh install stack
   ./scripts/AUDiaLLMGateway.sh install components
   ./scripts/AUDiaLLMGateway.sh generate
+  ./scripts/AUDiaLLMGateway.sh docker setup
   ./scripts/AUDiaLLMGateway.sh docker start
   ./scripts/AUDiaLLMGateway.sh check health
 EOF
@@ -150,6 +152,9 @@ case "$ACTION" in
   docker)
     DOCKER_COMPOSE="$(docker_cmd)"
     case "${TARGET:-}" in
+      setup)
+        "$ROOT_DIR/scripts/docker-setup.sh"
+        ;;
       start)
         echo ">>> Starting AUDia LLM Gateway stack (Docker)..."
         (cd "$ROOT_DIR" && $DOCKER_COMPOSE up -d)
@@ -180,7 +185,7 @@ case "$ACTION" in
         (cd "$ROOT_DIR" && $DOCKER_COMPOSE logs -f "$@")
         ;;
       *)
-        echo "Unknown docker target '${TARGET:-}'. Use: start, stop, restart, update, status, health, logs" >&2
+        echo "Unknown docker target '${TARGET:-}'. Use: setup, start, stop, restart, update, status, health, logs" >&2
         exit 1
         ;;
     esac

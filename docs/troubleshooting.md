@@ -1,5 +1,8 @@
 # Troubleshooting
 
+For Docker deployment notes, validated versions, and first-install failure modes,
+start with [docker-field-notes.md](docker-field-notes.md).
+
 ## Update preserved my local config but something broke
 
 - Run `.\scripts\AUDiaLLMGateway.ps1 validate`

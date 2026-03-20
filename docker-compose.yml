@@ -11,12 +11,12 @@ services:
       - ./config/generated/nginx/nginx.conf:/etc/nginx/nginx.conf:ro,z
       - ./config/generated/nginx:/app/static:ro,z
     depends_on:
-      gateway:
+      llm-gateway:
         condition: service_healthy
     restart: unless-stopped
 
   # --- API Gateway / Traffic Orchestrator (always on) ---
-  gateway:
+  llm-gateway:
     image: audumla/audia-llm-gateway-orchestrator:latest
     container_name: audia-gateway
     ports:
@@ -40,20 +40,21 @@ services:
       - ./config/local:/app/config/local:z
       - ./config/generated:/app/config/generated:z
     depends_on:
-      - backend-swappable
+      - llm-server-llamacpp
     restart: unless-stopped
 
   # --- llama.cpp Inference Server (always on) ---
   # provision-runtime.sh auto-detects GPU at container start and downloads the
-  # matching llama.cpp binary (CUDA, ROCm, Vulkan, or CPU). Binary is cached in
-  # BACKEND_RUNTIME_ROOT so re-detection and re-download only happen on first start.
+  # matching llama.cpp binary (CUDA, ROCm, Vulkan, or CPU). The host path mounted
+  # at BACKEND_RUNTIME_ROOT is treated as a base directory; startup resolves
+  # /app/runtime to a backend-specific subdirectory such as vulkan/ or rocm/.
   #
   # GPU device access is NOT requested here — this compose is for CPU or systems
   # where the Docker runtime already has GPU access configured (e.g. NVIDIA CDI).
   # For explicit GPU passthrough use the profiles in docker/examples/:
   #   NVIDIA: docker compose --project-directory . -f docker/examples/docker-compose.nvidia.yml up -d
   #   AMD:    docker compose --project-directory . -f docker/examples/docker-compose.amd.yml up -d
-  backend-swappable:
+  llm-server-llamacpp:
     image: audumla/audia-llm-gateway-server:latest
     container_name: audia-llama-cpp
     environment:
@@ -65,12 +66,13 @@ services:
     volumes:
       - ${MODEL_ROOT:-./models}:/app/models:ro
       - ./config/generated/llama-swap:/app/config:ro
-      - ${BACKEND_RUNTIME_ROOT:-./config/data/backend-runtime}:/app/runtime
+      - ${BACKEND_RUNTIME_ROOT:-./config/data/backend-runtime}:/app/runtime-root
     devices:
       - /dev/kfd:/dev/kfd
       - /dev/dri:/dev/dri
     group_add:
-      - "485" # render group GID on host 10.10.100.10
+      - video
+      - render
     privileged: true
     restart: unless-stopped
 
@@ -79,7 +81,7 @@ services:
   # config watching is enabled. Models are lazily loaded from the models
   # directory or downloaded from HuggingFace on first request.
   # Requires NVIDIA GPU with CUDA support.
-  backend-vllm:
+  llm-server-vllm:
     image: ${VLLM_IMAGE:-audumla/audia-llm-gateway-vllm:latest}
     container_name: audia-vllm
     profiles:
@@ -106,7 +108,7 @@ services:
   # --- Hot-Reload Watcher (optional) ---
   # Watches config/local/ for changes, regenerates configs, reloads nginx,
   # and restarts the gateway when LiteLLM auth/config changes.
-  watcher:
+  llm-config-watcher:
     image: audumla/audia-llm-gateway-orchestrator:latest
     container_name: audia-watcher
     profiles:
@@ -129,5 +131,5 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:z
     entrypoint: ["python3", "src/launcher/watcher.py"]
     depends_on:
-      - gateway
+      - llm-gateway
     restart: unless-stopped

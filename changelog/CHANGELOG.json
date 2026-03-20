@@ -1352,5 +1352,69 @@
       "Replaced the opaque backend-runtime Docker volume with a bind mount rooted at ./config/data/backend-runtime across the main and example compose files.",
       "Documented BACKEND_RUNTIME_ROOT and the visible persistence layout in README and docs/docker.md, and kept models-hf separate for vLLM caches."
     ]
+  },
+  {
+    "id": "CHG-23924e80",
+    "agent": "codex",
+    "change_group": "remote-e2e-validation",
+    "plugin_version": "unreleased",
+    "date": "2026-03-20",
+    "recorded_at": "2026-03-20T00:09:55.200654Z",
+    "summary_tags": [
+      "Configuration Cleanup"
+    ],
+    "summary": "Auto-resolve backend-specific llama.cpp runtime subdirectories under BACKEND_RUNTIME_ROOT and update Docker docs/examples.",
+    "details": [
+      "Changed the backend provisioner to mount a runtime base path at /app/runtime-root and symlink /app/runtime to a backend-specific subdirectory such as vulkan, rocm, cpu, or auto.",
+      "Updated compose files and docs so BACKEND_RUNTIME_ROOT is treated as a visible base directory instead of a single shared runtime path."
+    ]
+  },
+  {
+    "id": "CHG-23924e80-1",
+    "agent": "codex",
+    "change_group": "remote-e2e-validation",
+    "plugin_version": "unreleased",
+    "date": "2026-03-20",
+    "recorded_at": "2026-03-20T00:19:18.011081Z",
+    "summary_tags": [
+      "Configuration Cleanup"
+    ],
+    "summary": "Align compose examples, generated Docker hostnames, and docs with the llm-gateway / llm-server-* naming convention.",
+    "details": [
+      "Renamed compose services to llm-gateway, llm-server-llamacpp, llm-server-vllm, and llm-config-watcher while keeping the existing audia-* container_name values.",
+      "Updated Docker-specific hostnames in config generation plus the docs/specs/commands so examples and generated routing use the same service names."
+    ]
+  },
+  {
+    "id": "CHG-23924e80-2",
+    "agent": "codex",
+    "change_group": "remote-e2e-validation",
+    "plugin_version": "unreleased",
+    "date": "2026-03-20",
+    "recorded_at": "2026-03-20T00:26:23.878863Z",
+    "summary_tags": [
+      "Configuration Cleanup"
+    ],
+    "summary": "Add guided Docker setup, capture resolved deployment issues in field notes, and harden the generic Docker install path.",
+    "details": [
+      "Added scripts/docker-setup.sh and AUDiaLLMGateway.sh docker setup to detect hardware, prompt for Docker settings, write .env, and create visible runtime/model/cache directories.",
+      "Documented the resolved AMD/Linux Docker failure modes, validated versions, backend-specific runtime layout, and bottom-up debugging path in docs/docker-field-notes.md while removing a host-specific GID from the generic compose."
+    ]
+  },
+  {
+    "id": "CHG-23924e80-3",
+    "agent": "codex",
+    "change_group": "remote-e2e-validation",
+    "plugin_version": "unreleased",
+    "date": "2026-03-20",
+    "recorded_at": "2026-03-20T00:36:41.266305Z",
+    "summary_tags": [
+      "Configuration Cleanup"
+    ],
+    "summary": "Suppress successful gateway liveliness access logs while preserving failed health probes and normal request logging.",
+    "details": [
+      "Added a custom uvicorn access-log filter and log-config JSON, then wired the gateway entrypoint to launch LiteLLM with that log config.",
+      "Successful GET /health/liveliness 200 probes are now suppressed, while non-200 health responses and all non-health requests still appear in the logs."
+    ]
   }
 ]

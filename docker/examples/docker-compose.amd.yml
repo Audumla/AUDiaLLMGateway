@@ -10,7 +10,7 @@
 # With vLLM added:
 #   docker compose --project-directory . -f docker/examples/docker-compose.amd.yml --profile vllm up -d
 services:
-  gateway:
+  llm-gateway:
     image: audumla/audia-llm-gateway-orchestrator:latest
     container_name: audia-gateway
     ports:
@@ -24,10 +24,10 @@ services:
     volumes:
       - ./config:/app/config
     depends_on:
-      - backend-swappable
+      - llm-server-llamacpp
     restart: unless-stopped
 
-  backend-swappable:
+  llm-server-llamacpp:
     image: audumla/audia-llm-gateway-server:latest
     container_name: audia-llama-cpp
     environment:
@@ -36,7 +36,7 @@ services:
     volumes:
       - ${MODEL_ROOT:-./models}:/app/models:ro
       - ./config/generated/llama-swap:/app/config:ro
-      - ${BACKEND_RUNTIME_ROOT:-./config/data/backend-runtime}:/app/runtime
+      - ${BACKEND_RUNTIME_ROOT:-./config/data/backend-runtime}:/app/runtime-root
     devices:
       - /dev/kfd:/dev/kfd
       - /dev/dri:/dev/dri
@@ -46,7 +46,7 @@ services:
     restart: unless-stopped
 
   # vLLM backend (ROCm) — start with --profile vllm
-  backend-vllm:
+  llm-server-vllm:
     image: ${VLLM_IMAGE:-vllm/vllm-openai-rocm:latest}
     container_name: audia-vllm
     profiles:
