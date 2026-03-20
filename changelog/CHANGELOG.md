@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased 
+## Unreleased
 
 ### Scaffolded a native Windows local LLM gateway workspace in AUDiaLLMGateway. (New Feature)
 - Created a Git-backed repo scaffold with config, docs, PowerShell wrappers, and Python orchestration for llama-server plus LiteLLM.
@@ -474,5 +474,10 @@
 - Add deployment profile resolution and merging across model generation, exposures, groups, and vLLM startup config.
 - Update config/local/models.override.yaml to deployment_profiles and remove gpu_preset dependencies from active model deployments.
 - Adjust tests to assert deployment-profile-generated llama.cpp args and vLLM deployment profile precedence behavior.
+
+### Fixed watcher resilience, llama-swap/nginx timeout behavior, and ROCm/Vulkan profile validation with live server verification. (Bug Fix, Configuration Cleanup, Documentation Update)
+- Hardened config regeneration path and live reload behavior for override edits.
+- Fixed llama.cpp flash-attn arg rendering for YAML boolean values and corrected default model/runtime mappings.
+- Validated full nginx -> LiteLLM -> llama-swap matrix on 10.10.100.10 and documented ROCm/vLLM host-specific constraints.
 
 ---

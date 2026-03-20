@@ -1594,5 +1594,24 @@
       "Update config/local/models.override.yaml to deployment_profiles and remove gpu_preset dependencies from active model deployments.",
       "Adjust tests to assert deployment-profile-generated llama.cpp args and vLLM deployment profile precedence behavior."
     ]
+  },
+  {
+    "id": "CHG-8001c49e",
+    "agent": "codex",
+    "change_group": "llm-gateway-stability",
+    "plugin_version": "unreleased",
+    "date": "2026-03-21",
+    "recorded_at": "2026-03-20T15:35:46.709551Z",
+    "summary_tags": [
+      "Bug Fix",
+      "Configuration Cleanup",
+      "Documentation Update"
+    ],
+    "summary": "Fixed watcher resilience, llama-swap/nginx timeout behavior, and ROCm/Vulkan profile validation with live server verification.",
+    "details": [
+      "Hardened config regeneration path and live reload behavior for override edits.",
+      "Fixed llama.cpp flash-attn arg rendering for YAML boolean values and corrected default model/runtime mappings.",
+      "Validated full nginx -> LiteLLM -> llama-swap matrix on 10.10.100.10 and documented ROCm/vLLM host-specific constraints."
+    ]
   }
 ]

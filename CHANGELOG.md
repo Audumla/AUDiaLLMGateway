@@ -1,15 +1,5 @@
 # Changelog
 
-## [0.11.7](https://github.com/Audumla/AUDiaLLMGateway/compare/v0.11.6...v0.11.7) (2026-03-20)
-
-
-### Bug Fixes
-
-* config refactor ([478561b](https://github.com/Audumla/AUDiaLLMGateway/commit/478561b97478e7f11d11385c1ae0d82cd3c4482b))
-* updated ([3e614a2](https://github.com/Audumla/AUDiaLLMGateway/commit/3e614a2e9664ba3ddf863b089f3db3c8ffe2610d))
-
-## Changelog
-
 ## Unreleased
 
 ### Scaffolded a native Windows local LLM gateway workspace in AUDiaLLMGateway. (New Feature)
@@ -484,5 +474,10 @@
 - Add deployment profile resolution and merging across model generation, exposures, groups, and vLLM startup config.
 - Update config/local/models.override.yaml to deployment_profiles and remove gpu_preset dependencies from active model deployments.
 - Adjust tests to assert deployment-profile-generated llama.cpp args and vLLM deployment profile precedence behavior.
+
+### Fixed watcher resilience, llama-swap/nginx timeout behavior, and ROCm/Vulkan profile validation with live server verification. (Bug Fix, Configuration Cleanup, Documentation Update)
+- Hardened config regeneration path and live reload behavior for override edits.
+- Fixed llama.cpp flash-attn arg rendering for YAML boolean values and corrected default model/runtime mappings.
+- Validated full nginx -> LiteLLM -> llama-swap matrix on 10.10.100.10 and documented ROCm/vLLM host-specific constraints.
 
 ---
