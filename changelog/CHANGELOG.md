@@ -430,4 +430,8 @@
 - Added prisma==0.15.0 to gateway Python dependencies and updated docker/Dockerfile.gateway-base to run prisma generate against LiteLLM's bundled schema.prisma during image build.
 - Removed the empty model_group_alias_map emission to eliminate the non-fatal LiteLLM Router warning while keeping the Postgres-backed default compose path intact.
 
+### Hardened the gateway DB-backed startup path so LiteLLM waits for PostgreSQL before Prisma migration. (Bug Fix)
+- Patched docker/gateway-entrypoint.sh to wait on DATABASE_URL reachability and launch LiteLLM with enforced Prisma migration checks.
+- Documented DATABASE_WAIT_SECONDS and DATABASE_WAIT_INTERVAL_SECONDS plus the Postgres init race in the Docker docs and field notes.
+
 ---
