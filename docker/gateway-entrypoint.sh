@@ -4,6 +4,7 @@ set -e
 CONFIG=/app/config
 LITELLM_CONFIG_PATH="$CONFIG/generated/litellm/litellm.config.yaml"
 LITELLM_CONFIG_WAIT_SECONDS="${LITELLM_CONFIG_WAIT_SECONDS:-30}"
+UVICORN_LOG_CONFIG_PATH="/app/config/project/uvicorn.log-config.json"
 
 # --- Seed config/local/ on first run ---
 mkdir -p "$CONFIG/local"
@@ -126,4 +127,4 @@ while [ ! -s "$LITELLM_CONFIG_PATH" ]; do
     waited=$((waited + 1))
 done
 
-exec litellm --config "$LITELLM_CONFIG_PATH" --port 4000
+exec litellm --config "$LITELLM_CONFIG_PATH" --port 4000 --log_config "$UVICORN_LOG_CONFIG_PATH"

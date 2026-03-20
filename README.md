@@ -33,13 +33,24 @@ cp config/env.example .env
 docker compose up -d
 ```
 
-The provisioned `llama.cpp` runtime is persisted on the host at
-`./config/data/backend-runtime` by default so you can inspect, back up, or repair
-the downloaded binaries and backend plugins directly.
+For guided Docker setup on Linux, use:
+
+```bash
+./scripts/docker-setup.sh
+```
+
+The provisioned `llama.cpp` runtime is persisted on the host under
+`./config/data/backend-runtime/<backend>` by default so you can inspect, back up,
+or repair the downloaded binaries and backend plugins directly.
 
 The root [`docker-compose.yml`](docker-compose.yml) is deployment-oriented and
 pulls published images only, so a remote host can stay a clean Docker Compose
 install without a git checkout.
+
+Compose service names follow the deployment naming convention:
+`llm-gateway`, `llm-server-llamacpp`, `llm-server-vllm`, and
+`llm-config-watcher`. The Docker `container_name` values remain the shorter
+`audia-*` names.
 
 On first Docker start, LiteLLM Admin UI login defaults to username `admin` and password `sk-local-dev` unless you override `LITELLM_MASTER_KEY`.
 
@@ -84,6 +95,7 @@ See [docs/runbook.md](docs/runbook.md) for the full native install and operation
 | Document | Contents |
 | -------- | -------- |
 | [docs/docker.md](docs/docker.md) | Docker deployment — all profiles, setup, management |
+| [docs/docker-field-notes.md](docs/docker-field-notes.md) | Docker install field notes — validated versions, first-install issues, recovery notes |
 | [docs/runbook.md](docs/runbook.md) | Native install, update, start/stop, config validation |
 | [docs/architecture.md](docs/architecture.md) | System design — runtime, config, and installer topology |
 | [docs/reverse-proxy.md](docs/reverse-proxy.md) | nginx routes, config generation, upstream layout |

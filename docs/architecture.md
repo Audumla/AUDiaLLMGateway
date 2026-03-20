@@ -8,9 +8,9 @@ Two paths lead to the same runtime stack. Choose based on your environment.
 
 ```text
 docker compose up -d
-  └─> audia-gateway container   (LiteLLM + config generator)
-  └─> backend-swappable         (llama-swap + llama.cpp, auto-provisioned)
-  └─> nginx container           (optional reverse proxy)
+  └─> llm-gateway service       (LiteLLM + config generator)
+  └─> llm-server-llamacpp       (llama-swap + llama.cpp, auto-provisioned)
+  └─> nginx service             (optional reverse proxy)
 ```
 
 **Native install (Windows / macOS / Linux):**
