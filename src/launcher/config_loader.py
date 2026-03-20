@@ -1509,6 +1509,9 @@ http {{
         server_name  {stack.network.nginx_host};
 
         client_max_body_size 100m;
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 600s;
+        proxy_read_timeout 600s;
 
         location /v1/ {{
             proxy_pass http://litellm_upstream;
@@ -1568,7 +1571,7 @@ http {{
             proxy_buffering off;
             proxy_request_buffering off;
             sub_filter_once off;
-            sub_filter_types text/html text/css application/javascript;
+            sub_filter_types text/css application/javascript;
             sub_filter 'href="/ui/' 'href="/llamaswap/ui/';
             sub_filter 'src="/ui/' 'src="/llamaswap/ui/';
             sub_filter "url(/ui/" "url(/llamaswap/ui/";
