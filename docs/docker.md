@@ -433,9 +433,13 @@ All variables read from `.env` at compose start time.
 | `GATEWAY_PORT` | No | `4000` | Host port published for the LiteLLM gateway. |
 | `NGINX_PORT` | No | `8080` | Host port published for the nginx reverse proxy. |
 | `VLLM_MODEL` | No | `Qwen/Qwen2.5-0.5B-Instruct` | Model served by the vLLM backend (if used). |
+| `VLLM_BACKEND` | No | `rocm` | Selects which `vllm-<backend>` block to use from `gpu_profiles` (for example `vllm-rocm`). |
 | `VLLM_PORT` | No | `41090` | Host port for the vLLM backend. |
 | `VLLM_GPU_MEM` | No | `1.0` | GPU memory utilization fraction for vLLM. |
 | `VLLM_MAX_LEN` | No | `4096` | Maximum context length for the vLLM backend. |
+| `VLLM_TENSOR_PARALLEL_SIZE` | No | `1` | Tensor parallel size passed to vLLM (`--tensor-parallel-size`). |
+| `VLLM_PIPELINE_PARALLEL_SIZE` | No | `1` | Pipeline parallel size passed to vLLM (`--pipeline-parallel-size`). |
+| `VLLM_VISIBLE_DEVICES` | No | — | Optional `HIP_VISIBLE_DEVICES` override when set via generated vLLM startup config. |
 | `VLLM_IMAGE` | No | `audumla/audia-llm-gateway-vllm:latest` | Override the vLLM image. Use `vllm/vllm-openai-rocm:latest` with the AMD compose profile. |
 | `VLLM_MOCK_MODE` | No | `false` | Runs the mounted mock vLLM server instead of the real `vllm` process. Intended for Docker validation only. |
 | `LLAMA_BACKEND` | No | `auto` | Override llama.cpp backend detection: `auto`, `cuda`, `rocm`, `vulkan`, `cpu`. |
@@ -675,3 +679,63 @@ GGUF files. On AMD hosts, use [`docker/examples/docker-compose.amd.yml`](../dock
 set `LLAMA_BACKEND=vulkan` or `LLAMA_BACKEND=rocm` for `llama.cpp`, and use the
 validated ROCm image (`vllm/vllm-openai-rocm:latest`) for the optional `vLLM`
 service with `/dev/kfd`, `/dev/dri`, `ipc: host`, and `SYS_PTRACE`.
+
+You can keep vLLM runtime options next to model definitions in
+`config/local/models.override.yaml` under `model_profiles.<name>.defaults.vllm` and
+`model_profiles.<name>.deployments.<deployment>.vllm`. Example:
+
+```yaml
+model_profiles:
+  vllm_default:
+    defaults:
+      vllm:
+        gpu_memory_utilization: ${VLLM_GPU_MEM}
+        max_model_len: ${VLLM_MAX_LEN}
+    deployments:
+      vllm_primary:
+        framework: vllm
+        transport: direct
+        backend_model_name: ${VLLM_MODEL}
+        vllm:
+          tensor_parallel_size: ${VLLM_TENSOR_PARALLEL_SIZE}
+          pipeline_parallel_size: ${VLLM_PIPELINE_PARALLEL_SIZE}
+          visible_devices: ${VLLM_VISIBLE_DEVICES}
+```
+
+You can define backend-specific split settings in a shared `gpu_profiles` preset so
+the same profile name can be reused by both `llama.cpp` and `vLLM`:
+
+```yaml
+presets:
+  gpu_profiles:
+    gpu_equal:
+      llamacpp-vulkan:
+        device: [Vulkan0, Vulkan1]
+        split_mode: layer
+        tensor_split: [1, 1]
+      vllm-rocm:
+        visible_devices: "0,1"
+        tensor_parallel_size: 1
+        pipeline_parallel_size: 1
+
+model_profiles:
+  vllm_default:
+    defaults:
+      gpu_preset: gpu_equal
+    deployments:
+      vllm_primary:
+        framework: vllm
+        transport: direct
+        backend_model_name: ${VLLM_MODEL}
+```
+
+Supported backend keys inside `gpu_profiles.<name>`:
+
+- `llamacpp-vulkan`
+- `llamacpp-rocm`
+- `llamacpp-cuda`
+- `llamacpp-cpu`
+- `vllm-rocm`
+- `vllm-cuda` (if you use a CUDA vLLM image)
+
+Direct `vllm:` values on defaults/deployments/exposures still override preset values.

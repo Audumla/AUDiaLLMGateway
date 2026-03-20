@@ -1515,5 +1515,84 @@
       "Docker-side backend macros now point directly at backend-specific binary paths and env wrappers instead of /app/runtime symlinks.",
       "Updated docs, templates, and tests to match the per-backend runtime directory model."
     ]
+  },
+  {
+    "id": "CHG-b00f201f",
+    "agent": "codex",
+    "change_group": "vllm-config",
+    "plugin_version": "unreleased",
+    "date": "2026-03-20",
+    "recorded_at": "2026-03-20T08:22:15.590649Z",
+    "summary_tags": [
+      "New Feature",
+      "Documentation Update",
+      "Test Update"
+    ],
+    "summary": "Add model-catalog-driven vLLM startup/split configuration.",
+    "details": [
+      "Support vLLM startup overrides in models.override.yaml at defaults.vllm and deployments.<name>.vllm.",
+      "Emit tensor/pipeline split and related startup fields into generated vllm.config.json with env fallback compatibility.",
+      "Update vLLM entrypoint to pass split/runtime flags and optional HIP_VISIBLE_DEVICES from generated config.",
+      "Document and seed new VLLM_* env variables and add tests for generated vLLM config behavior."
+    ]
+  },
+  {
+    "id": "CHG-b00f201f-1",
+    "agent": "codex",
+    "change_group": "vllm-config",
+    "plugin_version": "unreleased",
+    "date": "2026-03-20",
+    "recorded_at": "2026-03-20T08:31:36.910065Z",
+    "summary_tags": [
+      "New Feature",
+      "Documentation Update",
+      "Test Update"
+    ],
+    "summary": "Add preset-based vLLM split profiles in model catalog.",
+    "details": [
+      "Support presets.vllm_profiles with vllm_preset/vllm_presets selectors on vLLM deployments.",
+      "Keep precedence defaults<deployment<exposure and allow direct vllm overrides over preset values.",
+      "Document vLLM preset usage and add regression tests for preset-driven tensor/pipeline split config."
+    ]
+  },
+  {
+    "id": "CHG-b00f201f-2",
+    "agent": "codex",
+    "change_group": "gpu-profile-schema",
+    "plugin_version": "unreleased",
+    "date": "2026-03-20",
+    "recorded_at": "2026-03-20T08:41:03.056510Z",
+    "summary_tags": [
+      "Configuration Cleanup",
+      "New Feature",
+      "Documentation Update",
+      "Test Update"
+    ],
+    "summary": "Unify backend-specific GPU split settings under shared gpu_profiles.",
+    "details": [
+      "Add new backend-keyed gpu profile schema using llamacpp-<backend> and vllm-<backend> blocks.",
+      "Use gpu_preset in vLLM path so a single profile name can drive both llama.cpp and vLLM split behavior.",
+      "Keep backward compatibility with legacy llama_cpp_options and llama_cpp_options_by_backend.",
+      "Update defaults/docs and add regression tests for vLLM gpu profile backend block resolution."
+    ]
+  },
+  {
+    "id": "CHG-b00f201f-3",
+    "agent": "codex",
+    "change_group": "deployment-profiles",
+    "plugin_version": "unreleased",
+    "date": "2026-03-20",
+    "recorded_at": "2026-03-20T11:25:30.691747Z",
+    "summary_tags": [
+      "Configuration Cleanup",
+      "Code Refactoring",
+      "Test Update"
+    ],
+    "summary": "Refactor model catalog to deployment-profile-first layout and update active config.",
+    "details": [
+      "Add deployment profile resolution and merging across model generation, exposures, groups, and vLLM startup config.",
+      "Update config/local/models.override.yaml to deployment_profiles and remove gpu_preset dependencies from active model deployments.",
+      "Adjust tests to assert deployment-profile-generated llama.cpp args and vLLM deployment profile precedence behavior."
+    ]
   }
 ]

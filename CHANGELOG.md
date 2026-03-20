@@ -453,4 +453,26 @@
 - Docker-side backend macros now point directly at backend-specific binary paths and env wrappers instead of /app/runtime symlinks.
 - Updated docs, templates, and tests to match the per-backend runtime directory model.
 
+### Add model-catalog-driven vLLM startup/split configuration. (New Feature, Documentation Update, Test Update)
+- Support vLLM startup overrides in models.override.yaml at defaults.vllm and deployments.<name>.vllm.
+- Emit tensor/pipeline split and related startup fields into generated vllm.config.json with env fallback compatibility.
+- Update vLLM entrypoint to pass split/runtime flags and optional HIP_VISIBLE_DEVICES from generated config.
+- Document and seed new VLLM_* env variables and add tests for generated vLLM config behavior.
+
+### Add preset-based vLLM split profiles in model catalog. (New Feature, Documentation Update, Test Update)
+- Support presets.vllm_profiles with vllm_preset/vllm_presets selectors on vLLM deployments.
+- Keep precedence defaults<deployment<exposure and allow direct vllm overrides over preset values.
+- Document vLLM preset usage and add regression tests for preset-driven tensor/pipeline split config.
+
+### Unify backend-specific GPU split settings under shared gpu_profiles. (Configuration Cleanup, New Feature, Documentation Update, Test Update)
+- Add new backend-keyed gpu profile schema using llamacpp-<backend> and vllm-<backend> blocks.
+- Use gpu_preset in vLLM path so a single profile name can drive both llama.cpp and vLLM split behavior.
+- Keep backward compatibility with legacy llama_cpp_options and llama_cpp_options_by_backend.
+- Update defaults/docs and add regression tests for vLLM gpu profile backend block resolution.
+
+### Refactor model catalog to deployment-profile-first layout and update active config. (Configuration Cleanup, Code Refactoring, Test Update)
+- Add deployment profile resolution and merging across model generation, exposures, groups, and vLLM startup config.
+- Update config/local/models.override.yaml to deployment_profiles and remove gpu_preset dependencies from active model deployments.
+- Adjust tests to assert deployment-profile-generated llama.cpp args and vLLM deployment profile precedence behavior.
+
 ---

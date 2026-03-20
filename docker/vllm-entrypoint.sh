@@ -55,5 +55,35 @@ args = [
     "--max-model-len",
     str(startup.get("max_model_len", 4096)),
 ]
+
+tensor_parallel_size = int(startup.get("tensor_parallel_size", 1))
+pipeline_parallel_size = int(startup.get("pipeline_parallel_size", 1))
+if tensor_parallel_size > 0:
+    args.extend(["--tensor-parallel-size", str(tensor_parallel_size)])
+if pipeline_parallel_size > 0:
+    args.extend(["--pipeline-parallel-size", str(pipeline_parallel_size)])
+
+dtype = str(startup.get("dtype", "")).strip()
+if dtype:
+    args.extend(["--dtype", dtype])
+
+max_num_seqs = int(startup.get("max_num_seqs", 0))
+if max_num_seqs > 0:
+    args.extend(["--max-num-seqs", str(max_num_seqs)])
+
+if bool(startup.get("enforce_eager", False)):
+    args.append("--enforce-eager")
+if bool(startup.get("trust_remote_code", False)):
+    args.append("--trust-remote-code")
+
+visible_devices = str(startup.get("visible_devices", "")).strip()
+if visible_devices and not os.environ.get("HIP_VISIBLE_DEVICES"):
+    os.environ["HIP_VISIBLE_DEVICES"] = visible_devices
+
+for item in startup.get("extra_args", []):
+    text = str(item).strip()
+    if text:
+        args.append(text)
+
 os.execvp(args[0], args)
 PY
