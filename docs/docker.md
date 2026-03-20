@@ -396,6 +396,8 @@ All variables read from `.env` at compose start time.
 | `POSTGRES_DB` | No | `litellm` | PostgreSQL database name for LiteLLM metadata. |
 | `POSTGRES_DATA_ROOT` | No | `./config/data/postgres` | Host path for PostgreSQL data files. |
 | `DATABASE_URL` | No | `postgresql://audia:audia-dev-password@llm-db-postgres:5432/litellm` | LiteLLM database connection string used by the Admin UI/auth path. |
+| `DATABASE_WAIT_SECONDS` | No | `120` | Seconds the gateway entrypoint waits for the database to become reachable before starting LiteLLM. |
+| `DATABASE_WAIT_INTERVAL_SECONDS` | No | `2` | Seconds between database reachability probes during gateway startup. |
 | `MODEL_ROOT` | No | `./models` | Host path to model directory. Mounted read-only into the backend. |
 | `MODEL_HF_ROOT` | No | `./models-hf` | Host path for Hugging Face cache and raw tensor weights used by vLLM. |
 | `BACKEND_RUNTIME_ROOT` | No | `./config/data/backend-runtime` | Host path base for the provisioned `llama.cpp` runtime. The container resolves `/app/runtime` to a backend-specific subdirectory under this base. |
@@ -573,7 +575,7 @@ Check the logs:
 docker compose logs llm-gateway
 ```
 
-Common causes: missing `LITELLM_MASTER_KEY`, malformed `config/generated/litellm/litellm.config.yaml`.
+Common causes: missing `LITELLM_MASTER_KEY`, malformed `config/generated/litellm/litellm.config.yaml`, or the database not yet being reachable on `DATABASE_URL`.
 
 ### Backend container exits or shows GPU errors
 

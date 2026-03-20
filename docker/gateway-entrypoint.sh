@@ -5,6 +5,8 @@ CONFIG=/app/config
 LITELLM_CONFIG_PATH="$CONFIG/generated/litellm/litellm.config.yaml"
 LITELLM_CONFIG_WAIT_SECONDS="${LITELLM_CONFIG_WAIT_SECONDS:-30}"
 UVICORN_LOG_CONFIG_PATH="/app/config/project/uvicorn.log-config.json"
+DATABASE_WAIT_SECONDS="${DATABASE_WAIT_SECONDS:-120}"
+DATABASE_WAIT_INTERVAL_SECONDS="${DATABASE_WAIT_INTERVAL_SECONDS:-2}"
 
 # --- Seed config/local/ on first run ---
 mkdir -p "$CONFIG/local"
@@ -127,4 +129,57 @@ while [ ! -s "$LITELLM_CONFIG_PATH" ]; do
     waited=$((waited + 1))
 done
 
-exec litellm --config "$LITELLM_CONFIG_PATH" --port 4000 --log_config "$UVICORN_LOG_CONFIG_PATH"
+if [ -n "${DATABASE_URL:-}" ]; then
+    echo ">>> Waiting for database connectivity from DATABASE_URL"
+    python - "$DATABASE_URL" "$DATABASE_WAIT_SECONDS" "$DATABASE_WAIT_INTERVAL_SECONDS" <<'PY'
+import socket
+import sys
+import time
+from urllib.parse import urlparse
+
+database_url = sys.argv[1]
+timeout_seconds = float(sys.argv[2])
+interval_seconds = float(sys.argv[3])
+deadline = time.time() + timeout_seconds
+
+parsed = urlparse(database_url)
+host = parsed.hostname
+port = parsed.port or 5432
+
+if not host:
+    print("ERROR: DATABASE_URL does not contain a hostname", flush=True)
+    sys.exit(1)
+
+last_error = "unknown error"
+attempt = 0
+while time.time() < deadline:
+    attempt += 1
+    try:
+        with socket.create_connection((host, port), timeout=5):
+            print(
+                f">>> Database is reachable at {host}:{port} after {attempt} attempt(s)",
+                flush=True,
+            )
+            sys.exit(0)
+    except OSError as exc:
+        last_error = str(exc)
+        print(
+            f">>> Database not reachable yet at {host}:{port} "
+            f"(attempt {attempt}): {last_error}",
+            flush=True,
+        )
+        time.sleep(interval_seconds)
+
+print(
+    f"ERROR: timed out waiting for database at {host}:{port}: {last_error}",
+    flush=True,
+)
+sys.exit(1)
+PY
+fi
+
+exec litellm \
+    --config "$LITELLM_CONFIG_PATH" \
+    --port 4000 \
+    --log_config "$UVICORN_LOG_CONFIG_PATH" \
+    --enforce_prisma_migration_check

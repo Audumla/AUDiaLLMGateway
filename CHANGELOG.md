@@ -1,21 +1,5 @@
 # Changelog
 
-## [0.11.5](https://github.com/example/AUDiaLLMGateway/compare/v0.11.4...v0.11.5) (2026-03-20)
-
-
-### Bug Fixes
-
-* added dependancy ([fae8f6c](https://github.com/example/AUDiaLLMGateway/commit/fae8f6ccca3768fe0a09f9d232129d385d27412c))
-
-## [0.11.4](https://github.com/example/AUDiaLLMGateway/compare/v0.11.3...v0.11.4) (2026-03-20)
-
-
-### Bug Fixes
-
-* update litellm for db backend ([ced2fd9](https://github.com/example/AUDiaLLMGateway/commit/ced2fd9dfeb0c0de1bb78ffd20db6883a149a98b))
-
-## Changelog
-
 ## Unreleased
 
 ### Scaffolded a native Windows local LLM gateway workspace in AUDiaLLMGateway. (New Feature)
@@ -445,5 +429,9 @@
 ### Enable DB-backed LiteLLM UI in the gateway image by bundling Prisma and generating the LiteLLM client during the Docker build. (Build / Packaging)
 - Added prisma==0.15.0 to gateway Python dependencies and updated docker/Dockerfile.gateway-base to run prisma generate against LiteLLM's bundled schema.prisma during image build.
 - Removed the empty model_group_alias_map emission to eliminate the non-fatal LiteLLM Router warning while keeping the Postgres-backed default compose path intact.
+
+### Hardened the gateway DB-backed startup path so LiteLLM waits for PostgreSQL before Prisma migration. (Bug Fix)
+- Patched docker/gateway-entrypoint.sh to wait on DATABASE_URL reachability and launch LiteLLM with enforced Prisma migration checks.
+- Documented DATABASE_WAIT_SECONDS and DATABASE_WAIT_INTERVAL_SECONDS plus the Postgres init race in the Docker docs and field notes.
 
 ---
