@@ -137,10 +137,18 @@ class ConfigChangeHandler(FileSystemEventHandler):
 
     def _regenerate_and_reload(self, changed_paths: list[str]) -> None:
         before = _snapshot_generated(self.root)
-        subprocess.run(
-            ["python3", "-m", "src.launcher.process_manager", "--root", str(self.root), "generate-configs"],
-            check=True,
-        )
+        try:
+            subprocess.run(
+                ["python3", "-m", "src.launcher.process_manager", "--root", str(self.root), "generate-configs"],
+                check=True,
+            )
+        except subprocess.CalledProcessError as exc:
+            print(
+                "Config regeneration failed; keeping watcher alive for subsequent changes. "
+                f"changed_paths={changed_paths} exit_code={exc.returncode}",
+                flush=True,
+            )
+            return
         after = _snapshot_generated(self.root)
         changed_outputs = _changed_outputs(before, after)
 
