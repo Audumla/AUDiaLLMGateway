@@ -239,6 +239,43 @@ Resolution:
 - rewrite absolute `/ui/*` links in proxied llama-swap UI responses to
   `/llamaswap/ui/*`
 
+### 15. YAML `on`/`off` values broke `llama.cpp` `--flash-attn`
+
+Symptom:
+
+- model startup failed immediately with:
+  - `error while handling argument "--flash-attn": unknown value '--temp'`
+
+Cause:
+
+- unquoted YAML `on`/`off` in runtime presets are parsed as booleans
+- renderer previously emitted bare `--flash-attn` for boolean `true`
+- current `llama.cpp` expects `--flash-attn on|off|auto`
+
+Resolution:
+
+- config rendering now emits explicit `--flash-attn on|off` when the source
+  value is boolean.
+
+### 16. ROCm device IDs are zero-based and must match runtime enumeration
+
+Symptom:
+
+- specific ROCm deployment labels failed with:
+  - `invalid device: ROCm3`
+
+Cause:
+
+- host exposed three devices (`ROCm0`, `ROCm1`, `ROCm2`)
+- one deployment profile referenced non-existent `ROCm3`
+
+Resolution:
+
+- align `deployment_profiles` device names with `llama-server --list-devices`
+  output for the target host
+- default local template now uses `ROCm0` for the primary single-GPU ROCm
+  profile
+
 ## First-Install Recommendations
 
 For a clean Docker install on Linux:

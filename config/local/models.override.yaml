@@ -70,7 +70,7 @@ presets:
       transport: llama-swap
       executable_macro: llama-server-rocm
       llama_cpp_options:
-        device: ROCm1
+        device: ROCm0
         split_mode: none
         parallel: 1
         gpu_layers: all
@@ -234,13 +234,13 @@ model_profiles:
         - vision
         - nothink
     artifacts:
-      model_file: Ministral-3-3B/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf
-      mmproj_file: Ministral-3-3B/mmproj-Ministral-3-3B-Instruct-2512-F16.gguf
+      model_file: Ministral-3-3B/Ministral-3B-Instruct-Q4_K_M.gguf
+      mmproj_file: Ministral-3-3B/Ministral-3B-Instruct-Q4_K_M-mmproj-f16.gguf
       revision: main
       source_page_url: https://huggingface.co/mistralai/Ministral-3B-Instruct
-      model_filename: Ministral-3-3B-Instruct-2512-Q4_K_M.gguf
+      model_filename: Ministral-3B-Instruct-Q4_K_M.gguf
       model_url: https://huggingface.co/bartowski/Ministral-3B-Instruct-GGUF/resolve/main/Ministral-3B-Instruct-Q4_K_M.gguf?download=true
-      mmproj_filename: mmproj-Ministral-3-3B-Instruct-2512-F16.gguf
+      mmproj_filename: Ministral-3B-Instruct-Q4_K_M-mmproj-f16.gguf
       mmproj_url: https://huggingface.co/second-state/Ministral-3B-Instruct-GGUF/resolve/main/Ministral-3B-Instruct-Q4_K_M-mmproj-f16.gguf?download=true
     deployments:
       llamacpp_vulkan:
