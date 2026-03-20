@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.11.6](https://github.com/Audumla/AUDiaLLMGateway/compare/v0.11.5...v0.11.6) (2026-03-20)
+
+
+### Bug Fixes
+
+* litellm db broken ([3374b1f](https://github.com/Audumla/AUDiaLLMGateway/commit/3374b1f0adbe035376fa813c875aa93342f8ec6e))
+
+## Changelog
+
 ## Unreleased
 
 ### Scaffolded a native Windows local LLM gateway workspace in AUDiaLLMGateway. (New Feature)
