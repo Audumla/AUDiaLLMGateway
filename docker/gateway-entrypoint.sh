@@ -93,9 +93,12 @@ if [ ! -f "$CONFIG/local/llama-swap.override.yaml" ]; then
 #   llama-server-cuda:   "/app/runtime/bin/llama-server-cuda"
 #   llama-server-rocm:   "/app/runtime/bin/llama-server-rocm"
 #   llama-server-vulkan: "/app/runtime/bin/llama-server-vulkan"
+#   model-path:          "--model /app/models/gguf"
+#   mmproj-path:         "--mmproj /app/models/gguf"
 #
 # --- Running multiple backends simultaneously ---
-# Uncomment the macros above, then set executable_macro per model in
+# Keep LLAMA_BACKEND=auto so the runtime provisions both ROCm and Vulkan, then set
+# executable_macro per model in
 # models.override.yaml to route each model to a specific backend:
 #
 #   executable_macro: llama-server-rocm     # run this model on ROCm

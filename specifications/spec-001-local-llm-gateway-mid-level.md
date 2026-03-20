@@ -50,7 +50,7 @@ Deployment profiles in `docker/examples/`:
 | ------- | ---- | -------- |
 | Universal | `docker-compose.yml` (root) | Auto-detects NVIDIA/AMD |
 | NVIDIA only | `docker/examples/docker-compose.nvidia.yml` | CUDA systems |
-| AMD only | `docker/examples/docker-compose.amd.yml` | ROCm/Vulkan systems |
+| AMD unified | `docker/examples/docker-compose.amd.yml` | Same config supports `LLAMA_BACKEND=vulkan` or `LLAMA_BACKEND=rocm`; optional `vLLM` stays ROCm |
 | External proxy | `docker/examples/docker-compose.external-proxy.yml` | Behind Traefik/nginx |
 
 See [docs/docker.md](../docs/docker.md) for setup instructions, environment

@@ -28,11 +28,17 @@ presets:
   gpu_profiles:
     gpu1:
       llama_swap_macro: gpu1-args
-      llama_cpp_options:
-        device: Vulkan0
-        split_mode: none
-        parallel: 1
-        gpu_layers: all
+      llama_cpp_options_by_backend:
+        vulkan:
+          device: Vulkan0
+          split_mode: none
+          parallel: 1
+          gpu_layers: all
+        rocm:
+          device: ROCm1
+          split_mode: none
+          parallel: 1
+          gpu_layers: all
     gpu2:
       llama_swap_macro: gpu2-args
       llama_cpp_options:
@@ -218,6 +224,7 @@ model_profiles:
       llamacpp_vulkan:
         framework: llama_cpp
         transport: llama-swap
+        executable_macro: llama-server-vulkan
         llama_swap_model: qwen3-5-4b-ud-q5-k-xl-vision
         backend_model_name: qwen3-5-4b-ud-q5-k-xl-vision
   ministral3b_vision:
@@ -243,6 +250,7 @@ model_profiles:
       llamacpp_vulkan:
         framework: llama_cpp
         transport: llama-swap
+        executable_macro: llama-server-vulkan
         llama_swap_model: ministral3b-vision
         backend_model_name: ministral3b-vision
   vllm_default:
@@ -260,6 +268,28 @@ model_profiles:
         framework: vllm
         transport: direct
         backend_model_name: ${VLLM_MODEL}
+  tiny_qwen25_test:
+    family: qwen2.5
+    purpose: Tiny test model routed through explicit ROCm llama.cpp macros
+    defaults:
+      context_preset: 32k
+      gpu_preset: gpu1
+      runtime_presets:
+        - jinja
+        - nothink
+    artifacts:
+      model_file: Qwen2.5-0.5B-Instruct/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf
+      revision: main
+      source_page_url: https://huggingface.co/bartowski/Qwen2.5-0.5B-Instruct-GGUF
+      model_filename: Qwen2.5-0.5B-Instruct-Q4_K_M.gguf
+      model_url: https://huggingface.co/bartowski/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf?download=true
+    deployments:
+      llamacpp_rocm:
+        framework: llama_cpp
+        transport: llama-swap
+        executable_macro: llama-server-rocm
+        llama_swap_model: tiny-qwen25-test
+        backend_model_name: tiny-qwen25-test
 exposures:
   - stable_name: local/qwen27_fast
     model_profile: qwen27_fast
@@ -280,6 +310,10 @@ exposures:
   - stable_name: local/vllm_default
     model_profile: vllm_default
     deployment: vllm_primary
+    mode: chat
+  - stable_name: local/tiny_qwen25_test
+    model_profile: tiny_qwen25_test
+    deployment: llamacpp_rocm
     mode: chat
 load_groups:
   coding_active:
@@ -327,3 +361,14 @@ load_groups:
     members:
       - model_profile: ministral3b_vision
         deployment: llamacpp_vulkan
+  tiny_test_active:
+    purpose: Keep a tiny ROCm-backed model available for smoke tests
+    activities:
+      - test
+      - smoke
+    persistent: false
+    swap: true
+    exclusive: false
+    members:
+      - model_profile: tiny_qwen25_test
+        deployment: llamacpp_rocm

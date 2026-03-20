@@ -16,7 +16,7 @@ For native (non-Docker) deployment on Windows, Linux, or macOS see [the runbook]
   - [Universal (auto-detect)](#1-universal-auto-detect)
   - [CPU Only](#2-cpu-only)
   - [NVIDIA / CUDA](#3-nvidia--cuda)
-  - [AMD / ROCm](#4-amd--rocm)
+  - [AMD / Vulkan Or ROCm](#4-amd--vulkan-or-rocm)
   - [External Proxy](#5-external-proxy)
 - [Port Reference](#port-reference)
 - [Environment Variables](#environment-variables)
@@ -249,11 +249,14 @@ services:
 
 ---
 
-### 4. AMD / ROCm
+### 4. AMD / Vulkan Or ROCm
 
-Profile for AMD GPUs using ROCm or Vulkan passthrough.
-The validated vLLM path on AMD uses the official `vllm/vllm-openai-rocm:latest`
-image in the AMD compose profile.
+Profile for AMD GPUs where `llama.cpp` may run with both Vulkan and ROCm at the
+same time. Use `LLAMA_BACKEND=auto` so the backend runtime provisions both
+implementations, then route individual models with explicit
+`executable_macro: llama-server-vulkan` or `executable_macro: llama-server-rocm`
+in `config/local/models.override.yaml`. The validated `vLLM` path on AMD remains
+the official `vllm/vllm-openai-rocm:latest` image in that same compose profile.
 
 **Prerequisite:** ROCm 5.6+ drivers. Verify with:
 
@@ -262,7 +265,8 @@ rocm-smi   # or: ls /dev/kfd
 ```
 
 ```bash
-docker compose --project-directory . -f docker/examples/docker-compose.amd.yml up -d
+# Provision both Vulkan and ROCm runtimes
+LLAMA_BACKEND=auto docker compose --project-directory . -f docker/examples/docker-compose.amd.yml up -d
 ```
 
 Compose file: [`docker/examples/docker-compose.amd.yml`](../docker/examples/docker-compose.amd.yml)
@@ -286,7 +290,8 @@ services:
     image: example/audia-llm-gateway-server:latest
     container_name: audia-llama-cpp
     environment:
-      - LLAMA_BACKEND=rocm
+      - LLAMA_BACKEND=${LLAMA_BACKEND:-auto}
+      - VK_ICD_FILENAMES=${VK_ICD_FILENAMES:-/usr/share/vulkan/icd.d/radeon_icd.json}
     volumes:
       - ./models:/app/models:ro
       - ./config/generated/llama-swap:/app/config:ro
@@ -299,6 +304,29 @@ services:
       - render
     restart: unless-stopped
 
+```
+
+Example mixed-backend catalog entries:
+
+```yaml
+deployments:
+  llamacpp_vulkan:
+    framework: llama_cpp
+    transport: llama-swap
+    executable_macro: llama-server-vulkan
+    llama_swap_model: qwen3-5-4b-ud-q5-k-xl-vision
+
+  llamacpp_rocm:
+    framework: llama_cpp
+    transport: llama-swap
+    executable_macro: llama-server-rocm
+    llama_swap_model: tiny-qwen25-test
+```
+
+The optional `vLLM` profile in this same AMD compose stays ROCm-only:
+
+```bash
+LLAMA_BACKEND=auto AUDIA_ENABLE_VLLM=true docker compose --project-directory . -f docker/examples/docker-compose.amd.yml --profile vllm up -d
 ```
 
 AMD device passthrough notes:
@@ -644,5 +672,6 @@ adds `/vllm/` and `/vllm-health`, and the watcher restarts `llm-server-vllm` whe
 generated vLLM config or relevant env values change. The Hugging Face cache mount
 should use `MODEL_HF_ROOT`, not `MODEL_ROOT`, so raw HF weights stay separate from
 GGUF files. On AMD hosts, use [`docker/examples/docker-compose.amd.yml`](../docker/examples/docker-compose.amd.yml),
-which runs the validated ROCm image (`vllm/vllm-openai-rocm:latest`) with
-`/dev/kfd`, `/dev/dri`, `ipc: host`, and `SYS_PTRACE`.
+set `LLAMA_BACKEND=vulkan` or `LLAMA_BACKEND=rocm` for `llama.cpp`, and use the
+validated ROCm image (`vllm/vllm-openai-rocm:latest`) for the optional `vLLM`
+service with `/dev/kfd`, `/dev/dri`, `ipc: host`, and `SYS_PTRACE`.

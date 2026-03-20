@@ -86,9 +86,12 @@ if [ ! -f config/local/llama-swap.override.yaml ]; then
 #   llama-server-cuda:   "llama-server-cuda"      # explicit CUDA build
 #   llama-server-rocm:   "llama-server-rocm"      # explicit ROCm build
 #   llama-server-vulkan: "llama-server-vulkan"    # explicit Vulkan build
+#   model-path:          "--model models/gguf"
+#   mmproj-path:         "--mmproj models/gguf"
 #
 # --- Per-model backend selection ---
-# Set executable_macro in config/local/models.override.yaml to route
+# Keep LLAMA_BACKEND=auto so the runtime provisions both ROCm and Vulkan, then
+# set executable_macro in config/local/models.override.yaml to route
 # specific models to specific backends:
 #   executable_macro: llama-server-rocm     # run this model on ROCm
 #   executable_macro: llama-server-vulkan   # run this model on Vulkan
