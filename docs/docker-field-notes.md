@@ -175,6 +175,32 @@ Additional implementation note:
   - `No module named 'prisma'`
   - `Unable to find Prisma binaries. Please run 'prisma generate' first.`
 
+### 12. PostgreSQL can report healthy before LiteLLM can safely migrate
+
+Symptom:
+
+- `llm-db-postgres` shows `healthy`
+- `llm-gateway` still logs repeated Prisma migration failures like:
+  - `P1001: Can't reach database server at llm-db-postgres:5432`
+- the gateway restarts and never becomes healthy
+
+Cause:
+
+- PostgreSQL's container health check can pass during its init/startup cycle
+  before the database is stably reachable for LiteLLM's Prisma migration step.
+
+Resolution:
+
+- the gateway entrypoint now waits on `DATABASE_URL` TCP reachability before
+  launching LiteLLM
+- LiteLLM is started with enforced Prisma migration checks so DB startup issues
+  fail clearly instead of surfacing later as a Prisma health-check crash
+
+Useful env knobs:
+
+- `DATABASE_WAIT_SECONDS`
+- `DATABASE_WAIT_INTERVAL_SECONDS`
+
 ## First-Install Recommendations
 
 For a clean Docker install on Linux:
