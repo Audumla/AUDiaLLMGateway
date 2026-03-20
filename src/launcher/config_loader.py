@@ -916,7 +916,6 @@ def build_litellm_config(stack: StackConfig) -> dict[str, Any]:
         },
         "router_settings": {
             "enable_pre_call_checks": False,
-            "model_group_alias_map": {},
         },
     }
 

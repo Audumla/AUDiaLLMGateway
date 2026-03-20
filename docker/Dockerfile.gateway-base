@@ -19,3 +19,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /install /usr/local
+
+# LiteLLM's DB-backed Admin UI path expects the Python Prisma client and generated
+# client code to be present in the image. Generate it from LiteLLM's bundled schema
+# during image build so DATABASE_URL-backed deployments work out of the box.
+RUN SCHEMA_PATH="$(python -c "from pathlib import Path; import litellm.proxy.proxy_server as p; print(Path(p.__file__).parent / 'schema.prisma')")" \
+    && prisma generate --schema "$SCHEMA_PATH"

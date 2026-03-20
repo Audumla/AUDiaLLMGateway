@@ -167,6 +167,14 @@ Resolution:
 - the gateway receives `DATABASE_URL` by default
 - PostgreSQL data is persisted visibly under `POSTGRES_DATA_ROOT`
 
+Additional implementation note:
+
+- the gateway image must include the Python `prisma` package and run
+  `prisma generate` against LiteLLM's bundled `schema.prisma` during image build
+  or the gateway will fail at startup with:
+  - `No module named 'prisma'`
+  - `Unable to find Prisma binaries. Please run 'prisma generate' first.`
+
 ## First-Install Recommendations
 
 For a clean Docker install on Linux:
