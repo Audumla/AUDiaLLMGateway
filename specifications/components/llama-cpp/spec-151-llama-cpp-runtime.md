@@ -16,6 +16,7 @@
 - sidecar runtime DLLs must be supportable for builds that require them
 - install state must record the chosen profile, version, backend, asset, install directory, and executable path
 - Docker runtime launch must ensure backend plugins (`libggml-*.so`) are present alongside the provisioned binaries on every container start, not only on first provision
+- Docker runtime persistence must isolate backend-specific runtime state under a backend-namespaced directory rather than reusing one shared runtime path across Vulkan, ROCm, CUDA, and CPU
 
 ## Configuration
 
@@ -33,3 +34,4 @@ Machine-local overrides may change:
 
 - generated `llama-swap` config should be able to consume the installed `llama-server` path from install state when local overrides do not explicitly replace it
 - Docker entrypoints must refresh backend plugin symlinks before launch so persisted runtime volumes remain runnable after image updates or container recreation
+- Docker entrypoints must resolve `/app/runtime` from a backend-specific subdirectory under the visible `BACKEND_RUNTIME_ROOT` base path

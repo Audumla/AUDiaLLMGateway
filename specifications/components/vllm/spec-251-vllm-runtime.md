@@ -44,17 +44,18 @@ model_profiles:
 ## Integration
 
 ### Gateway Routing
-LiteLLM communicates with `vLLM` using the Docker internal hostname `audia-vllm:8000`
+LiteLLM communicates with `vLLM` using the Docker internal hostname `llm-server-vllm:8000`
 when `AUDIA_ENABLE_VLLM=true`. The generator emits direct LiteLLM routes for
 `framework: vllm` / `transport: direct` exposures and writes
 `config/generated/vllm/vllm.config.json` for the container entrypoint.
 
 For AMD Docker deployments, the validated path is the AMD compose profile using
 the official ROCm image (`vllm/vllm-openai-rocm:latest`) with `/dev/kfd`,
-`/dev/dri`, `ipc: host`, and `SYS_PTRACE`. The root compose's `backend-vllm`
+`/dev/dri`, `ipc: host`, and `SYS_PTRACE`. The root compose's `llm-server-vllm`
 section is NVIDIA-oriented unless explicitly overridden.
 
 ### Health Check
-The `audia-watcher` service restarts `backend-vllm` when the generated vLLM config
+The `audia-watcher` container backs the `llm-config-watcher` service, which restarts
+`llm-server-vllm` when the generated vLLM config
 or relevant env values change. nginx proxies `/vllm/` and `/vllm-health` directly
 to the backend when enabled.

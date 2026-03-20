@@ -331,9 +331,9 @@ def load_stack_config(root: str | Path) -> StackConfig:
     
     if _is_docker:
         # In Docker, Nginx and LiteLLM talk to other containers via service names
-        _litellm_host = "audia-gateway"
-        _llamaswap_host = "audia-llama-cpp"
-        _vllm_host = "audia-vllm"
+        _litellm_host = "llm-gateway"
+        _llamaswap_host = "llm-server-llamacpp"
+        _vllm_host = "llm-server-vllm"
 
     _backend_bind_host = str(network_raw.get("backend_bind_host") or _auto_ip)
     if _is_docker:

@@ -1,19 +1,16 @@
 #!/bin/bash
 # provision-runtime.sh
-# Downloads and provisions llama.cpp binaries into a persistent runtime volume.
+# Downloads and provisions llama.cpp binaries into a persistent runtime directory.
 # Runs inside the backend container on first start (or when hardware changes).
-# Results are cached in the backend-runtime volume to avoid re-downloading.
+# Results are cached under a backend-specific subdirectory to avoid
+# re-downloading and to prevent cross-backend runtime drift.
 set -e
 
-RUNTIME_DIR="/app/runtime"
-BIN_DIR="$RUNTIME_DIR/bin"
-LIB_DIR="$RUNTIME_DIR/lib"
-STATE_FILE="$RUNTIME_DIR/.hw_signature"
+RUNTIME_ROOT="${RUNTIME_ROOT:-/app/runtime-root}"
+RUNTIME_LINK="/app/runtime"
 DEFAULT_SWAP_CONFIG="${LLAMA_SWAP_CONFIG_PATH:-/app/config/llama-swap.generated.yaml}"
 DEFAULT_SWAP_ADDR="${LLAMA_SWAP_LISTEN_ADDR:-0.0.0.0:41080}"
 DEFAULT_SWAP_WAIT_SECONDS="${LLAMA_SWAP_CONFIG_WAIT_SECONDS:-120}"
-
-mkdir -p "$BIN_DIR" "$LIB_DIR"
 
 sync_backend_plugins() {
     # ggml_backend_load_all() scans the executable directory for backend plugins.
@@ -80,6 +77,32 @@ else
 fi
 
 CURRENT_SIG="VERSION=${LLAMA_VERSION:-latest}|NV=$HAS_NVIDIA|AMD=$HAS_AMD|VK=$HAS_VULKAN|BACKEND=${LLAMA_BACKEND:-auto}"
+
+# ---------------------------------------------------------------------------
+# 1b. Resolve backend-specific runtime directory and link it to /app/runtime
+# ---------------------------------------------------------------------------
+RUNTIME_NAMESPACE="${LLAMA_BACKEND:-auto}"
+case "$RUNTIME_NAMESPACE" in
+    ""|auto)
+        RUNTIME_NAMESPACE="auto"
+        ;;
+    cuda|rocm|vulkan|cpu)
+        ;;
+    *)
+        RUNTIME_NAMESPACE=$(printf "%s" "$RUNTIME_NAMESPACE" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9._-' '-')
+        ;;
+esac
+
+RUNTIME_DIR="$RUNTIME_ROOT/$RUNTIME_NAMESPACE"
+BIN_DIR="$RUNTIME_DIR/bin"
+LIB_DIR="$RUNTIME_DIR/lib"
+STATE_FILE="$RUNTIME_DIR/.hw_signature"
+
+mkdir -p "$BIN_DIR" "$LIB_DIR"
+mkdir -p "$RUNTIME_ROOT"
+rm -rf "$RUNTIME_LINK"
+ln -s "$RUNTIME_DIR" "$RUNTIME_LINK"
+echo "--- Runtime namespace: $RUNTIME_NAMESPACE ($RUNTIME_DIR) ---"
 
 # ---------------------------------------------------------------------------
 # 2. Provisioning (skipped if signature matches cached state)

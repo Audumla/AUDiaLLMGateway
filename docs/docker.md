@@ -80,6 +80,19 @@ If you do not change it, the Docker install defaults LiteLLM to:
 
 That password is the LiteLLM `LITELLM_MASTER_KEY`. Change it before exposing the gateway on a network.
 
+If you want guided first-time setup on Linux, run:
+
+```bash
+./scripts/docker-setup.sh
+```
+
+That helper:
+
+- detects whether the host looks like NVIDIA, AMD, Vulkan-only, or CPU-only
+- prompts for the main Docker settings
+- writes `.env`
+- creates visible host directories for `models`, `models-hf`, and `BACKEND_RUNTIME_ROOT`
+
 ### 2. Place your model files
 
 ```text
@@ -123,7 +136,7 @@ To customise after first start, edit any file under `config/local/` and restart 
 gateway:
 
 ```bash
-docker compose restart gateway
+docker compose restart llm-gateway
 ```
 
 To force regeneration without restarting the full stack:
@@ -155,8 +168,9 @@ AUDIA_ENABLE_VLLM=true docker compose --profile vllm up -d
 
 This uses the root `docker-compose.yml`. On first start, the backend container
 downloads and caches the appropriate llama.cpp binary. Subsequent starts reuse the
-host-mounted runtime directory at `BACKEND_RUNTIME_ROOT` (default:
-`./config/data/backend-runtime`).
+host-mounted runtime base directory at `BACKEND_RUNTIME_ROOT` (default:
+`./config/data/backend-runtime`), with backend-specific runtimes kept under
+subdirectories such as `vulkan/`, `rocm/`, or `cpu/`.
 
 Full compose definition: [`docker-compose.yml`](../docker-compose.yml)
 
@@ -193,7 +207,7 @@ Compose file: [`docker/examples/docker-compose.nvidia.yml`](../docker/examples/d
 ```yaml
 # docker/examples/docker-compose.nvidia.yml
 services:
-  gateway:
+  llm-gateway:
     image: example/audia-llm-gateway-orchestrator:latest
     container_name: audia-gateway
     ports:
@@ -203,9 +217,9 @@ services:
     volumes:
       - ./config:/app/config
     depends_on:
-      - backend-swappable
+      - llm-server-llamacpp
 
-  backend-swappable:
+  llm-server-llamacpp:
     image: example/audia-llm-gateway-server:latest
     container_name: audia-llama-cpp
     environment:
@@ -213,7 +227,7 @@ services:
     volumes:
       - ./models:/app/models:ro
       - ./config/generated/llama-swap:/app/config:ro
-      - ${BACKEND_RUNTIME_ROOT:-./config/data/backend-runtime}:/app/runtime
+      - ${BACKEND_RUNTIME_ROOT:-./config/data/backend-runtime}:/app/runtime-root
     deploy:
       resources:
         reservations:
@@ -248,7 +262,7 @@ Compose file: [`docker/examples/docker-compose.amd.yml`](../docker/examples/dock
 ```yaml
 # docker/examples/docker-compose.amd.yml
 services:
-  gateway:
+  llm-gateway:
     image: example/audia-llm-gateway-orchestrator:latest
     container_name: audia-gateway
     ports:
@@ -258,9 +272,9 @@ services:
     volumes:
       - ./config:/app/config
     depends_on:
-      - backend-swappable
+      - llm-server-llamacpp
 
-  backend-swappable:
+  llm-server-llamacpp:
     image: example/audia-llm-gateway-server:latest
     container_name: audia-llama-cpp
     environment:
@@ -268,7 +282,7 @@ services:
     volumes:
       - ./models:/app/models:ro
       - ./config/generated/llama-swap:/app/config:ro
-      - ${BACKEND_RUNTIME_ROOT:-./config/data/backend-runtime}:/app/runtime
+      - ${BACKEND_RUNTIME_ROOT:-./config/data/backend-runtime}:/app/runtime-root
     devices:
       - /dev/kfd:/dev/kfd
       - /dev/dri:/dev/dri
@@ -301,7 +315,7 @@ Compose file: [`docker/examples/docker-compose.external-proxy.yml`](../docker/ex
 ```yaml
 # docker/examples/docker-compose.external-proxy.yml
 services:
-  gateway:
+  llm-gateway:
     image: example/audia-llm-gateway-orchestrator:latest
     container_name: audia-gateway
     # No port mapping — proxied via the web-proxy network
@@ -310,12 +324,12 @@ services:
     volumes:
       - ./config:/app/config
     depends_on:
-      - backend-swappable
+      - llm-server-llamacpp
     networks:
       - web-proxy
       - internal
 
-  backend-swappable:
+  llm-server-llamacpp:
     image: example/audia-llm-gateway-server:latest
     container_name: audia-llama-cpp
     environment:
@@ -323,7 +337,7 @@ services:
     volumes:
       - ./models:/app/models:ro
       - ./config/generated/llama-swap:/app/config:ro
-      - ${BACKEND_RUNTIME_ROOT:-./config/data/backend-runtime}:/app/runtime
+      - ${BACKEND_RUNTIME_ROOT:-./config/data/backend-runtime}:/app/runtime-root
     networks:
       - internal
     restart: unless-stopped
@@ -336,7 +350,7 @@ networks:
 
 ```
 
-Point your external proxy to `audia-gateway:4000` on the `web-proxy` network.
+Point your external proxy to `llm-gateway:4000` on the `web-proxy` network.
 Add a label for Traefik, or an upstream block in nginx as appropriate.
 
 ---
@@ -371,7 +385,7 @@ All variables read from `.env` at compose start time.
 | `HUGGING_FACE_HUB_TOKEN` | No | — | HuggingFace token for gated model downloads. |
 | `MODEL_ROOT` | No | `./models` | Host path to model directory. Mounted read-only into the backend. |
 | `MODEL_HF_ROOT` | No | `./models-hf` | Host path for Hugging Face cache and raw tensor weights used by vLLM. |
-| `BACKEND_RUNTIME_ROOT` | No | `./config/data/backend-runtime` | Host path for the provisioned `llama.cpp` runtime (`/app/runtime`). |
+| `BACKEND_RUNTIME_ROOT` | No | `./config/data/backend-runtime` | Host path base for the provisioned `llama.cpp` runtime. The container resolves `/app/runtime` to a backend-specific subdirectory under this base. |
 | `AUDIA_ENABLE_VLLM` | No | `false` | Enables vLLM-backed LiteLLM routes and watcher-managed vLLM restarts. Requires `--profile vllm`. |
 | `GATEWAY_PORT` | No | `4000` | Host port published for the LiteLLM gateway. |
 | `NGINX_PORT` | No | `8080` | Host port published for the nginx reverse proxy. |
@@ -405,7 +419,7 @@ To add a model: place the file in `models/`, update `config/local/models.overrid
 and restart the backend container:
 
 ```bash
-docker compose restart backend-swappable
+docker compose restart llm-server-llamacpp
 ```
 
 The gateway container will re-generate configs on next start.
@@ -424,14 +438,14 @@ docker compose up -d
 docker compose logs -f
 
 # View logs for a specific container
-docker compose logs -f audia-gateway
+docker compose logs -f llm-gateway
 
 # Stop and remove containers (volumes preserved)
 docker compose down
 
 # Restart a single container
-docker compose restart audia-gateway
-docker compose restart backend-swappable
+docker compose restart llm-gateway
+docker compose restart llm-server-llamacpp
 
 # Check container status
 docker compose ps
@@ -467,7 +481,7 @@ The update preserves:
 
 - `config/local/` — your local overrides
 - `models/` — your model files
-- `config/data/backend-runtime/` — cached llama.cpp binaries and backend plugins
+- `config/data/backend-runtime/<backend>/` — cached llama.cpp binaries and backend plugins
 - `.env` — your environment file
 
 On a clean remote host you only need:
@@ -515,7 +529,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 
 | Volume / path | Contents | Managed by |
 | ------------- | -------- | ---------- |
-| `./config/data/backend-runtime` (bind mount) | Provisioned llama.cpp binaries and backend plugins (~500 MB) | Installer on first start |
+| `./config/data/backend-runtime/<backend>` (under bind-mounted base) | Provisioned llama.cpp binaries and backend plugins (~500 MB) | Installer on first start |
 | `./models` (bind mount) | GGUF model files | You |
 | `./models-hf` (bind mount) | Hugging Face cache and raw tensor weights for vLLM | You / vLLM |
 | `./config/local/` (bind mount) | Machine-specific overrides | You |
@@ -533,12 +547,15 @@ docker compose up -d
 
 ## Troubleshooting
 
+Field notes from validated installs, known-good versions, and failure modes live in
+[docs/docker-field-notes.md](docker-field-notes.md).
+
 ### Gateway container exits immediately
 
 Check the logs:
 
 ```bash
-docker compose logs audia-gateway
+docker compose logs llm-gateway
 ```
 
 Common causes: missing `LITELLM_MASTER_KEY`, malformed `config/generated/litellm/litellm.config.yaml`.
@@ -546,7 +563,7 @@ Common causes: missing `LITELLM_MASTER_KEY`, malformed `config/generated/litellm
 ### Backend container exits or shows GPU errors
 
 ```bash
-docker compose logs backend-swappable
+docker compose logs llm-server-llamacpp
 ```
 
 - NVIDIA: confirm Container Toolkit is installed (`docker run --gpus all nvidia/cuda:... nvidia-smi`)
@@ -576,7 +593,7 @@ If you see backslashes, re-run generate:
 
 ```bash
 ./scripts/AUDiaLLMGateway.sh generate
-docker compose restart backend-swappable
+docker compose restart llm-server-llamacpp
 ```
 
 ### Port already in use
@@ -602,11 +619,11 @@ The `LITELLM_MASTER_KEY` in `.env` must match what your client sends.
 ### vLLM enablement
 
 vLLM routing is intentionally gated behind `AUDIA_ENABLE_VLLM=true`. Starting the
-`backend-vllm` profile without that flag leaves LiteLLM on the llama-swap-only
+`llm-server-vllm` profile without that flag leaves LiteLLM on the llama-swap-only
 catalog so the gateway does not advertise dead vLLM aliases.
 
 When enabled, the generator writes `config/generated/vllm/vllm.config.json`, nginx
-adds `/vllm/` and `/vllm-health`, and the watcher restarts `backend-vllm` when the
+adds `/vllm/` and `/vllm-health`, and the watcher restarts `llm-server-vllm` when the
 generated vLLM config or relevant env values change. The Hugging Face cache mount
 should use `MODEL_HF_ROOT`, not `MODEL_ROOT`, so raw HF weights stay separate from
 GGUF files. On AMD hosts, use [`docker/examples/docker-compose.amd.yml`](../docker/examples/docker-compose.amd.yml),
