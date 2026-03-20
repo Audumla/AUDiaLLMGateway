@@ -114,6 +114,8 @@ services:
       - AUDIA_ENABLE_VLLM=${AUDIA_ENABLE_VLLM:-false}
       - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN:-}
       - VLLM_MOCK_MODE=${VLLM_MOCK_MODE:-false}
+      - ROCR_VISIBLE_DEVICES=${VLLM_VISIBLE_DEVICES:-0}
+      - HIP_VISIBLE_DEVICES=${VLLM_VISIBLE_DEVICES:-0}
     volumes:
       - ${MODEL_HF_ROOT:-./models-hf}:/root/.cache/huggingface:rw
       - ./config/generated/vllm:/app/config/generated/vllm:ro

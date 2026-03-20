@@ -439,7 +439,7 @@ All variables read from `.env` at compose start time.
 | `VLLM_MAX_LEN` | No | `4096` | Maximum context length for the vLLM backend. |
 | `VLLM_TENSOR_PARALLEL_SIZE` | No | `1` | Tensor parallel size passed to vLLM (`--tensor-parallel-size`). |
 | `VLLM_PIPELINE_PARALLEL_SIZE` | No | `1` | Pipeline parallel size passed to vLLM (`--pipeline-parallel-size`). |
-| `VLLM_VISIBLE_DEVICES` | No | — | Optional `HIP_VISIBLE_DEVICES` override when set via generated vLLM startup config. |
+| `VLLM_VISIBLE_DEVICES` | No | `0` | GPU index list exported to both `ROCR_VISIBLE_DEVICES` and `HIP_VISIBLE_DEVICES` in the `llm-server-vllm` container (for example `0` or `0,1`). |
 | `VLLM_IMAGE` | No | `audumla/audia-llm-gateway-vllm:latest` | Override the vLLM image. Use `vllm/vllm-openai-rocm:latest` with the AMD compose profile. |
 | `VLLM_MOCK_MODE` | No | `false` | Runs the mounted mock vLLM server instead of the real `vllm` process. Intended for Docker validation only. |
 | `LLAMA_BACKEND` | No | `auto` | Override llama.cpp backend detection: `auto`, `cuda`, `rocm`, `vulkan`, `cpu`. |
