@@ -39,9 +39,9 @@ For guided Docker setup on Linux, use:
 ./scripts/docker-setup.sh
 ```
 
-The provisioned `llama.cpp` runtime is persisted on the host under
-`./config/data/backend-runtime/<backend>` by default so you can inspect, back up,
-or repair the downloaded binaries and backend plugins directly.
+The provisioned `llama.cpp` runtimes are persisted on the host under
+`./config/data/backend-runtime/<backend>/` by default, one directory per backend,
+so you can inspect, back up, or repair the downloaded binaries directly.
 
 The root [`docker-compose.yml`](docker-compose.yml) is deployment-oriented and
 pulls published images only, so a remote host can stay a clean Docker Compose

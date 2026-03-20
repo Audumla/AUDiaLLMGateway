@@ -5,7 +5,7 @@ frameworks:
       - llama-swap
       - litellm
     llama_swap:
-      executable_macro: llama-server
+      executable_macro: llama-server-cpu
       server_args_macro: server-args
       model_path_macro: model-path
       mmproj_path_macro: mmproj-path
@@ -173,6 +173,7 @@ model_profiles:
       llamacpp_vulkan:
         framework: llama_cpp
         transport: llama-swap
+        executable_macro: llama-server-vulkan
         llama_swap_model: qwen3.5-27b-(96k-Q6)
         backend_model_name: qwen3.5-27b-(96k-Q6)
   qwen122_smart:
@@ -199,6 +200,7 @@ model_profiles:
       llamacpp_vulkan:
         framework: llama_cpp
         transport: llama-swap
+        executable_macro: llama-server-vulkan
         llama_swap_model: qwen3.5-122b
         backend_model_name: qwen3.5-122b
   qwen4b_vision:

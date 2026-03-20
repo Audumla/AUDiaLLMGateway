@@ -9,28 +9,24 @@ logLevel: warn
 startPort: 41000
 
 macros:
-  # Default binary — symlink to whichever backend was auto-detected at provisioning time.
-  # Override individual macros in config/local/llama-swap.override.yaml to run specific
-  # backends per model (e.g. rocm for one model, vulkan for another simultaneously).
-  #
-  # Docker runtime paths (set by provision-runtime.sh):
-  #   /app/runtime/bin/llama-server-cuda
-  #   /app/runtime/bin/llama-server-rocm
-  #   /app/runtime/bin/llama-server-vulkan
-  #   /app/runtime/bin/llama-server-cpu
+  # Backend binaries live in dedicated runtime directories:
+  #   /app/runtime-root/cpu/bin/llama-server-cpu
+  #   /app/runtime-root/cuda/bin/llama-server-cuda
+  #   /app/runtime-root/rocm/bin/llama-server-rocm
+  #   /app/runtime-root/vulkan/bin/llama-server-vulkan
   #
   # Example — config/local/llama-swap.override.yaml:
   #   macros:
-  #     llama-server-rocm:   "/app/runtime/bin/llama-server-rocm"
-  #     llama-server-vulkan: "/app/runtime/bin/llama-server-vulkan"
+  #     llama-server-rocm:   "env LD_LIBRARY_PATH=/app/runtime-root/rocm/lib:/opt/rocm/lib /app/runtime-root/rocm/bin/llama-server-rocm"
+  #     llama-server-vulkan: "env VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/radeon_icd.json LD_LIBRARY_PATH=/app/runtime-root/vulkan/lib /app/runtime-root/vulkan/bin/llama-server-vulkan"
   #
   # Then per model in models.override.yaml set:
   #   executable_macro: llama-server-rocm   # or -vulkan, -cuda, -cpu
-  llama-server: "llama-server"
-  llama-server-cpu: "llama-server"
-  llama-server-rocm: "llama-server"
-  llama-server-cuda: "llama-server"
-  llama-server-vulkan: "llama-server"
+  llama-server: "llama-server-cpu"
+  llama-server-cpu: "llama-server-cpu"
+  llama-server-rocm: "llama-server-rocm"
+  llama-server-cuda: "llama-server-cuda"
+  llama-server-vulkan: "llama-server-vulkan"
   model-path: "--model models"
   mmproj-path: "--mmproj models"
 

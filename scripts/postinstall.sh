@@ -77,11 +77,10 @@ if [ ! -f config/local/llama-swap.override.yaml ]; then
 #
 # --- Backend binary macros ---
 # By default all macros resolve to the installed 'llama-server' binary.
-# Override to point at specific builds if you have multiple installed.
-# Use 'AUDiaLLMGateway.sh install components' to install binaries.
+# Use backend-specific macros to point at specific builds if you have multiple
+# installed. Use 'AUDiaLLMGateway.sh install components' to install binaries.
 #
 # macros:
-#   llama-server:        "llama-server"          # default (auto-detected)
 #   llama-server-cpu:    "llama-server-cpu"       # explicit CPU build
 #   llama-server-cuda:   "llama-server-cuda"      # explicit CUDA build
 #   llama-server-rocm:   "llama-server-rocm"      # explicit ROCm build
@@ -90,7 +89,8 @@ if [ ! -f config/local/llama-swap.override.yaml ]; then
 #   mmproj-path:         "--mmproj models/gguf"
 #
 # --- Per-model backend selection ---
-# Keep LLAMA_BACKEND=auto so the runtime provisions both ROCm and Vulkan, then
+# Keep LLAMA_BACKEND=auto so the runtime provisions separate ROCm and Vulkan
+# directories, then
 # set executable_macro in config/local/models.override.yaml to route
 # specific models to specific backends:
 #   executable_macro: llama-server-rocm     # run this model on ROCm

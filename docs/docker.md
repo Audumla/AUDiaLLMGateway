@@ -177,8 +177,8 @@ AUDIA_ENABLE_VLLM=true docker compose --profile vllm up -d
 This uses the root `docker-compose.yml`. On first start, the backend container
 downloads and caches the appropriate llama.cpp binary. Subsequent starts reuse the
 host-mounted runtime base directory at `BACKEND_RUNTIME_ROOT` (default:
-`./config/data/backend-runtime`), with backend-specific runtimes kept under
-subdirectories such as `vulkan/`, `rocm/`, or `cpu/`.
+`./config/data/backend-runtime`), with one sibling directory per backend such as
+`vulkan/`, `rocm/`, `cuda/`, or `cpu/`.
 
 Full compose definition: [`docker-compose.yml`](../docker-compose.yml)
 
@@ -428,7 +428,7 @@ All variables read from `.env` at compose start time.
 | `DATABASE_WAIT_INTERVAL_SECONDS` | No | `2` | Seconds between database reachability probes during gateway startup. |
 | `MODEL_ROOT` | No | `./models` | Host path to model directory. Mounted read-only into the backend. |
 | `MODEL_HF_ROOT` | No | `./models-hf` | Host path for Hugging Face cache and raw tensor weights used by vLLM. |
-| `BACKEND_RUNTIME_ROOT` | No | `./config/data/backend-runtime` | Host path base for the provisioned `llama.cpp` runtime. The container resolves `/app/runtime` to a backend-specific subdirectory under this base. |
+| `BACKEND_RUNTIME_ROOT` | No | `./config/data/backend-runtime` | Host path base for the provisioned `llama.cpp` runtimes. Each backend is stored in its own subdirectory such as `cpu/`, `rocm/`, `vulkan/`, or `cuda/`. |
 | `AUDIA_ENABLE_VLLM` | No | `false` | Enables vLLM-backed LiteLLM routes and watcher-managed vLLM restarts. Requires `--profile vllm`. |
 | `GATEWAY_PORT` | No | `4000` | Host port published for the LiteLLM gateway. |
 | `NGINX_PORT` | No | `8080` | Host port published for the nginx reverse proxy. |

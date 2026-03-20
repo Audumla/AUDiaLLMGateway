@@ -7,22 +7,23 @@
 set -e
 
 RUNTIME_ROOT="${RUNTIME_ROOT:-/app/runtime-root}"
-RUNTIME_LINK="/app/runtime"
 DEFAULT_SWAP_CONFIG="${LLAMA_SWAP_CONFIG_PATH:-/app/config/llama-swap.generated.yaml}"
 DEFAULT_SWAP_ADDR="${LLAMA_SWAP_LISTEN_ADDR:-0.0.0.0:41080}"
 DEFAULT_SWAP_WAIT_SECONDS="${LLAMA_SWAP_CONFIG_WAIT_SECONDS:-120}"
 
 sync_backend_plugins() {
+    local _bin_dir="$1"
+    local _lib_dir="$2"
     # ggml_backend_load_all() scans the executable directory for backend plugins.
     # Re-sync them on every container start, not just after a fresh provision,
     # so persisted runtime volumes stay runnable across image/container changes.
-    for _so in "$LIB_DIR"/libggml-*.so; do
+    for _so in "$_lib_dir"/libggml-*.so; do
         [ -f "$_so" ] || continue
         _name=$(basename "$_so")
         case "$_name" in
             libggml.so|libggml-base.so) continue ;;
         esac
-        ln -sf "$_so" "$BIN_DIR/$_name"
+        ln -sf "$_so" "$_bin_dir/$_name"
     done
 }
 
@@ -97,7 +98,7 @@ else
     echo "  Vulkan:                 $HAS_VULKAN"
 fi
 
-CURRENT_SIG="VERSION=${LLAMA_VERSION:-latest}|NV=$HAS_NVIDIA|AMD=$HAS_AMD|VK=$HAS_VULKAN|BACKEND=${LLAMA_BACKEND:-auto}"
+CURRENT_SIG_PREFIX="VERSION=${LLAMA_VERSION:-latest}|NV=$HAS_NVIDIA|AMD=$HAS_AMD|VK=$HAS_VULKAN"
 
 # ---------------------------------------------------------------------------
 # 1a. Ensure container-level runtime packages are present on every start.
@@ -110,84 +111,46 @@ $HAS_AMD    && RUNTIME_PACKAGES+=(libnuma1)
 $HAS_VULKAN && RUNTIME_PACKAGES+=(libvulkan1 mesa-vulkan-drivers vulkan-tools)
 ensure_apt_packages "${RUNTIME_PACKAGES[@]}"
 
-# ---------------------------------------------------------------------------
-# 1b. Resolve backend-specific runtime directory and link it to /app/runtime
-# ---------------------------------------------------------------------------
-RUNTIME_NAMESPACE="${LLAMA_BACKEND:-auto}"
-case "$RUNTIME_NAMESPACE" in
-    ""|auto)
-        RUNTIME_NAMESPACE="auto"
-        ;;
-    cuda|rocm|vulkan|cpu)
-        ;;
-    *)
-        RUNTIME_NAMESPACE=$(printf "%s" "$RUNTIME_NAMESPACE" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9._-' '-')
-        ;;
-esac
-
-RUNTIME_DIR="$RUNTIME_ROOT/$RUNTIME_NAMESPACE"
-BIN_DIR="$RUNTIME_DIR/bin"
-LIB_DIR="$RUNTIME_DIR/lib"
-STATE_FILE="$RUNTIME_DIR/.hw_signature"
-
-mkdir -p "$BIN_DIR" "$LIB_DIR"
 mkdir -p "$RUNTIME_ROOT"
-rm -rf "$RUNTIME_LINK"
-ln -s "$RUNTIME_DIR" "$RUNTIME_LINK"
-echo "--- Runtime namespace: $RUNTIME_NAMESPACE ($RUNTIME_DIR) ---"
 
-# ---------------------------------------------------------------------------
-# 2. Provisioning (skipped if signature matches cached state)
-# ---------------------------------------------------------------------------
-if [ ! -f "$STATE_FILE" ] || [ "$(cat "$STATE_FILE")" != "$CURRENT_SIG" ]; then
-    echo "--- Provisioning llama.cpp runtime ---"
-    rm -rf "$BIN_DIR"/* "$LIB_DIR"/*
+provision_backend() {
+    local BE="$1"
+    local PATTERN=""
+    local SUFFIX="$BE"
+    local CURRENT_SIG="${CURRENT_SIG_PREFIX}|BACKEND=${BE}"
+    local RUNTIME_DIR="$RUNTIME_ROOT/$BE"
+    local BIN_DIR="$RUNTIME_DIR/bin"
+    local LIB_DIR="$RUNTIME_DIR/lib"
+    local STATE_FILE="$RUNTIME_DIR/.hw_signature"
 
-    # Build ordered list of backends to provision — first entry becomes the default.
-    # Vulkan is always included alongside CUDA/ROCm so users can switch backends
-    # (e.g. LLAMA_BACKEND=vulkan on an AMD system that also has ROCm) without
-    # needing to reprovision.
-    BACKENDS=()
-    $HAS_NVIDIA  && BACKENDS+=("cuda")
-    $HAS_AMD     && BACKENDS+=("rocm")
-    $HAS_VULKAN  && BACKENDS+=("vulkan")
-    [ ${#BACKENDS[@]} -eq 0 ] && BACKENDS+=("cpu")
+    mkdir -p "$BIN_DIR" "$LIB_DIR"
 
-    echo "  Backends to provision: ${BACKENDS[*]}"
+    case "$BE" in
+        rocm)
+            PATTERN="ubuntu-rocm.*x64\.(tar\.gz|zip)$"
+            ;;
+        cuda)
+            PATTERN="ubuntu-x64\.(tar\.gz|zip)$"
+            ;;
+        vulkan)
+            PATTERN="ubuntu-vulkan.*x64\.(tar\.gz|zip)$"
+            ;;
+        *)
+            PATTERN="ubuntu-x64\.(tar\.gz|zip)$"
+            SUFFIX="cpu"
+            ;;
+    esac
 
-    # Fetch release metadata once
-    VERSION_TAG=${LLAMA_VERSION:-latest}
-    API_URL="https://api.github.com/repos/ggml-org/llama.cpp/releases/latest"
-    [ "$VERSION_TAG" != "latest" ] && API_URL="https://api.github.com/repos/ggml-org/llama.cpp/releases/tags/$VERSION_TAG"
-    RELEASE_DATA=$(curl -sL "$API_URL")
-
-    for BE in "${BACKENDS[@]}"; do
-        echo ">>> Provisioning $BE backend..."
-        case $BE in
-            rocm)
-                PATTERN="ubuntu-rocm.*x64\.(tar\.gz|zip)$"
-                SUFFIX="rocm"
-                ;;
-            cuda)
-                PATTERN="ubuntu-x64\.(tar\.gz|zip)$"
-                SUFFIX="cuda"
-                ;;
-            vulkan)
-                PATTERN="ubuntu-vulkan.*x64\.(tar\.gz|zip)$"
-                SUFFIX="vulkan"
-                ;;
-            *)
-                PATTERN="ubuntu-x64\.(tar\.gz|zip)$"
-                SUFFIX="cpu"
-                ;;
-        esac
+    if [ ! -f "$STATE_FILE" ] || [ "$(cat "$STATE_FILE")" != "$CURRENT_SIG" ]; then
+        echo ">>> Provisioning $BE backend into $RUNTIME_DIR..."
+        rm -rf "$BIN_DIR"/* "$LIB_DIR"/*
 
         DL_URL=$(echo "$RELEASE_DATA" | jq -r --arg p "$PATTERN" \
             '.assets[] | select(.name | test($p)) | .browser_download_url' | head -1)
 
         if [ -z "$DL_URL" ]; then
             echo "  WARNING: no asset found for pattern $PATTERN — skipping $BE"
-            continue
+            return
         fi
 
         echo "  Downloading from $DL_URL..."
@@ -201,36 +164,50 @@ if [ ! -f "$STATE_FILE" ] || [ "$(cat "$STATE_FILE")" != "$CURRENT_SIG" ]; then
         find "/tmp/extract_$BE" -name "llama-server" -exec cp {} "$BIN_DIR/llama-server-$SUFFIX" \;
         find "/tmp/extract_$BE" -name "*.so*" -exec cp {} "$LIB_DIR/" \;
         rm -rf "/tmp/llama_${BE}.archive" "/tmp/extract_$BE"
+
+        sync_backend_plugins "$BIN_DIR" "$LIB_DIR"
+        echo "$CURRENT_SIG" > "$STATE_FILE"
         echo "  $BE provisioned: $BIN_DIR/llama-server-$SUFFIX"
-    done
+    else
+        echo ">>> Runtime up to date for $BE ($RUNTIME_DIR), skipping provisioning"
+        sync_backend_plugins "$BIN_DIR" "$LIB_DIR"
+    fi
+}
 
-    # Symlink the primary backend as the default llama-server
-    PRIMARY="${BACKENDS[0]}"
-    ln -sf "$BIN_DIR/llama-server-${PRIMARY}" "$BIN_DIR/llama-server"
-    echo "  Default: llama-server -> llama-server-${PRIMARY}"
+# ---------------------------------------------------------------------------
+# 2. Provisioning (skipped if signature matches cached state)
+# ---------------------------------------------------------------------------
+echo "--- Provisioning llama.cpp runtime ---"
 
-    # Symlink all backend plugin .so files into $BIN_DIR so that
-    # ggml_backend_load_all() can find them alongside the binary.
-    # ggml scans the executable's directory for libggml-*.so files;
-    # GGML_BACKEND_PATH is treated as a single-file path, not a directory.
-    sync_backend_plugins
-    echo "  Backend plugins symlinked into $BIN_DIR"
-
-    echo "$CURRENT_SIG" > "$STATE_FILE"
-    echo "--- Provisioning complete ---"
+# Build list of backend-specific runtime directories to manage.
+BACKENDS=()
+if [ -n "$LLAMA_BACKEND" ] && [ "$LLAMA_BACKEND" != "auto" ]; then
+    BACKENDS+=("$LLAMA_BACKEND")
 else
-    echo "--- Runtime up to date (signature matches), skipping provisioning ---"
+    $HAS_NVIDIA  && BACKENDS+=("cuda")
+    $HAS_AMD     && BACKENDS+=("rocm")
+    $HAS_VULKAN  && BACKENDS+=("vulkan")
+    [ ${#BACKENDS[@]} -eq 0 ] && BACKENDS+=("cpu")
 fi
+
+echo "  Backend directories: ${BACKENDS[*]}"
+
+VERSION_TAG=${LLAMA_VERSION:-latest}
+API_URL="https://api.github.com/repos/ggml-org/llama.cpp/releases/latest"
+[ "$VERSION_TAG" != "latest" ] && API_URL="https://api.github.com/repos/ggml-org/llama.cpp/releases/tags/$VERSION_TAG"
+RELEASE_DATA=$(curl -sL "$API_URL")
+
+for BE in "${BACKENDS[@]}"; do
+    provision_backend "$BE"
+done
 
 # ---------------------------------------------------------------------------
 # 3. Launch
 # ---------------------------------------------------------------------------
-printf "%s\n%s\n" "$LIB_DIR" "/opt/rocm/lib" > /etc/ld.so.conf.d/llama-runtime.conf
+printf "%s\n" "/opt/rocm/lib" > /etc/ld.so.conf.d/llama-runtime.conf
 ldconfig
-export PATH="$BIN_DIR:$PATH"
-export LD_LIBRARY_PATH="$LIB_DIR:/opt/rocm/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export LD_LIBRARY_PATH="/opt/rocm/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export ROCBLAS_TENSILE_LIBPATH="${ROCBLAS_TENSILE_LIBPATH:-/opt/rocm/lib/rocblas/library}"
-sync_backend_plugins
 
 # When VK_ICD_FILENAMES is not already set, restrict Vulkan to the AMD RADV ICD
 # if this is an AMD GPU system. Without this, all ICDs (intel, gfxstream, nouveau,

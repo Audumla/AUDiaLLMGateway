@@ -448,4 +448,9 @@
 - Runtime startup now exports ROCBLAS_TENSILE_LIBPATH by default to the bundled rocBLAS library directory.
 - Field notes now document the rocBLAS data requirement that caused gfx1100 startup failures.
 
+### Simplified backend runtime layout to one directory per llama.cpp backend. (Configuration Cleanup)
+- Removed the shared runtime namespace concept and now provision cpu, cuda, rocm, and vulkan into sibling directories under BACKEND_RUNTIME_ROOT.
+- Docker-side backend macros now point directly at backend-specific binary paths and env wrappers instead of /app/runtime symlinks.
+- Updated docs, templates, and tests to match the per-backend runtime directory model.
+
 ---
