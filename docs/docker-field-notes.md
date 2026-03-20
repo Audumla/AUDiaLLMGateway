@@ -201,6 +201,44 @@ Useful env knobs:
 - `DATABASE_WAIT_SECONDS`
 - `DATABASE_WAIT_INTERVAL_SECONDS`
 
+### 13. Watcher stopped reacting after one bad local override edit
+
+Symptom:
+
+- `llm-config-watcher` detected a change once, then never applied later changes
+- `docker compose logs llm-config-watcher` showed a traceback from
+  `generate-configs` followed by watchdog thread termination
+
+Cause:
+
+- watcher called `generate-configs` with `check=True` and did not catch
+  `CalledProcessError`, so a single invalid override killed the event thread
+
+Resolution:
+
+- keep watcher alive on regeneration failure
+- log the failure and wait for the next file change instead of crashing
+
+### 14. llama-swap UI under `/llamaswap/` conflicted with LiteLLM `/ui/`
+
+Symptom:
+
+- `/llamaswap/` UI appeared slow or inconsistent
+- browser loaded unexpected assets or redirects when both products exposed `/ui/*`
+
+Cause:
+
+- llama-swap UI emits absolute `/ui/*` asset links
+- nginx was proxying llama-swap under `/llamaswap/*`, while LiteLLM also owned
+  `/ui/*` at root
+
+Resolution:
+
+- normalize llama-swap entrypoints to `/llamaswap/ui/`
+- add dedicated `/llamaswap/ui/*` proxy rule with redirect rewriting
+- rewrite absolute `/ui/*` links in proxied llama-swap UI responses to
+  `/llamaswap/ui/*`
+
 ## First-Install Recommendations
 
 For a clean Docker install on Linux:

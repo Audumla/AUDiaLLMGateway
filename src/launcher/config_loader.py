@@ -1537,7 +1537,38 @@ http {{
         }}
 
         location = /llamaswap {{
-            return 301 /llamaswap/;
+            return 301 /llamaswap/ui/;
+        }}
+
+        location = /llamaswap/ {{
+            return 301 /llamaswap/ui/;
+        }}
+
+        location = /llamaswap/ui {{
+            return 301 /llamaswap/ui/;
+        }}
+
+        # llama-swap UI is built with absolute /ui/* asset URLs.
+        # Keep it namespaced under /llamaswap/ui/* by rewriting body links
+        # and redirect targets on the fly.
+        location /llamaswap/ui/ {{
+            rewrite ^/llamaswap/ui/(.*)$ /ui/$1 break;
+            proxy_pass http://llamaswap_upstream;
+            proxy_redirect ~^/ui/(.+)$ /llamaswap/ui/$1;
+            proxy_redirect ~^/(.+)$ /llamaswap/$1;
+            proxy_http_version 1.1;
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
+            proxy_buffering off;
+            proxy_request_buffering off;
+            sub_filter_once off;
+            sub_filter_types text/html text/css application/javascript;
+            sub_filter 'href="/ui/' 'href="/llamaswap/ui/';
+            sub_filter 'src="/ui/' 'src="/llamaswap/ui/';
+            sub_filter "url(/ui/" "url(/llamaswap/ui/";
         }}
 
         location /llamaswap/ {{
