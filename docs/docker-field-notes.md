@@ -313,6 +313,24 @@ Resolution:
 - validate paths against the real host model tree (`models/gguf/**`) and update
   `model_file` / `mmproj_file` per host where needed.
 
+### 19. vLLM ROCm device pinning failed for non-zero device indices on one host
+
+Symptom:
+
+- `llm-server-vllm` worked with `VLLM_VISIBLE_DEVICES=0`
+- setting `VLLM_VISIBLE_DEVICES=1` or `2` failed at startup with:
+  - `RuntimeError: No HIP GPUs are available`
+
+Cause:
+
+- host/runtime-specific ROCm visibility behavior in the tested environment.
+
+Resolution:
+
+- keep `VLLM_VISIBLE_DEVICES=0` for stable operation on that host
+- if per-GPU vLLM workers are required, validate host ROCm runtime behavior
+  first and consider running separate vLLM services with explicit device maps.
+
 ## First-Install Recommendations
 
 For a clean Docker install on Linux:
