@@ -276,6 +276,43 @@ Resolution:
 - default local template now uses `ROCm0` for the primary single-GPU ROCm
   profile
 
+### 17. Nginx default proxy timeout was too short for cold model loads
+
+Symptom:
+
+- first requests for larger models returned:
+  - `504 Gateway Time-out` at exactly ~60 seconds
+- retries often succeeded after the model had already loaded
+
+Cause:
+
+- nginx default `proxy_read_timeout` (60s) was lower than cold-start load time
+  for some llama.cpp deployments.
+
+Resolution:
+
+- set server-level proxy timeouts:
+  - `proxy_connect_timeout 60s`
+  - `proxy_send_timeout 600s`
+  - `proxy_read_timeout 600s`
+
+### 18. Live model filenames can differ from template URLs
+
+Symptom:
+
+- a configured model deployment failed with `No such file or directory` even
+  though a similarly named model existed on disk.
+
+Cause:
+
+- local model folder had files from a different GGUF source/rename convention
+  than the template defaults.
+
+Resolution:
+
+- validate paths against the real host model tree (`models/gguf/**`) and update
+  `model_file` / `mmproj_file` per host where needed.
+
 ## First-Install Recommendations
 
 For a clean Docker install on Linux:
