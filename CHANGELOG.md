@@ -1,14 +1,5 @@
 # Changelog
 
-## [0.11.3](https://github.com/example/AUDiaLLMGateway/compare/v0.11.2...v0.11.3) (2026-03-20)
-
-
-### Bug Fixes
-
-* litellma db backend ([2cecd1c](https://github.com/example/AUDiaLLMGateway/commit/2cecd1ce72413db40c014a3880143e2d32312c14))
-
-## Changelog
-
 ## Unreleased
 
 ### Scaffolded a native Windows local LLM gateway workspace in AUDiaLLMGateway. (New Feature)
@@ -434,5 +425,9 @@
 ### Suppress successful gateway liveliness access logs while preserving failed health probes and normal request logging. (Configuration Cleanup)
 - Added a custom uvicorn access-log filter and log-config JSON, then wired the gateway entrypoint to launch LiteLLM with that log config.
 - Successful GET /health/liveliness 200 probes are now suppressed, while non-200 health responses and all non-health requests still appear in the logs.
+
+### Enable DB-backed LiteLLM UI in the gateway image by bundling Prisma and generating the LiteLLM client during the Docker build. (Build / Packaging)
+- Added prisma==0.15.0 to gateway Python dependencies and updated docker/Dockerfile.gateway-base to run prisma generate against LiteLLM's bundled schema.prisma during image build.
+- Removed the empty model_group_alias_map emission to eliminate the non-fatal LiteLLM Router warning while keeping the Postgres-backed default compose path intact.
 
 ---

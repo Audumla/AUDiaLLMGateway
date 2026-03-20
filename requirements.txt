@@ -1,3 +1,4 @@
 litellm[proxy]
+prisma==0.15.0
 watchdog
 pyyaml
