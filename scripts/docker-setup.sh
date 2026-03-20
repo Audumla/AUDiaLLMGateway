@@ -58,7 +58,7 @@ set_env_value() {
     fi
 }
 
-mkdir -p "$ROOT_DIR/config/data/backend-runtime" "$ROOT_DIR/models" "$ROOT_DIR/models-hf"
+mkdir -p "$ROOT_DIR/config/data/backend-runtime" "$ROOT_DIR/config/data/postgres" "$ROOT_DIR/models" "$ROOT_DIR/models-hf"
 
 header "Hardware Detection"
 
@@ -111,11 +111,15 @@ ENABLE_VLLM=$(prompt_yes_no "Enable vLLM profile support now" "$DEFAULT_ENABLE_V
 MODEL_ROOT=$(prompt_with_default "GGUF model root" "./models")
 MODEL_HF_ROOT=$(prompt_with_default "vLLM Hugging Face cache root" "./models-hf")
 BACKEND_RUNTIME_ROOT=$(prompt_with_default "Visible llama.cpp runtime base root" "./config/data/backend-runtime")
+POSTGRES_DATA_ROOT=$(prompt_with_default "Visible PostgreSQL data root" "./config/data/postgres")
 LLAMA_VERSION=$(prompt_with_default "llama.cpp release tag" "$DEFAULT_LLAMA_VERSION")
 GATEWAY_PORT=$(prompt_with_default "LiteLLM gateway port" "4000")
 NGINX_PORT=$(prompt_with_default "nginx port" "8080")
 VLLM_PORT=$(prompt_with_default "vLLM port" "41090")
 LITELLM_MASTER_KEY=$(prompt_with_default "LiteLLM master key" "sk-local-dev")
+POSTGRES_USER=$(prompt_with_default "PostgreSQL user" "audia")
+POSTGRES_PASSWORD=$(prompt_with_default "PostgreSQL password" "audia-dev-password")
+POSTGRES_DB=$(prompt_with_default "PostgreSQL database" "litellm")
 
 VLLM_MODEL_DEFAULT="Qwen/Qwen3-0.6B"
 if [ "$ENABLE_VLLM" != "true" ]; then
@@ -131,6 +135,11 @@ set_env_value "LITELLM_MASTER_KEY" "$LITELLM_MASTER_KEY"
 set_env_value "MODEL_ROOT" "$MODEL_ROOT"
 set_env_value "MODEL_HF_ROOT" "$MODEL_HF_ROOT"
 set_env_value "BACKEND_RUNTIME_ROOT" "$BACKEND_RUNTIME_ROOT"
+set_env_value "POSTGRES_DATA_ROOT" "$POSTGRES_DATA_ROOT"
+set_env_value "POSTGRES_USER" "$POSTGRES_USER"
+set_env_value "POSTGRES_PASSWORD" "$POSTGRES_PASSWORD"
+set_env_value "POSTGRES_DB" "$POSTGRES_DB"
+set_env_value "DATABASE_URL" "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@llm-db-postgres:5432/${POSTGRES_DB}"
 set_env_value "LLAMA_BACKEND" "$BACKEND"
 set_env_value "LLAMA_VERSION" "$LLAMA_VERSION"
 set_env_value "AUDIA_ENABLE_VLLM" "$ENABLE_VLLM"
@@ -145,15 +154,17 @@ set_env_value "VLLM_PORT" "$VLLM_PORT"
 mkdir -p \
     "$ROOT_DIR/${MODEL_ROOT#./}" \
     "$ROOT_DIR/${MODEL_HF_ROOT#./}" \
-    "$ROOT_DIR/${BACKEND_RUNTIME_ROOT#./}"
+    "$ROOT_DIR/${BACKEND_RUNTIME_ROOT#./}" \
+    "$ROOT_DIR/${POSTGRES_DATA_ROOT#./}"
 
 ok "Wrote $ENV_FILE"
 ok "Created visible runtime/cache/model directories if missing"
 
 header "Summary"
-echo "  Compose services: llm-gateway, llm-server-llamacpp, llm-server-vllm, llm-config-watcher"
+echo "  Compose services: llm-db-postgres, llm-gateway, llm-server-llamacpp, llm-server-vllm, llm-config-watcher"
 echo "  llama.cpp backend: $BACKEND"
 echo "  llama.cpp runtime base: $BACKEND_RUNTIME_ROOT"
+echo "  postgres data root: $POSTGRES_DATA_ROOT"
 echo "  vLLM enabled: $ENABLE_VLLM"
 echo "  vLLM image: $VLLM_IMAGE"
 

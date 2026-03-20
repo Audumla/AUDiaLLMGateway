@@ -64,6 +64,13 @@ LITELLM_MASTER_KEY=sk-change-me
 # HuggingFace token (only needed if downloading gated models)
 HUGGING_FACE_HUB_TOKEN=hf_your_token_here
 
+# LiteLLM UI/auth database
+POSTGRES_USER=audia
+POSTGRES_PASSWORD=audia-dev-password
+POSTGRES_DB=litellm
+POSTGRES_DATA_ROOT=./config/data/postgres
+DATABASE_URL=postgresql://audia:audia-dev-password@llm-db-postgres:5432/litellm
+
 # Path to your model directory (defaults to ./models)
 MODEL_ROOT=./models
 MODEL_HF_ROOT=./models-hf
@@ -79,6 +86,7 @@ If you do not change it, the Docker install defaults LiteLLM to:
 - Password: `sk-local-dev`
 
 That password is the LiteLLM `LITELLM_MASTER_KEY`. Change it before exposing the gateway on a network.
+The default root compose also starts PostgreSQL and wires `DATABASE_URL`, so LiteLLM UI login works against a real database by default.
 
 If you want guided first-time setup on Linux, run:
 
@@ -91,7 +99,7 @@ That helper:
 - detects whether the host looks like NVIDIA, AMD, Vulkan-only, or CPU-only
 - prompts for the main Docker settings
 - writes `.env`
-- creates visible host directories for `models`, `models-hf`, and `BACKEND_RUNTIME_ROOT`
+- creates visible host directories for `models`, `models-hf`, `BACKEND_RUNTIME_ROOT`, and PostgreSQL data
 
 ### 2. Place your model files
 
@@ -383,6 +391,11 @@ All variables read from `.env` at compose start time.
 | -------- | -------- | ------- | ----------- |
 | `LITELLM_MASTER_KEY` | No | `sk-local-dev` | API key for LiteLLM Admin UI and gateway auth. Set a strong value before exposing externally. |
 | `HUGGING_FACE_HUB_TOKEN` | No | — | HuggingFace token for gated model downloads. |
+| `POSTGRES_USER` | No | `audia` | PostgreSQL username for the LiteLLM metadata database. |
+| `POSTGRES_PASSWORD` | No | `audia-dev-password` | PostgreSQL password for the LiteLLM metadata database. |
+| `POSTGRES_DB` | No | `litellm` | PostgreSQL database name for LiteLLM metadata. |
+| `POSTGRES_DATA_ROOT` | No | `./config/data/postgres` | Host path for PostgreSQL data files. |
+| `DATABASE_URL` | No | `postgresql://audia:audia-dev-password@llm-db-postgres:5432/litellm` | LiteLLM database connection string used by the Admin UI/auth path. |
 | `MODEL_ROOT` | No | `./models` | Host path to model directory. Mounted read-only into the backend. |
 | `MODEL_HF_ROOT` | No | `./models-hf` | Host path for Hugging Face cache and raw tensor weights used by vLLM. |
 | `BACKEND_RUNTIME_ROOT` | No | `./config/data/backend-runtime` | Host path base for the provisioned `llama.cpp` runtime. The container resolves `/app/runtime` to a backend-specific subdirectory under this base. |
@@ -482,6 +495,7 @@ The update preserves:
 - `config/local/` — your local overrides
 - `models/` — your model files
 - `config/data/backend-runtime/<backend>/` — cached llama.cpp binaries and backend plugins
+- `config/data/postgres/` — LiteLLM metadata database
 - `.env` — your environment file
 
 On a clean remote host you only need:
@@ -530,6 +544,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 | Volume / path | Contents | Managed by |
 | ------------- | -------- | ---------- |
 | `./config/data/backend-runtime/<backend>` (under bind-mounted base) | Provisioned llama.cpp binaries and backend plugins (~500 MB) | Installer on first start |
+| `./config/data/postgres` (bind mount) | PostgreSQL data for LiteLLM UI/auth metadata | PostgreSQL container |
 | `./models` (bind mount) | GGUF model files | You |
 | `./models-hf` (bind mount) | Hugging Face cache and raw tensor weights for vLLM | You / vLLM |
 | `./config/local/` (bind mount) | Machine-specific overrides | You |

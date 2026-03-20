@@ -53,6 +53,7 @@ Compose service names follow the deployment naming convention:
 `audia-*` names.
 
 On first Docker start, LiteLLM Admin UI login defaults to username `admin` and password `sk-local-dev` unless you override `LITELLM_MASTER_KEY`.
+The default Docker stack also provisions PostgreSQL and sets `DATABASE_URL`, so the LiteLLM UI has a real DB-backed login path on first install.
 
 To add the optional `vLLM` backend, set `AUDIA_ENABLE_VLLM=true` in `.env` and start the profile.
 For NVIDIA hosts, the root compose profile is the direct path:
