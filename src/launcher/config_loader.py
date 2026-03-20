@@ -84,7 +84,7 @@ class VLLMRuntime:
 
 @dataclass(frozen=True)
 class PublishedModel:
-    stable_name: str
+    label: str
     framework: str
     transport: str
     api_base: str
@@ -846,68 +846,77 @@ def _catalog_published_models(stack: StackConfig) -> list[PublishedModel]:
     profiles = catalog.get("model_profiles", {})
     load_groups = catalog.get("load_groups", {})
     result: list[PublishedModel] = []
-    for exposure in catalog.get("exposures", []):
-        profile_name = str(exposure["model_profile"])
-        profile = profiles.get(profile_name, {})
-        deployment_name = str(exposure.get("deployment", ""))
-        raw_deployment = profile.get("deployments", {}).get(deployment_name, {})
-        deployment = (
-            _resolve_model_deployment(catalog, profile_name, deployment_name, raw_deployment)
-            if isinstance(raw_deployment, dict)
-            else {}
-        )
-        if not deployment_name or not deployment:
-            raise ValueError(f"Model exposure '{exposure.get('stable_name', '<unknown>')}' references missing deployment '{profile_name}.{deployment_name}'")
-
-        framework = str(deployment.get("framework", "llama_cpp"))
-        transport = str(deployment.get("transport", "llama-swap"))
-        if framework == "vllm" and not stack.vllm.enabled:
+    seen_labels: set[str] = set()
+    for profile_name, profile in profiles.items():
+        if not isinstance(profile, dict):
             continue
+        artifacts = profile.get("artifacts", {}) if isinstance(profile.get("artifacts"), dict) else {}
+        mode = str(profile.get("mode", "chat")).strip() or "chat"
+        purpose = str(profile.get("purpose", ""))
+        deployments = profile.get("deployments", {})
+        if not isinstance(deployments, dict):
+            continue
+        for deployment_name, raw_deployment in deployments.items():
+            if not isinstance(raw_deployment, dict):
+                continue
+            deployment = _resolve_model_deployment(catalog, str(profile_name), str(deployment_name), raw_deployment)
+            if not deployment.get("enabled", True):
+                continue
+            label = str(deployment.get("label", "")).strip()
+            if not label:
+                continue
+            if label in seen_labels:
+                raise ValueError(f"Model deployment label '{label}' is duplicated")
+            seen_labels.add(label)
 
-        llama_swap_model = str(exposure.get("llama_swap_model", deployment.get("llama_swap_model", deployment_name)))
-        backend_model_name = str(exposure.get("backend_model_name", deployment.get("backend_model_name", llama_swap_model or deployment_name)))
-        if framework == "vllm":
-            backend_model_name = _fallback_env_placeholder(
-                backend_model_name,
-                "VLLM_MODEL",
-                "Qwen/Qwen2.5-0.5B-Instruct",
-            )
-        api_base = f"http://{stack.network.llamaswap_host}:{stack.network.llamaswap_port}/v1"
-        if framework == "vllm" and transport == "direct":
-            api_base = f"http://{stack.network.vllm_host}:{stack.network.vllm_port}/v1"
+            framework = str(deployment.get("framework", "llama_cpp"))
+            transport = str(deployment.get("transport", "llama-swap"))
+            if framework == "vllm" and not stack.vllm.enabled:
+                continue
 
-        purpose = str(exposure.get("purpose", profile.get("purpose", "")))
-        model_load_groups = [
-            str(group_name)
-            for group_name, group in load_groups.items()
-            if any(
-                isinstance(member, dict)
-                and str(member.get("model_profile", "")) == profile_name
-                and str(member.get("deployment", "")) == deployment_name
-                for member in group.get("members", [])
+            llama_swap_model = str(deployment.get("llama_swap_model", deployment_name))
+            backend_model_name = str(deployment.get("backend_model_name", llama_swap_model or deployment_name))
+            if framework == "vllm":
+                backend_model_name = _fallback_env_placeholder(
+                    backend_model_name,
+                    "VLLM_MODEL",
+                    "Qwen/Qwen2.5-0.5B-Instruct",
+                )
+            api_base = f"http://{stack.network.llamaswap_host}:{stack.network.llamaswap_port}/v1"
+            if framework == "vllm" and transport == "direct":
+                api_base = f"http://{stack.network.vllm_host}:{stack.network.vllm_port}/v1"
+
+            model_load_groups = [
+                str(group_name)
+                for group_name, group in load_groups.items()
+                if any(
+                    isinstance(member, dict)
+                    and str(member.get("model_profile", "")) == str(profile_name)
+                    and str(member.get("deployment", "")) == str(deployment_name)
+                    for member in group.get("members", [])
+                )
+            ]
+            result.append(
+                PublishedModel(
+                    label=label,
+                    framework=framework,
+                    transport=transport,
+                    api_base=api_base,
+                    llama_swap_model=llama_swap_model,
+                    backend_model_name=backend_model_name,
+                    purpose=purpose,
+                    revision=str(deployment.get("revision", artifacts.get("revision", ""))),
+                    model_filename=str(deployment.get("model_filename", artifacts.get("model_filename", ""))),
+                    model_url=str(deployment.get("model_url", artifacts.get("model_url", ""))),
+                    additional_model_urls=[str(url) for url in deployment.get("additional_model_urls", artifacts.get("additional_model_urls", []))],
+                    mmproj_filename=str(deployment.get("mmproj_filename", artifacts.get("mmproj_filename", ""))),
+                    mmproj_url=str(deployment.get("mmproj_url", artifacts.get("mmproj_url", ""))),
+                    source_page_url=str(deployment.get("source_page_url", artifacts.get("source_page_url", ""))),
+                    load_groups=model_load_groups,
+                    api_key_placeholder=str(deployment.get("api_key_placeholder", "not-required-for-local-backends")),
+                    mode=mode,
+                )
             )
-        ]
-        result.append(
-            PublishedModel(
-                stable_name=str(exposure["stable_name"]),
-                framework=framework,
-                transport=transport,
-                api_base=api_base,
-                llama_swap_model=llama_swap_model,
-                backend_model_name=backend_model_name,
-                purpose=purpose,
-                revision=str(exposure.get("revision", profile.get("artifacts", {}).get("revision", ""))),
-                model_filename=str(exposure.get("model_filename", profile.get("artifacts", {}).get("model_filename", ""))),
-                model_url=str(exposure.get("model_url", profile.get("artifacts", {}).get("model_url", ""))),
-                additional_model_urls=[str(url) for url in exposure.get("additional_model_urls", profile.get("artifacts", {}).get("additional_model_urls", []))],
-                mmproj_filename=str(exposure.get("mmproj_filename", profile.get("artifacts", {}).get("mmproj_filename", ""))),
-                mmproj_url=str(exposure.get("mmproj_url", profile.get("artifacts", {}).get("mmproj_url", ""))),
-                source_page_url=str(exposure.get("source_page_url", profile.get("artifacts", {}).get("source_page_url", ""))),
-                load_groups=model_load_groups,
-                api_key_placeholder=str(exposure.get("api_key_placeholder", "not-required-for-local-backends")),
-                mode=str(exposure.get("mode", "chat")),
-            )
-        )
     return result
 
 
@@ -1020,7 +1029,7 @@ def build_litellm_config(stack: StackConfig) -> dict[str, Any]:
             }
         model_list.append(
             {
-                "model_name": model.stable_name,
+                "model_name": model.label,
                 "litellm_params": litellm_params,
                 "model_info": {
                     "mode": model.mode,
@@ -1164,42 +1173,33 @@ def build_vllm_config(stack: StackConfig) -> dict[str, Any]:
                 if isinstance(cleaned_section, dict) and cleaned_section:
                     startup_overrides = deep_merge(startup_overrides, cleaned_section)
 
-        for exposure in catalog.get("exposures", []):
-            profile_name = str(exposure.get("model_profile", ""))
-            deployment_name = str(exposure.get("deployment", ""))
-            profile = profiles.get(profile_name, {})
-            raw_deployment = profile.get("deployments", {}).get(deployment_name, {})
-            if not isinstance(raw_deployment, dict):
+        for profile_name, profile in profiles.items():
+            if not isinstance(profile, dict):
                 continue
-            deployment_profile = _resolve_deployment_profile(catalog, raw_deployment)
-            framework_name = str(
-                raw_deployment.get(
-                    "framework",
-                    deployment_profile.get("framework", "llama_cpp"),
-                )
-            )
-            transport_name = str(
-                raw_deployment.get(
-                    "transport",
-                    deployment_profile.get("transport", "llama-swap"),
-                )
-            )
-            enabled = raw_deployment.get("enabled", deployment_profile.get("enabled", True))
-            if not enabled:
-                continue
-            if framework_name != "vllm":
-                continue
-            if transport_name != "direct":
-                continue
-
             defaults = profile.get("defaults", {}) if isinstance(profile.get("defaults"), dict) else {}
-            # Allow vLLM startup options at profile defaults, deployment-profile defaults,
-            # deployment overrides, and exposure overrides.
-            # Precedence: defaults < deployment_profile < deployment < exposure.
-            for section in (defaults, deployment_profile, raw_deployment, exposure):
-                if isinstance(section, dict):
-                    _apply_container(section)
-            break
+            deployments = profile.get("deployments", {})
+            if not isinstance(deployments, dict):
+                continue
+            for deployment_name, raw_deployment in deployments.items():
+                if not isinstance(raw_deployment, dict):
+                    continue
+                deployment_profile = _resolve_deployment_profile(catalog, raw_deployment)
+                resolved_deployment = deep_merge(deployment_profile, raw_deployment)
+                if not resolved_deployment.get("enabled", True):
+                    continue
+                # Only consider deployments that are published (label set).
+                if not str(resolved_deployment.get("label", "")).strip():
+                    continue
+                framework_name = str(resolved_deployment.get("framework", "llama_cpp"))
+                transport_name = str(resolved_deployment.get("transport", "llama-swap"))
+                if framework_name != "vllm" or transport_name != "direct":
+                    continue
+
+                # Precedence: defaults < deployment_profile < deployment.
+                for section in (defaults, deployment_profile, raw_deployment):
+                    if isinstance(section, dict):
+                        _apply_container(section)
+                return startup_overrides
 
         return startup_overrides
 
@@ -1270,7 +1270,7 @@ def build_vllm_config(stack: StackConfig) -> dict[str, Any]:
         },
         "exposures": [
             {
-                "stable_name": model.stable_name,
+                "label": model.label,
                 "backend_model_name": model.backend_model_name,
                 "api_base": model.api_base,
                 "mode": model.mode,
