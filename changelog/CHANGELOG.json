@@ -1613,5 +1613,37 @@
       "Fixed llama.cpp flash-attn arg rendering for YAML boolean values and corrected default model/runtime mappings.",
       "Validated full nginx -> LiteLLM -> llama-swap matrix on gpu-host.example and documented ROCm/vLLM host-specific constraints."
     ]
+  },
+  {
+    "id": "CHG-9c137785",
+    "agent": "codex",
+    "change_group": "regression-test-coverage",
+    "plugin_version": "unreleased",
+    "date": "2026-03-21",
+    "recorded_at": "2026-03-20T23:46:46.265121Z",
+    "summary_tags": [
+      "Test Update"
+    ],
+    "summary": "Added regression tests for watcher resilience, config generation, and compose defaults.",
+    "details": [
+      "Cover watcher generate-config failure path and restart/reload decision matrix.",
+      "Assert llama-swap/nginx generated config invariants and Docker defaults for Postgres plus AMD vLLM device env wiring."
+    ]
+  },
+  {
+    "id": "CHG-9c137785-1",
+    "agent": "codex",
+    "change_group": "nginx-base-path-routing",
+    "plugin_version": "unreleased",
+    "date": "2026-03-21",
+    "recorded_at": "2026-03-21T00:02:55.926408Z",
+    "summary_tags": [
+      "Configuration Cleanup"
+    ],
+    "summary": "Added configurable nginx base URL routing and defaulted it to /audia/llmgateway.",
+    "details": [
+      "Added network.base_path handling in config loader and generated nginx namespace passthrough routes.",
+      "Updated landing-page links/docs and added regression tests for base-path route generation."
+    ]
   }
 ]

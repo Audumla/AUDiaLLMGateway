@@ -405,9 +405,12 @@ Override machine-specific values in `config/local/stack.override.yaml`:
 
 ```yaml
 network:
+  base_path: /audia/llmgateway
   litellm:
     port: 5000   # change published port
 ```
+
+Set `network.base_path` to `""` if you want root-only routes without a URL prefix.
 
 ---
 
