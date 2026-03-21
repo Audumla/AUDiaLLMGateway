@@ -10,6 +10,9 @@ RUNTIME_ROOT="${RUNTIME_ROOT:-/app/runtime-root}"
 DEFAULT_SWAP_CONFIG="${LLAMA_SWAP_CONFIG_PATH:-/app/config/llama-swap.generated.yaml}"
 DEFAULT_SWAP_ADDR="${LLAMA_SWAP_LISTEN_ADDR:-0.0.0.0:41080}"
 DEFAULT_SWAP_WAIT_SECONDS="${LLAMA_SWAP_CONFIG_WAIT_SECONDS:-120}"
+BACKEND_RUNTIME_CATALOG_PATH="${BACKEND_RUNTIME_CATALOG_PATH:-/app/config/backend-runtime.catalog.json}"
+BACKEND_RUNTIME_CATALOG_WAIT_SECONDS="${BACKEND_RUNTIME_CATALOG_WAIT_SECONDS:-45}"
+EFFECTIVE_RUNTIME_CATALOG="/tmp/backend-runtime.catalog.json"
 
 sync_backend_plugins() {
     local _bin_dir="$1"
@@ -46,6 +49,106 @@ ensure_apt_packages() {
         apt-get install -y --no-install-recommends $MISSING_PACKAGES
         rm -rf /var/lib/apt/lists/*
     fi
+}
+
+default_runtime_catalog_json() {
+    local _ver="${LLAMA_VERSION:-latest}"
+    cat <<EOF
+{
+  "schema_version": 1,
+  "runtime_root": "/app/runtime-root",
+  "variants": [
+    {
+      "name": "cpu",
+      "backend": "cpu",
+      "macro": "llama-server-cpu",
+      "version": "${_ver}",
+      "asset_pattern": "ubuntu-x64\\\\.(tar\\\\.gz|zip)$",
+      "repo_owner": "ggml-org",
+      "repo_name": "llama.cpp",
+      "runtime_subdir": "cpu",
+      "enabled": true,
+      "always": false
+    },
+    {
+      "name": "cuda",
+      "backend": "cuda",
+      "macro": "llama-server-cuda",
+      "version": "${_ver}",
+      "asset_pattern": "ubuntu-x64\\\\.(tar\\\\.gz|zip)$",
+      "repo_owner": "ggml-org",
+      "repo_name": "llama.cpp",
+      "runtime_subdir": "cuda",
+      "enabled": true,
+      "always": false
+    },
+    {
+      "name": "rocm",
+      "backend": "rocm",
+      "macro": "llama-server-rocm",
+      "version": "${_ver}",
+      "asset_pattern": "ubuntu-rocm.*x64\\\\.(tar\\\\.gz|zip)$",
+      "repo_owner": "ggml-org",
+      "repo_name": "llama.cpp",
+      "runtime_subdir": "rocm",
+      "enabled": true,
+      "always": false
+    },
+    {
+      "name": "vulkan",
+      "backend": "vulkan",
+      "macro": "llama-server-vulkan",
+      "version": "${_ver}",
+      "asset_pattern": "ubuntu-vulkan.*x64\\\\.(tar\\\\.gz|zip)$",
+      "repo_owner": "ggml-org",
+      "repo_name": "llama.cpp",
+      "runtime_subdir": "vulkan",
+      "enabled": true,
+      "always": false
+    }
+  ]
+}
+EOF
+}
+
+load_runtime_catalog() {
+    local _waited=0
+    if [ -n "$BACKEND_RUNTIME_CATALOG_PATH" ]; then
+        while [ ! -s "$BACKEND_RUNTIME_CATALOG_PATH" ] && [ "$_waited" -lt "$BACKEND_RUNTIME_CATALOG_WAIT_SECONDS" ]; do
+            sleep 1
+            _waited=$((_waited + 1))
+        done
+        if [ -s "$BACKEND_RUNTIME_CATALOG_PATH" ] && jq -e . "$BACKEND_RUNTIME_CATALOG_PATH" >/dev/null 2>&1; then
+            cp "$BACKEND_RUNTIME_CATALOG_PATH" "$EFFECTIVE_RUNTIME_CATALOG"
+            echo "  Using runtime catalog: $BACKEND_RUNTIME_CATALOG_PATH"
+            return
+        fi
+    fi
+    echo "  Runtime catalog unavailable or invalid; using built-in defaults"
+    default_runtime_catalog_json > "$EFFECTIVE_RUNTIME_CATALOG"
+}
+
+release_metadata_path() {
+    local _owner="$1"
+    local _repo="$2"
+    local _version="$3"
+    local _safe
+    _safe="$(echo "${_owner}_${_repo}_${_version}" | tr '/: ' '___')"
+    echo "/tmp/llama-release-${_safe}.json"
+}
+
+ensure_release_metadata() {
+    local _owner="$1"
+    local _repo="$2"
+    local _version="$3"
+    local _target
+    _target="$(release_metadata_path "$_owner" "$_repo" "$_version")"
+    if [ ! -s "$_target" ]; then
+        local _api_url="https://api.github.com/repos/${_owner}/${_repo}/releases/latest"
+        [ "$_version" != "latest" ] && _api_url="https://api.github.com/repos/${_owner}/${_repo}/releases/tags/${_version}"
+        curl -fsSL "$_api_url" -o "$_target"
+    fi
+    echo "$_target"
 }
 
 # ---------------------------------------------------------------------------
@@ -113,63 +216,87 @@ ensure_apt_packages "${RUNTIME_PACKAGES[@]}"
 
 mkdir -p "$RUNTIME_ROOT"
 
-provision_backend() {
-    local BE="$1"
-    local PATTERN=""
+is_backend_available() {
+    local _backend="$1"
+    case "$_backend" in
+        cuda) $HAS_NVIDIA ;;
+        rocm) $HAS_AMD ;;
+        vulkan) $HAS_VULKAN ;;
+        cpu) true ;;
+        *) false ;;
+    esac
+}
+
+should_provision_variant() {
+    local _backend="$1"
+    local _always="$2"
+    if [ -n "$LLAMA_BACKEND" ] && [ "$LLAMA_BACKEND" != "auto" ]; then
+        [ "$_backend" = "$LLAMA_BACKEND" ]
+        return
+    fi
+    if ! is_backend_available "$_backend"; then
+        return 1
+    fi
+    if [ "$_backend" = "cpu" ] && [ "$_always" != "true" ] && { $HAS_NVIDIA || $HAS_AMD || $HAS_VULKAN; }; then
+        return 1
+    fi
+    return 0
+}
+
+provision_variant() {
+    local NAME="$1"
+    local BE="$2"
+    local VERSION="$3"
+    local PATTERN="$4"
+    local OWNER="$5"
+    local REPO="$6"
+    local RUNTIME_SUBDIR="$7"
     local SUFFIX="$BE"
-    local CURRENT_SIG="${CURRENT_SIG_PREFIX}|BACKEND=${BE}"
-    local RUNTIME_DIR="$RUNTIME_ROOT/$BE"
+    [ "$SUFFIX" = "cpu" ] && SUFFIX="cpu"
+    local CURRENT_SIG="${CURRENT_SIG_PREFIX}|VARIANT=${NAME}|BACKEND=${BE}|VERSION=${VERSION}|REPO=${OWNER}/${REPO}|PATTERN=${PATTERN}|SUBDIR=${RUNTIME_SUBDIR}"
+    local RUNTIME_DIR="$RUNTIME_ROOT/$RUNTIME_SUBDIR"
     local BIN_DIR="$RUNTIME_DIR/bin"
     local LIB_DIR="$RUNTIME_DIR/lib"
     local STATE_FILE="$RUNTIME_DIR/.hw_signature"
+    local RELEASE_META=""
+    local DL_URL=""
 
     mkdir -p "$BIN_DIR" "$LIB_DIR"
 
-    case "$BE" in
-        rocm)
-            PATTERN="ubuntu-rocm.*x64\.(tar\.gz|zip)$"
-            ;;
-        cuda)
-            PATTERN="ubuntu-x64\.(tar\.gz|zip)$"
-            ;;
-        vulkan)
-            PATTERN="ubuntu-vulkan.*x64\.(tar\.gz|zip)$"
-            ;;
-        *)
-            PATTERN="ubuntu-x64\.(tar\.gz|zip)$"
-            SUFFIX="cpu"
-            ;;
-    esac
-
     if [ ! -f "$STATE_FILE" ] || [ "$(cat "$STATE_FILE")" != "$CURRENT_SIG" ]; then
-        echo ">>> Provisioning $BE backend into $RUNTIME_DIR..."
+        echo ">>> Provisioning ${NAME} (${BE}@${VERSION}) into $RUNTIME_DIR..."
         rm -rf "$BIN_DIR"/* "$LIB_DIR"/*
 
-        DL_URL=$(echo "$RELEASE_DATA" | jq -r --arg p "$PATTERN" \
-            '.assets[] | select(.name | test($p)) | .browser_download_url' | head -1)
+        if ! RELEASE_META="$(ensure_release_metadata "$OWNER" "$REPO" "$VERSION")"; then
+            echo "  WARNING: failed to fetch release metadata for ${OWNER}/${REPO}@${VERSION} — skipping ${NAME}"
+            return
+        fi
+        DL_URL=$(jq -r --arg p "$PATTERN" '.assets[] | select(.name | test($p)) | .browser_download_url' "$RELEASE_META" 2>/dev/null | head -1 || true)
 
         if [ -z "$DL_URL" ]; then
-            echo "  WARNING: no asset found for pattern $PATTERN — skipping $BE"
+            echo "  WARNING: no asset found for pattern $PATTERN in ${OWNER}/${REPO}@${VERSION} — skipping ${NAME}"
             return
         fi
 
         echo "  Downloading from $DL_URL..."
-        curl -L -o "/tmp/llama_${BE}.archive" "$DL_URL"
-        mkdir -p "/tmp/extract_$BE"
+        local _archive="/tmp/llama_${NAME}.archive"
+        local _extract="/tmp/extract_${NAME}"
+        curl -L -o "$_archive" "$DL_URL"
+        mkdir -p "$_extract"
         if echo "$DL_URL" | grep -q "\.zip$"; then
-            unzip "/tmp/llama_${BE}.archive" -d "/tmp/extract_$BE"
+            unzip "$_archive" -d "$_extract"
         else
-            tar -xzf "/tmp/llama_${BE}.archive" -C "/tmp/extract_$BE"
+            tar -xzf "$_archive" -C "$_extract"
         fi
-        find "/tmp/extract_$BE" -name "llama-server" -exec cp {} "$BIN_DIR/llama-server-$SUFFIX" \;
-        find "/tmp/extract_$BE" -name "*.so*" -exec cp {} "$LIB_DIR/" \;
-        rm -rf "/tmp/llama_${BE}.archive" "/tmp/extract_$BE"
+        find "$_extract" -name "llama-server" -exec cp {} "$BIN_DIR/llama-server-$SUFFIX" \;
+        find "$_extract" -name "*.so*" -exec cp {} "$LIB_DIR/" \;
+        rm -rf "$_archive" "$_extract"
 
         sync_backend_plugins "$BIN_DIR" "$LIB_DIR"
         echo "$CURRENT_SIG" > "$STATE_FILE"
-        echo "  $BE provisioned: $BIN_DIR/llama-server-$SUFFIX"
+        echo "  ${NAME} provisioned: $BIN_DIR/llama-server-$SUFFIX"
     else
-        echo ">>> Runtime up to date for $BE ($RUNTIME_DIR), skipping provisioning"
+        echo ">>> Runtime up to date for ${NAME} ($RUNTIME_DIR), skipping provisioning"
         sync_backend_plugins "$BIN_DIR" "$LIB_DIR"
     fi
 }
@@ -178,28 +305,45 @@ provision_backend() {
 # 2. Provisioning (skipped if signature matches cached state)
 # ---------------------------------------------------------------------------
 echo "--- Provisioning llama.cpp runtime ---"
+load_runtime_catalog
+echo "  Runtime catalog variants:"
+jq -r '.variants[]? | "    - " + (.name // "<unnamed>") + " [" + (.backend // "?") + "@" + (.version // "latest") + "]"' "$EFFECTIVE_RUNTIME_CATALOG" || true
 
-# Build list of backend-specific runtime directories to manage.
-BACKENDS=()
-if [ -n "$LLAMA_BACKEND" ] && [ "$LLAMA_BACKEND" != "auto" ]; then
-    BACKENDS+=("$LLAMA_BACKEND")
-else
-    $HAS_NVIDIA  && BACKENDS+=("cuda")
-    $HAS_AMD     && BACKENDS+=("rocm")
-    $HAS_VULKAN  && BACKENDS+=("vulkan")
-    [ ${#BACKENDS[@]} -eq 0 ] && BACKENDS+=("cpu")
-fi
+mapfile -t VARIANT_ROWS < <(jq -c '.variants[]? | select((.enabled // true) == true)' "$EFFECTIVE_RUNTIME_CATALOG")
 
-echo "  Backend directories: ${BACKENDS[*]}"
+PROVISIONED_COUNT=0
+for ROW in "${VARIANT_ROWS[@]}"; do
+    NAME="$(echo "$ROW" | jq -r '.name // ""')"
+    BACKEND="$(echo "$ROW" | jq -r '.backend // ""' | tr '[:upper:]' '[:lower:]')"
+    VERSION="$(echo "$ROW" | jq -r '.version // "latest"')"
+    PATTERN="$(echo "$ROW" | jq -r '.asset_pattern // ""')"
+    OWNER="$(echo "$ROW" | jq -r '.repo_owner // "ggml-org"')"
+    REPO="$(echo "$ROW" | jq -r '.repo_name // "llama.cpp"')"
+    RUNTIME_SUBDIR="$(echo "$ROW" | jq -r '.runtime_subdir // ""')"
+    ALWAYS="$(echo "$ROW" | jq -r '.always // false')"
 
-VERSION_TAG=${LLAMA_VERSION:-latest}
-API_URL="https://api.github.com/repos/ggml-org/llama.cpp/releases/latest"
-[ "$VERSION_TAG" != "latest" ] && API_URL="https://api.github.com/repos/ggml-org/llama.cpp/releases/tags/$VERSION_TAG"
-RELEASE_DATA=$(curl -sL "$API_URL")
+    [ -z "$BACKEND" ] && continue
+    [ -z "$NAME" ] && NAME="$BACKEND"
+    [ -z "$RUNTIME_SUBDIR" ] && RUNTIME_SUBDIR="$BACKEND"
+    if [ -z "$PATTERN" ]; then
+        case "$BACKEND" in
+            rocm) PATTERN="ubuntu-rocm.*x64\\.(tar\\.gz|zip)$" ;;
+            vulkan) PATTERN="ubuntu-vulkan.*x64\\.(tar\\.gz|zip)$" ;;
+            cuda) PATTERN="ubuntu-x64\\.(tar\\.gz|zip)$" ;;
+            *) PATTERN="ubuntu-x64\\.(tar\\.gz|zip)$" ;;
+        esac
+    fi
 
-for BE in "${BACKENDS[@]}"; do
-    provision_backend "$BE"
+    if should_provision_variant "$BACKEND" "$ALWAYS"; then
+        provision_variant "$NAME" "$BACKEND" "$VERSION" "$PATTERN" "$OWNER" "$REPO" "$RUNTIME_SUBDIR"
+        PROVISIONED_COUNT=$((PROVISIONED_COUNT + 1))
+    fi
 done
+
+if [ "$PROVISIONED_COUNT" -eq 0 ]; then
+    echo "  No runtime variants selected from catalog; provisioning cpu fallback"
+    provision_variant "cpu" "cpu" "${LLAMA_VERSION:-latest}" "ubuntu-x64\\.(tar\\.gz|zip)$" "ggml-org" "llama.cpp" "cpu"
+fi
 
 # ---------------------------------------------------------------------------
 # 3. Launch

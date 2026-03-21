@@ -104,6 +104,11 @@ if [ ! -f "$CONFIG/local/llama-swap.override.yaml" ]; then
 #   executable_macro: llama-server-rocm     # run this model on ROCm
 #   executable_macro: llama-server-vulkan   # run this model on Vulkan
 #
+# For versioned backend binaries, add `backend_runtime_variants` entries in
+# config/local/models.override.yaml. The gateway generates
+# /app/config/generated/llama-swap/backend-runtime.catalog.json, and
+# provision-runtime.sh will download those variants and expose matching macros.
+#
 # llama-swap manages each as an independent process — backends are loaded
 # and unloaded on demand as requests arrive.
 EOF
