@@ -14,36 +14,40 @@ Expose one front-door host while keeping:
 
 ## Route layout
 
-Assuming nginx listens on `http://127.0.0.1:8080`:
+Assuming nginx listens on `http://127.0.0.1:8080` and the default base URL
+`/audia/llmgateway` is enabled:
 
-- `http://127.0.0.1:8080/v1/...`
+- `http://127.0.0.1:8080/audia/llmgateway/v1/...`
   - forwarded to LiteLLM
-- `http://127.0.0.1:8080/litellm/...`
+- `http://127.0.0.1:8080/audia/llmgateway/litellm/...`
   - full LiteLLM API with the prefix stripped
-- `http://127.0.0.1:8080/llamaswap/...`
+- `http://127.0.0.1:8080/audia/llmgateway/llamaswap/...`
   - full `llama-swap` API with the prefix stripped
+
+The root routes (`/v1/*`, `/litellm/*`, `/llamaswap/*`) remain available for
+backward compatibility.
 
 ## Examples
 
 - LiteLLM models:
-  - `/v1/models`
+  - `/audia/llmgateway/v1/models`
 - LiteLLM examples:
-  - `/v1/models`
-  - `/litellm/health`
-  - `/litellm/routes`
-  - `/litellm/model/info`
-  - `/health`
+  - `/audia/llmgateway/v1/models`
+  - `/audia/llmgateway/litellm/health`
+  - `/audia/llmgateway/litellm/routes`
+  - `/audia/llmgateway/litellm/model/info`
+  - `/audia/llmgateway/health`
 - llama-swap health:
-  - `/llamaswap/health`
-  - `/llamaswap-health`
+  - `/audia/llmgateway/llamaswap/health`
+  - `/audia/llmgateway/llamaswap-health`
 - llama-swap examples:
-  - `/llamaswap/v1/models`
-  - `/llamaswap/logs`
-  - `/llamaswap/logs/stream`
-  - `/llamaswap/logs/stream/proxy`
-  - `/llamaswap/logs/stream/upstream`
-  - `/llamaswap/running`
-  - `/llamaswap/upstream/<model_id>`
+  - `/audia/llmgateway/llamaswap/v1/models`
+  - `/audia/llmgateway/llamaswap/logs`
+  - `/audia/llmgateway/llamaswap/logs/stream`
+  - `/audia/llmgateway/llamaswap/logs/stream/proxy`
+  - `/audia/llmgateway/llamaswap/logs/stream/upstream`
+  - `/audia/llmgateway/llamaswap/running`
+  - `/audia/llmgateway/llamaswap/upstream/<model_id>`
 
 ## Notes
 
@@ -51,6 +55,8 @@ Assuming nginx listens on `http://127.0.0.1:8080`:
 - Both products are fully proxied via their own namespaces: `/litellm/*` and `/llamaswap/*`.
 - `llama-swap` also exposes OpenAI-compatible `/v1/*`, but this config intentionally keeps that under `/llamaswap/v1/*` so it does not collide with LiteLLM at the root.
 - Buffering is disabled on the namespaced proxy routes so streaming responses continue to pass through cleanly.
+- The base URL path is configured by `network.base_path` in `stack.base.yaml`
+  (default `/audia/llmgateway`). Set it to `""` to disable base-path routing.
 
 ## Installation and startup
 

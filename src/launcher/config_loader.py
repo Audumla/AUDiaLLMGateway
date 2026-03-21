@@ -142,6 +142,7 @@ class InstallConfig:
 @dataclass(frozen=True)
 class NetworkConfig:
     backend_bind_host: str
+    base_path: str
     public_host: str
     llamaswap_host: str
     llamaswap_port: int
@@ -171,6 +172,17 @@ class StackConfig:
     component_settings: dict[str, Any]
     models_project_config_path: str
     models_local_override_path: str
+
+
+def _normalize_base_path(value: Any) -> str:
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if not text or text == "/":
+        return ""
+    if not text.startswith("/"):
+        text = f"/{text}"
+    return text.rstrip("/")
 
 
 def _substitute_env(value: str) -> str:
@@ -341,6 +353,7 @@ def load_stack_config(root: str | Path) -> StackConfig:
 
     network = NetworkConfig(
         backend_bind_host=_backend_bind_host,
+        base_path=_normalize_base_path(network_raw.get("base_path", "/audia/llmgateway")),
         public_host=str(network_raw.get("public_host") or _auto_ip),
         llamaswap_host=_llamaswap_host,
         llamaswap_port=int(llamaswap_service.get("port", llama_swap_raw.get("port", 41080))),
@@ -1334,20 +1347,26 @@ def build_mcp_client_config(stack: StackConfig) -> dict[str, Any]:
 
 def build_nginx_landing_page(stack: StackConfig) -> str:
     port = stack.network.nginx_port
+    base_path = stack.network.base_path
+
+    def _url(path: str) -> str:
+        return f"{base_path}{path}" if base_path else path
+
     vllm_rows = ""
     if stack.vllm.enabled:
         vllm_rows = f"""
       <tr>
-        <td><a href="/vllm/">/vllm/</a></td>
+        <td><a href="{_url('/vllm/')}">{_url('/vllm/')}</a></td>
         <td>vLLM backend &mdash; direct backend access
           (<code>{stack.network.vllm_host}:{stack.network.vllm_port}</code>)</td>
         <td><span class="tag">Proxy</span></td>
       </tr>
       <tr>
-        <td><a href="/vllm-health">/vllm-health</a></td>
+        <td><a href="{_url('/vllm-health')}">{_url('/vllm-health')}</a></td>
         <td>vLLM health check</td>
         <td><span class="tag">Health</span></td>
       </tr>"""
+    base_hint = base_path or "/"
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1369,40 +1388,40 @@ def build_nginx_landing_page(stack: StackConfig) -> str:
 </head>
 <body>
   <h1>AUDia LLM Gateway</h1>
-  <p class="sub">Port <code>{port}</code> &mdash; links are relative to this page</p>
+  <p class="sub">Port <code>{port}</code> &mdash; base URL <code>{base_hint}</code></p>
 
   <table>
     <thead><tr><th>Endpoint</th><th>Description</th><th>Type</th></tr></thead>
     <tbody>
       <tr>
-        <td><a href="/v1/models">/v1/models</a></td>
+        <td><a href="{_url('/v1/models')}">{_url('/v1/models')}</a></td>
         <td>OpenAI-compatible model list via LiteLLM</td>
         <td><span class="tag">API</span></td>
       </tr>
       <tr>
-        <td><a href="/litellm/">/litellm/</a></td>
+        <td><a href="{_url('/litellm/')}">{_url('/litellm/')}</a></td>
         <td>LiteLLM gateway &mdash; full OpenAI-compatible API
           (<code>{stack.network.litellm_host}:{stack.network.litellm_port}</code>)</td>
         <td><span class="tag">Proxy</span></td>
       </tr>
       <tr>
-        <td><a href="/llamaswap/">/llamaswap/</a></td>
+        <td><a href="{_url('/llamaswap/')}">{_url('/llamaswap/')}</a></td>
         <td>llama-swap model router &mdash; direct backend access
           (<code>{stack.network.llamaswap_host}:{stack.network.llamaswap_port}</code>)</td>
         <td><span class="tag">Proxy</span></td>
       </tr>
       <tr>
-        <td><a href="/ui/">/ui/</a></td>
+        <td><a href="{_url('/ui/')}">{_url('/ui/')}</a></td>
         <td>LiteLLM admin UI</td>
         <td><span class="tag">UI</span></td>
       </tr>
       <tr>
-        <td><a href="/health">/health</a></td>
+        <td><a href="{_url('/health')}">{_url('/health')}</a></td>
         <td>LiteLLM health check</td>
         <td><span class="tag">Health</span></td>
       </tr>
       <tr>
-        <td><a href="/llamaswap-health">/llamaswap-health</a></td>
+        <td><a href="{_url('/llamaswap-health')}">{_url('/llamaswap-health')}</a></td>
         <td>llama-swap health check</td>
         <td><span class="tag">Health</span></td>
       </tr>
@@ -1434,6 +1453,31 @@ def _read_local_env_var(stack: StackConfig, var_name: str) -> str:
 def build_nginx_config(stack: StackConfig) -> str:
     litellm_key = _read_local_env_var(stack, stack.litellm.master_key_env)
     litellm_auth_header = f'\n            proxy_set_header Authorization "Bearer {litellm_key}";' if litellm_key else ""
+    base_path = stack.network.base_path
+    base_namespace_routes = ""
+    if base_path:
+        escaped_base = re.escape(base_path)
+        base_namespace_routes = f"""
+
+        location = {base_path} {{
+            return 301 {base_path}/;
+        }}
+
+        # Base-path namespace passthrough. Requests under {base_path}/* are
+        # rewritten to root paths and internally proxied back through nginx,
+        # so all existing route handlers work unchanged under the base URL.
+        location {base_path}/ {{
+            rewrite ^{escaped_base}/(.*)$ /$1 break;
+            proxy_pass http://127.0.0.1:{stack.network.nginx_port};
+            proxy_http_version 1.1;
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
+            proxy_buffering off;
+            proxy_request_buffering off;
+        }}"""
     vllm_upstream = ""
     vllm_routes = ""
     if stack.vllm.enabled:
@@ -1511,7 +1555,7 @@ http {{
         client_max_body_size 100m;
         proxy_connect_timeout 60s;
         proxy_send_timeout 600s;
-        proxy_read_timeout 600s;
+        proxy_read_timeout 600s;{base_namespace_routes}
 
         location /v1/ {{
             proxy_pass http://litellm_upstream;
