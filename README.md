@@ -135,6 +135,7 @@ Project base files:
 
 - `config/project/stack.base.yaml` — services, network, components
 - `config/project/models.base.yaml` — shared catalog scaffold and empty defaults
+- `config/project/backend-runtime.base.yaml` — backend runtime source catalog
 - `config/project/llama-swap.base.yaml` — llama-swap substrate
 - `config/project/mcp.base.yaml` — MCP scaffold
 
@@ -142,12 +143,14 @@ Local override files:
 
 - `config/local/stack.override.yaml`
 - `config/local/models.override.yaml`
+- `config/local/backend-runtime.override.yaml`
 - `config/local/llama-swap.override.yaml`
 - `config/local/mcp.override.yaml`
 
 Generated outputs:
 
 - `config/generated/llama-swap/llama-swap.generated.yaml`
+- `config/generated/llama-swap/backend-runtime.catalog.json`
 - `config/generated/litellm/litellm.config.yaml`
 - `config/generated/vllm/vllm.config.json`
 - `config/generated/nginx/nginx.conf`
@@ -168,6 +171,27 @@ the scaffold and merge targets used by the local catalog. The catalog holds:
 
 The config generator translates the catalog into backend-specific config at
 generation time. Machine-specific additions go in `config/local/models.override.yaml`.
+
+### Backend runtime catalog
+
+Backend binary download/build sources are configured independently from model
+definitions in:
+
+- `config/project/backend-runtime.base.yaml`
+- `config/local/backend-runtime.override.yaml`
+
+Each variant can use `github_release`, `direct_url`, or `git` source types and
+produces a versioned backend macro (for example `llama-server-rocm-b8429`) that
+you can reference in model deployments.
+
+How to add a new backend variant:
+
+1. Add a variant under `config/local/backend-runtime.override.yaml`.
+2. Reference its macro in `config/local/models.override.yaml` deployment
+   (`executable_macro: <macro>`).
+3. Regenerate and restart:
+   - `python -m src.launcher.process_manager --root . generate-configs`
+   - `docker compose restart llm-server-llamacpp` (Docker)
 
 ### Central network config
 

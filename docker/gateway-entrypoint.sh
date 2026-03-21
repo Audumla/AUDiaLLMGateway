@@ -70,6 +70,45 @@ if [ ! -f "$CONFIG/local/models.override.yaml" ]; then
 EOF
 fi
 
+if [ ! -f "$CONFIG/local/backend-runtime.override.yaml" ]; then
+    echo ">>> First run: seeding config/local/backend-runtime.override.yaml"
+    cat > "$CONFIG/local/backend-runtime.override.yaml" <<'EOF'
+# AUDia LLM Gateway — backend runtime variant overrides.
+# Merged on top of config/project/backend-runtime.base.yaml.
+# Use this file to add extra backend binaries (alternate tags, repos, direct URLs, git builds).
+#
+# variants:
+#   rocm-b8429:
+#     backend: rocm
+#     macro: llama-server-rocm-b8429
+#     version: b8429
+#     runtime_subdir: rocm/b8429
+#
+#   vulkan-custom-url:
+#     backend: vulkan
+#     macro: llama-server-vulkan-custom
+#     source_type: direct_url
+#     download_url: https://example.com/llama-vulkan-custom.tar.gz
+#     archive_type: tar.gz
+#     runtime_subdir: vulkan/custom
+#
+#   rocm-built-from-git:
+#     backend: rocm
+#     macro: llama-server-rocm-git
+#     source_type: git
+#     git_url: https://github.com/ggml-org/llama.cpp.git
+#     git_ref: master
+#     configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_HIPBLAS=ON -DCMAKE_BUILD_TYPE=Release
+#     build_command: cmake --build build --config Release -j$(nproc)
+#     binary_glob: build/bin/llama-server
+#     library_glob: build/bin/*.so*
+#     apt_packages:
+#       - git
+#       - cmake
+#       - build-essential
+EOF
+fi
+
 if [ ! -f "$CONFIG/local/llama-swap.override.yaml" ]; then
     echo ">>> First run: seeding config/local/llama-swap.override.yaml"
     cat > "$CONFIG/local/llama-swap.override.yaml" <<'EOF'
@@ -104,8 +143,8 @@ if [ ! -f "$CONFIG/local/llama-swap.override.yaml" ]; then
 #   executable_macro: llama-server-rocm     # run this model on ROCm
 #   executable_macro: llama-server-vulkan   # run this model on Vulkan
 #
-# For versioned backend binaries, add `backend_runtime_variants` entries in
-# config/local/models.override.yaml. The gateway generates
+# For versioned backend binaries, add entries in
+# config/local/backend-runtime.override.yaml. The gateway generates
 # /app/config/generated/llama-swap/backend-runtime.catalog.json, and
 # provision-runtime.sh will download those variants and expose matching macros.
 #

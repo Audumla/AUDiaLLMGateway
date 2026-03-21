@@ -134,6 +134,7 @@ commented template files if they do not already exist:
 | `config/local/env` | Service-level env overrides (hint file — Docker reads `.env` at root) |
 | `config/local/stack.override.yaml` | Port, host, and service overrides |
 | `config/local/models.override.yaml` | Add or override model definitions |
+| `config/local/backend-runtime.override.yaml` | Add backend binary source variants and versioned macros |
 
 Then it generates `config/generated/` from `config/project/` + `config/local/` and
 starts LiteLLM. If `LITELLM_MASTER_KEY` is not already present in the container
@@ -452,8 +453,9 @@ All variables read from `.env` at compose start time.
 ### Versioned llama.cpp backend catalog
 
 You can provision multiple versions of the same backend (for example multiple
-ROCm and Vulkan builds) by adding `backend_runtime_variants` to
-`config/local/models.override.yaml`. Each variant generates:
+ROCm and Vulkan builds) by adding variants in
+`config/local/backend-runtime.override.yaml` (merged with
+`config/project/backend-runtime.base.yaml`). Each variant generates:
 
 - a versioned llama-swap macro (for example `llama-server-rocm-b8429`)
 - an entry in `config/generated/llama-swap/backend-runtime.catalog.json`
@@ -463,17 +465,38 @@ ROCm and Vulkan builds) by adding `backend_runtime_variants` to
 Example:
 
 ```yaml
-backend_runtime_variants:
-  - name: rocm-b8429
+variants:
+  rocm-b8429:
     backend: rocm
     macro: llama-server-rocm-b8429
     version: b8429
     runtime_subdir: rocm/b8429
-  - name: vulkan-b8429
+  vulkan-b8429:
     backend: vulkan
     macro: llama-server-vulkan-b8429
     version: b8429
     runtime_subdir: vulkan/b8429
+  vulkan-custom-url:
+    backend: vulkan
+    macro: llama-server-vulkan-custom
+    source_type: direct_url
+    download_url: https://example.com/llama-vulkan-custom.tar.gz
+    archive_type: tar.gz
+    runtime_subdir: vulkan/custom
+  rocm-built-from-git:
+    backend: rocm
+    macro: llama-server-rocm-git
+    source_type: git
+    git_url: https://github.com/ggml-org/llama.cpp.git
+    git_ref: master
+    configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_HIPBLAS=ON -DCMAKE_BUILD_TYPE=Release
+    build_command: cmake --build build --config Release -j$(nproc)
+    binary_glob: build/bin/llama-server
+    library_glob: build/bin/*.so*
+    apt_packages:
+      - git
+      - cmake
+      - build-essential
 
 model_profiles:
   tiny_qwen25_test:
@@ -483,6 +506,77 @@ model_profiles:
         executable_macro: llama-server-rocm-b8429
         profile: llamacpp_rocm_single_gpu1
         llama_swap_model: tiny-qwen25-test-rocm-b8429
+```
+
+### Add a new backend variant
+
+Use this flow whenever you want to add a new backend build (new version, alternate
+repo, direct artifact URL, or source build):
+
+1. Add a variant in `config/local/backend-runtime.override.yaml`.
+2. Point one or more model deployments at that macro in `config/local/models.override.yaml`
+   using `executable_macro`.
+3. Regenerate configs.
+4. Restart `llm-server-llamacpp` (or let watcher restart it if running).
+5. Verify the variant appears in generated runtime catalog and responds.
+
+Minimal examples:
+
+```yaml
+variants:
+  rocm-b9000:
+    backend: rocm
+    macro: llama-server-rocm-b9000
+    source_type: github_release
+    repo_owner: ggml-org
+    repo_name: llama.cpp
+    version: b9000
+    asset_pattern: ubuntu-rocm.*x64\.(tar\.gz|zip)$
+    runtime_subdir: rocm/b9000
+
+  vulkan-direct:
+    backend: vulkan
+    macro: llama-server-vulkan-direct
+    source_type: direct_url
+    download_url: https://example.com/llama-vulkan-custom.tar.gz
+    archive_type: tar.gz
+    runtime_subdir: vulkan/direct
+
+  rocm-from-git:
+    backend: rocm
+    macro: llama-server-rocm-git-main
+    source_type: git
+    git_url: https://github.com/ggml-org/llama.cpp.git
+    git_ref: master
+    configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_HIPBLAS=ON -DCMAKE_BUILD_TYPE=Release
+    build_command: cmake --build build --config Release -j$(nproc)
+    binary_glob: build/bin/llama-server
+    library_glob: build/bin/*.so*
+    apt_packages:
+      - git
+      - cmake
+      - build-essential
+    runtime_subdir: rocm/git-main
+```
+
+Bind a model deployment to the new variant:
+
+```yaml
+model_profiles:
+  tiny_qwen25_test:
+    deployments:
+      llamacpp_rocm_b9000:
+        label: local/tiny_qwen25_test_b9000
+        profile: llamacpp_rocm_single_gpu1
+        executable_macro: llama-server-rocm-b9000
+```
+
+Apply and verify:
+
+```bash
+python -m src.launcher.process_manager --root . generate-configs
+docker compose restart llm-server-llamacpp
+docker compose exec llm-server-llamacpp sh -lc 'jq . /app/config/backend-runtime.catalog.json'
 ```
 
 ---

@@ -49,7 +49,7 @@ config layer. It is the authoritative design guide for the next build-out phase.
 2. No automatic model file download triggered by config change (download remains
    a deliberate user action).
 3. No cloud-aware routing or multi-host orchestration.
-4. No breaking changes to the merged catalog schema — extensions only.
+4. No breaking changes to runtime behaviour during config regeneration and reload.
 
 ---
 
@@ -69,6 +69,23 @@ current layout, `config/project/models.base.yaml` provides the scaffold and
 - `model_profiles` — per-model definitions with `defaults`, `artifacts`, `deployments`
 - `exposures` — stable LiteLLM gateway alias → model_profile + deployment bindings
 - `load_groups` — activity-oriented model residency groups
+
+### Separate backend runtime catalog
+
+Backend binary source configuration is not part of the model catalog. It must be
+defined in a separate layered catalog:
+
+- `config/project/backend-runtime.base.yaml`
+- `config/local/backend-runtime.override.yaml`
+
+This backend runtime catalog is responsible for:
+
+- backend variant source definitions (`github_release`, `direct_url`, `git`)
+- versioned macro generation (`llama-server-<variant>`)
+- runtime subdirectory layout under `BACKEND_RUNTIME_ROOT`
+
+Model deployments consume backend runtime outcomes (macro names), but do not own
+download/build source definitions.
 
 ### Extensions required by this spec
 
@@ -194,11 +211,13 @@ frameworks:
 ```
 config/project/stack.base.yaml          project defaults
 config/project/models.base.yaml         project catalog scaffold / merge target
+config/project/backend-runtime.base.yaml backend runtime source catalog
 config/project/llama-swap.base.yaml     llama-swap substrate defaults
 config/project/mcp.base.yaml            MCP scaffold
 
 config/local/stack.override.yaml        machine overrides (ports, hosts, flags)
 config/local/models.override.yaml       machine-local model catalog and overrides
+config/local/backend-runtime.override.yaml machine-local backend runtime source overrides
 config/local/llama-swap.override.yaml   machine llama-swap substrate overrides
 
 state/install-state.json               installed components and binary paths
@@ -208,6 +227,7 @@ state/install-state.json               installed components and binary paths
 
 ```
 config/generated/llama-swap/llama-swap.generated.yaml
+config/generated/llama-swap/backend-runtime.catalog.json
 config/generated/litellm/litellm.config.yaml
 config/generated/mcp/litellm.mcp.client.json
 config/generated/nginx/nginx.conf
@@ -386,6 +406,7 @@ create the same three files if absent:
 | ---- | --------- |
 | `config/local/stack.override.yaml` | `postinstall.sh` (native) · `gateway-entrypoint.sh` (Docker) |
 | `config/local/models.override.yaml` | `postinstall.sh` (native) · `gateway-entrypoint.sh` (Docker) |
+| `config/local/backend-runtime.override.yaml` | `postinstall.sh` (native) · `gateway-entrypoint.sh` (Docker) |
 | `config/local/env` | `postinstall.sh` (native) · `gateway-entrypoint.sh` (Docker) |
 
 Port settings are commented out with project defaults shown as reference. Host

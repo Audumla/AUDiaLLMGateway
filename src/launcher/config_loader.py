@@ -172,6 +172,8 @@ class StackConfig:
     component_settings: dict[str, Any]
     models_project_config_path: str
     models_local_override_path: str
+    backend_runtime_project_config_path: str
+    backend_runtime_local_override_path: str
 
 
 def _normalize_base_path(value: Any) -> str:
@@ -301,9 +303,12 @@ def load_stack_config(root: str | Path) -> StackConfig:
     component_settings = project_raw.get("component_settings", {})
     vllm_raw = component_settings.get("vllm", {}) if isinstance(component_settings, dict) else {}
     models_raw = raw.get("models", {})
+    backend_runtime_raw = raw.get("backend_runtime", {})
 
     if not isinstance(models_raw, dict):
         models_raw = {}
+    if not isinstance(backend_runtime_raw, dict):
+        backend_runtime_raw = {}
 
     if not models_raw:
         raise ValueError("stack config does not define a model catalog configuration")
@@ -460,6 +465,12 @@ def load_stack_config(root: str | Path) -> StackConfig:
             component_settings=component_settings,
             models_project_config_path=str(models_raw.get("project_config_path", "config/project/models.base.yaml")),
             models_local_override_path=str(models_raw.get("local_override_path", "config/local/models.override.yaml")),
+            backend_runtime_project_config_path=str(
+                backend_runtime_raw.get("project_config_path", "config/project/backend-runtime.base.yaml")
+            ),
+            backend_runtime_local_override_path=str(
+                backend_runtime_raw.get("local_override_path", "config/local/backend-runtime.override.yaml")
+            ),
         )
         published_models = _catalog_published_models(temp_stack)
     return StackConfig(
@@ -479,6 +490,12 @@ def load_stack_config(root: str | Path) -> StackConfig:
         component_settings=component_settings,
         models_project_config_path=str(models_raw.get("project_config_path", "config/project/models.base.yaml")),
         models_local_override_path=str(models_raw.get("local_override_path", "config/local/models.override.yaml")),
+        backend_runtime_project_config_path=str(
+            backend_runtime_raw.get("project_config_path", "config/project/backend-runtime.base.yaml")
+        ),
+        backend_runtime_local_override_path=str(
+            backend_runtime_raw.get("local_override_path", "config/local/backend-runtime.override.yaml")
+        ),
     )
 
 
@@ -513,6 +530,34 @@ def load_model_catalog(root: str | Path) -> tuple[dict[str, Any], dict[str, Any]
     project_data = _load_yaml(project_path)
     local_data = _load_yaml(local_path) if local_path.exists() else {}
     return project_data, local_data, deep_merge(project_data, local_data)
+
+
+def load_backend_runtime_catalog(root: str | Path) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    root_path = Path(root).resolve()
+    _, _, stack_merged = load_layered_yaml(root_path, "config/project/stack.base.yaml", "config/local/stack.override.yaml")
+    backend_runtime_raw = stack_merged.get("backend_runtime", {})
+    if not isinstance(backend_runtime_raw, dict):
+        backend_runtime_raw = {}
+    project_path = root_path / str(backend_runtime_raw.get("project_config_path", "config/project/backend-runtime.base.yaml"))
+    local_path = root_path / str(backend_runtime_raw.get("local_override_path", "config/local/backend-runtime.override.yaml"))
+
+    if not project_path.exists():
+        return {}, {}, {}
+
+    project_data = _load_yaml(project_path)
+    local_data = _load_yaml(local_path) if local_path.exists() else {}
+
+    merged = deep_merge(project_data, local_data)
+    project_variants = project_data.get("variants")
+    local_variants = local_data.get("variants")
+
+    # Allow local layered extension without duplicating the entire base list:
+    # - mapping style variants deep-merge naturally
+    # - list style variants append project + local
+    if isinstance(project_variants, list) and isinstance(local_variants, list):
+        merged["variants"] = [*project_variants, *local_variants]
+
+    return project_data, local_data, merged
 
 
 def _resolve_context_preset(catalog: dict[str, Any], context_name: str) -> tuple[str, dict[str, Any]]:
@@ -654,70 +699,147 @@ def _default_runtime_asset_pattern(backend: str) -> str:
     return patterns.get(backend, patterns["cpu"])
 
 
-def _default_runtime_variant(backend: str, version: str) -> dict[str, Any]:
+def _default_runtime_variant(backend: str, version: str, repo_owner: str, repo_name: str) -> dict[str, Any]:
     return {
         "name": backend,
         "backend": backend,
         "macro": f"llama-server-{backend}",
         "version": version,
         "asset_pattern": _default_runtime_asset_pattern(backend),
-        "repo_owner": "ggml-org",
-        "repo_name": "llama.cpp",
+        "source_type": "github_release",
+        "repo_owner": repo_owner,
+        "repo_name": repo_name,
         "runtime_subdir": backend,
         "enabled": True,
+        "always": False,
     }
 
 
+def _iter_backend_runtime_variants(raw_variants: Any) -> list[tuple[str, dict[str, Any]]]:
+    if isinstance(raw_variants, dict):
+        return [
+            (str(name), value if isinstance(value, dict) else {})
+            for name, value in raw_variants.items()
+        ]
+    if isinstance(raw_variants, list):
+        result: list[tuple[str, dict[str, Any]]] = []
+        for idx, value in enumerate(raw_variants):
+            if not isinstance(value, dict):
+                continue
+            name = str(value.get("name", "")).strip() or f"variant-{idx + 1}"
+            result.append((name, value))
+        return result
+    return []
+
+
 def _collect_backend_runtime_variants(stack: StackConfig) -> list[dict[str, Any]]:
-    _, _, catalog = load_model_catalog(stack.root)
+    _, _, catalog = load_backend_runtime_catalog(stack.root)
     global_version = _resolve_env_token(os.environ.get("LLAMA_VERSION", "latest"), "latest")
     llama_cpp_settings = stack.component_settings.get("llama_cpp", {})
-    default_owner = str(llama_cpp_settings.get("repo_owner", "ggml-org")).strip() or "ggml-org"
-    default_repo = str(llama_cpp_settings.get("repo_name", "llama.cpp")).strip() or "llama.cpp"
+    defaults = catalog.get("defaults", {}) if isinstance(catalog.get("defaults"), dict) else {}
+
+    default_source_type = str(defaults.get("source_type", "github_release")).strip().lower() or "github_release"
+    default_owner = str(defaults.get("repo_owner", llama_cpp_settings.get("repo_owner", "ggml-org"))).strip() or "ggml-org"
+    default_repo = str(defaults.get("repo_name", llama_cpp_settings.get("repo_name", "llama.cpp"))).strip() or "llama.cpp"
+    default_version = _resolve_env_token(defaults.get("version", global_version), global_version)
+    default_enabled = bool(defaults.get("enabled", True))
+    default_always = bool(defaults.get("always", False))
+    default_runtime_subdir_prefix = str(defaults.get("runtime_subdir_prefix", "")).strip().strip("/")
+    default_asset_pattern = str(defaults.get("asset_pattern", "")).strip()
+    default_backends = defaults.get("base_backends", ["cpu", "cuda", "rocm", "vulkan"])
+    if not isinstance(default_backends, list):
+        default_backends = ["cpu", "cuda", "rocm", "vulkan"]
 
     variants_by_macro: dict[str, dict[str, Any]] = {}
-    for backend in ("cpu", "cuda", "rocm", "vulkan"):
-        variant = _default_runtime_variant(backend, global_version)
-        variant["repo_owner"] = default_owner
-        variant["repo_name"] = default_repo
-        variants_by_macro[str(variant["macro"])] = variant
 
-    custom_variants = catalog.get("backend_runtime_variants", [])
-    if isinstance(custom_variants, list):
-        for raw_variant in custom_variants:
-            if not isinstance(raw_variant, dict):
-                continue
-            backend = str(raw_variant.get("backend", "")).strip().lower()
+    variants_config = catalog.get("variants")
+    if not variants_config:
+        for backend_value in default_backends:
+            backend = str(backend_value).strip().lower()
             if not backend:
                 continue
-            name = str(raw_variant.get("name", "")).strip()
-            version = _resolve_env_token(raw_variant.get("version", global_version), global_version)
-            if not name:
-                if version in ("", "latest"):
-                    name = backend
-                else:
-                    name = f"{backend}-{version}"
-            runtime_subdir = str(raw_variant.get("runtime_subdir", "")).strip()
-            if not runtime_subdir:
-                runtime_subdir = backend if name == backend else f"{backend}/{name}"
-            macro = str(raw_variant.get("macro", "")).strip()
-            if not macro:
-                macro = f"llama-server-{name}"
-            variant = {
-                "name": name,
-                "backend": backend,
-                "macro": macro,
-                "version": version,
-                "asset_pattern": str(raw_variant.get("asset_pattern", _default_runtime_asset_pattern(backend))).strip(),
-                "repo_owner": str(raw_variant.get("repo_owner", default_owner)).strip() or default_owner,
-                "repo_name": str(raw_variant.get("repo_name", default_repo)).strip() or default_repo,
-                "runtime_subdir": runtime_subdir,
-                "enabled": bool(raw_variant.get("enabled", True)),
-                "always": bool(raw_variant.get("always", False)),
-            }
-            if raw_variant.get("command"):
-                variant["command"] = str(raw_variant.get("command", "")).strip()
-            variants_by_macro[macro] = variant
+            variant = _default_runtime_variant(backend, default_version, default_owner, default_repo)
+            variant["enabled"] = default_enabled
+            variant["always"] = default_always
+            if default_runtime_subdir_prefix:
+                variant["runtime_subdir"] = f"{default_runtime_subdir_prefix}/{variant['runtime_subdir']}"
+            if default_asset_pattern:
+                variant["asset_pattern"] = default_asset_pattern
+            variants_by_macro[str(variant["macro"])] = variant
+        return list(variants_by_macro.values())
+
+    for entry_name, raw_variant in _iter_backend_runtime_variants(variants_config):
+        source = raw_variant.get("source", {})
+        if not isinstance(source, dict):
+            source = {}
+
+        name = str(raw_variant.get("name", "")).strip() or entry_name.strip()
+        backend = str(raw_variant.get("backend", "")).strip().lower()
+        if not backend:
+            backend = str(source.get("backend", "")).strip().lower()
+        if not backend:
+            continue
+
+        version = _resolve_env_token(
+            raw_variant.get("version", source.get("version", default_version)),
+            default_version,
+        )
+        source_type = str(raw_variant.get("source_type", source.get("type", default_source_type))).strip().lower()
+        if not source_type:
+            source_type = "github_release"
+
+        if not name:
+            name = backend if version in ("", "latest") else f"{backend}-{version}"
+
+        runtime_subdir = str(raw_variant.get("runtime_subdir", source.get("runtime_subdir", ""))).strip().strip("/")
+        if not runtime_subdir:
+            runtime_subdir = backend if name == backend else f"{backend}/{name}"
+        if default_runtime_subdir_prefix:
+            runtime_subdir = f"{default_runtime_subdir_prefix}/{runtime_subdir}"
+
+        macro = str(raw_variant.get("macro", source.get("macro", ""))).strip()
+        if not macro:
+            macro = f"llama-server-{name}"
+
+        variant = {
+            "name": name,
+            "backend": backend,
+            "macro": macro,
+            "version": version,
+            "source_type": source_type,
+            "asset_pattern": str(
+                raw_variant.get(
+                    "asset_pattern",
+                    source.get("asset_pattern", default_asset_pattern or _default_runtime_asset_pattern(backend)),
+                )
+            ).strip(),
+            "repo_owner": str(raw_variant.get("repo_owner", source.get("repo_owner", default_owner))).strip() or default_owner,
+            "repo_name": str(raw_variant.get("repo_name", source.get("repo_name", default_repo))).strip() or default_repo,
+            "download_url": str(raw_variant.get("download_url", source.get("url", ""))).strip(),
+            "archive_type": str(raw_variant.get("archive_type", source.get("archive_type", ""))).strip(),
+            "git_url": str(raw_variant.get("git_url", source.get("repo_url", ""))).strip(),
+            "git_ref": str(raw_variant.get("git_ref", source.get("ref", version))).strip() or version,
+            "configure_command": str(
+                raw_variant.get("configure_command", source.get("configure_command", ""))
+            ).strip(),
+            "build_command": str(raw_variant.get("build_command", source.get("build_command", ""))).strip(),
+            "binary_glob": str(raw_variant.get("binary_glob", source.get("binary_glob", ""))).strip(),
+            "library_glob": str(raw_variant.get("library_glob", source.get("library_glob", ""))).strip(),
+            "runtime_subdir": runtime_subdir,
+            "enabled": bool(raw_variant.get("enabled", source.get("enabled", default_enabled))),
+            "always": bool(raw_variant.get("always", source.get("always", default_always))),
+        }
+
+        apt_packages = raw_variant.get("apt_packages", source.get("apt_packages", []))
+        if isinstance(apt_packages, str):
+            variant["apt_packages"] = [item.strip() for item in apt_packages.split() if item.strip()]
+        elif isinstance(apt_packages, list):
+            variant["apt_packages"] = [str(item).strip() for item in apt_packages if str(item).strip()]
+
+        if raw_variant.get("command") or source.get("command"):
+            variant["command"] = str(raw_variant.get("command", source.get("command", ""))).strip()
+
+        variants_by_macro[macro] = variant
 
     return list(variants_by_macro.values())
 
@@ -1447,15 +1569,29 @@ def build_backend_runtime_catalog(stack: StackConfig) -> dict[str, Any]:
     return {
         "schema_version": 1,
         "runtime_root": "/app/runtime-root",
+        "source_config": {
+            "project": stack.backend_runtime_project_config_path,
+            "local": stack.backend_runtime_local_override_path,
+        },
         "variants": [
             {
                 "name": str(variant.get("name", "")),
                 "backend": str(variant.get("backend", "")),
                 "macro": str(variant.get("macro", "")),
                 "version": str(variant.get("version", "latest")),
+                "source_type": str(variant.get("source_type", "github_release")),
                 "asset_pattern": str(variant.get("asset_pattern", "")),
                 "repo_owner": str(variant.get("repo_owner", "ggml-org")),
                 "repo_name": str(variant.get("repo_name", "llama.cpp")),
+                "download_url": str(variant.get("download_url", "")),
+                "archive_type": str(variant.get("archive_type", "")),
+                "git_url": str(variant.get("git_url", "")),
+                "git_ref": str(variant.get("git_ref", "")),
+                "configure_command": str(variant.get("configure_command", "")),
+                "build_command": str(variant.get("build_command", "")),
+                "binary_glob": str(variant.get("binary_glob", "")),
+                "library_glob": str(variant.get("library_glob", "")),
+                "apt_packages": [str(item) for item in variant.get("apt_packages", []) if str(item).strip()],
                 "runtime_subdir": str(variant.get("runtime_subdir", "")),
                 "enabled": bool(variant.get("enabled", True)),
                 "always": bool(variant.get("always", False)),
@@ -1856,6 +1992,7 @@ def write_llama_swap_config(root: str | Path) -> Path:
     payload = build_llama_swap_config(stack)
     header = (
         "# Generated from config/project/models.base.yaml, config/local/models.override.yaml,\n"
+        "# config/project/backend-runtime.base.yaml, config/local/backend-runtime.override.yaml,\n"
         "# config/project/llama-swap.base.yaml, and config/local/llama-swap.override.yaml.\n"
         "# Regenerate with:\n"
         "#   python -m src.launcher.process_manager generate-configs\n"
@@ -1938,6 +2075,7 @@ def validate_layered_configs(root: str | Path) -> dict[str, Any]:
     llama_base, llama_local, _ = load_llama_swap_source_config(root)
     mcp_base, mcp_local, _ = load_mcp_registry(root)
     models_base, models_local, _ = load_model_catalog(root)
+    backend_runtime_base, backend_runtime_local, _ = load_backend_runtime_catalog(root)
     stack_base, stack_local, _ = load_layered_yaml(root, "config/project/stack.base.yaml", "config/local/stack.override.yaml")
     state_path = stack_base.get("project", {}).get("installer", {}).get("state_path", "state/install-state.json")
     return {
@@ -1947,6 +2085,7 @@ def validate_layered_configs(root: str | Path) -> dict[str, Any]:
             "llama_swap": type_conflicts(llama_base, llama_local),
             "mcp": type_conflicts(mcp_base, mcp_local),
             "models": type_conflicts(models_base, models_local),
+            "backend_runtime": type_conflicts(backend_runtime_base, backend_runtime_local),
         },
         "state_path": str(Path(root).resolve() / state_path),
     }
