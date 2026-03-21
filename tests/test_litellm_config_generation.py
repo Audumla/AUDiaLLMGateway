@@ -75,10 +75,12 @@ def test_build_vllm_config_supports_vllm_preset(tmp_path: Path, monkeypatch) -> 
         "config/project/stack.base.yaml",
         "config/project/llama-swap.base.yaml",
         "config/project/models.base.yaml",
+        "config/project/backend-runtime.base.yaml",
         "config/project/mcp.base.yaml",
         "config/local/stack.override.yaml",
         "config/local/llama-swap.override.yaml",
         "config/local/models.override.yaml",
+        "config/local/backend-runtime.override.yaml",
         "config/local/mcp.override.yaml",
     ]:
         source = source_root / rel_path
@@ -116,10 +118,12 @@ def test_build_vllm_config_supports_gpu_profile_backend_block(tmp_path: Path, mo
         "config/project/stack.base.yaml",
         "config/project/llama-swap.base.yaml",
         "config/project/models.base.yaml",
+        "config/project/backend-runtime.base.yaml",
         "config/project/mcp.base.yaml",
         "config/local/stack.override.yaml",
         "config/local/llama-swap.override.yaml",
         "config/local/models.override.yaml",
+        "config/local/backend-runtime.override.yaml",
         "config/local/mcp.override.yaml",
     ]:
         source = source_root / rel_path
@@ -157,10 +161,12 @@ def test_write_generated_configs_writes_yaml_and_json(tmp_path: Path) -> None:
         "config/project/stack.base.yaml",
         "config/project/llama-swap.base.yaml",
         "config/project/models.base.yaml",
+        "config/project/backend-runtime.base.yaml",
         "config/project/mcp.base.yaml",
         "config/local/stack.override.yaml",
         "config/local/llama-swap.override.yaml",
         "config/local/models.override.yaml",
+        "config/local/backend-runtime.override.yaml",
         "config/local/mcp.override.yaml",
     ]:
         source = source_root / rel_path
@@ -196,10 +202,12 @@ def test_write_generated_configs_includes_base_path_namespace_routes(tmp_path: P
         "config/project/stack.base.yaml",
         "config/project/llama-swap.base.yaml",
         "config/project/models.base.yaml",
+        "config/project/backend-runtime.base.yaml",
         "config/project/mcp.base.yaml",
         "config/local/stack.override.yaml",
         "config/local/llama-swap.override.yaml",
         "config/local/models.override.yaml",
+        "config/local/backend-runtime.override.yaml",
         "config/local/mcp.override.yaml",
     ]:
         source = source_root / rel_path
@@ -451,10 +459,12 @@ def test_backend_runtime_variants_generate_versioned_macros_and_catalog(tmp_path
         "config/project/stack.base.yaml",
         "config/project/llama-swap.base.yaml",
         "config/project/models.base.yaml",
+        "config/project/backend-runtime.base.yaml",
         "config/project/mcp.base.yaml",
         "config/local/stack.override.yaml",
         "config/local/llama-swap.override.yaml",
         "config/local/models.override.yaml",
+        "config/local/backend-runtime.override.yaml",
         "config/local/mcp.override.yaml",
     ]:
         source = source_root / rel_path
@@ -462,18 +472,16 @@ def test_backend_runtime_variants_generate_versioned_macros_and_catalog(tmp_path
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
 
-    models_override = tmp_path / "config" / "local" / "models.override.yaml"
-    data = yaml.safe_load(models_override.read_text(encoding="utf-8"))
-    data.setdefault("backend_runtime_variants", []).append(
-        {
-            "name": "rocm-b8429",
-            "backend": "rocm",
-            "macro": "llama-server-rocm-b8429",
-            "version": "b8429",
-            "runtime_subdir": "rocm/b8429",
-        }
-    )
-    models_override.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+    runtime_override = tmp_path / "config" / "local" / "backend-runtime.override.yaml"
+    data = yaml.safe_load(runtime_override.read_text(encoding="utf-8"))
+    data.setdefault("variants", {})
+    data["variants"]["rocm-b8429"] = {
+        "backend": "rocm",
+        "macro": "llama-server-rocm-b8429",
+        "version": "b8429",
+        "runtime_subdir": "rocm/b8429",
+    }
+    runtime_override.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
 
     write_generated_configs(tmp_path)
     llama_swap_text = (tmp_path / "config" / "generated" / "llama-swap" / "llama-swap.generated.yaml").read_text(encoding="utf-8")
@@ -487,3 +495,69 @@ def test_backend_runtime_variants_generate_versioned_macros_and_catalog(tmp_path
         and item.get("version") == "b8429"
         for item in backend_catalog.get("variants", [])
     )
+
+
+def test_backend_runtime_catalog_supports_direct_url_and_git_sources(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("AUDIA_DOCKER", "true")
+    source_root = Path(__file__).resolve().parents[1]
+    for rel_path in [
+        "config/project/stack.base.yaml",
+        "config/project/llama-swap.base.yaml",
+        "config/project/models.base.yaml",
+        "config/project/backend-runtime.base.yaml",
+        "config/project/mcp.base.yaml",
+        "config/local/stack.override.yaml",
+        "config/local/llama-swap.override.yaml",
+        "config/local/models.override.yaml",
+        "config/local/backend-runtime.override.yaml",
+        "config/local/mcp.override.yaml",
+    ]:
+        source = source_root / rel_path
+        target = tmp_path / rel_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+
+    runtime_override = tmp_path / "config" / "local" / "backend-runtime.override.yaml"
+    runtime_override.write_text(
+        yaml.safe_dump(
+            {
+                "variants": {
+                    "vulkan-url": {
+                        "backend": "vulkan",
+                        "macro": "llama-server-vulkan-url",
+                        "source_type": "direct_url",
+                        "download_url": "https://example.com/llama-vulkan.tar.gz",
+                        "archive_type": "tar.gz",
+                        "runtime_subdir": "vulkan/url",
+                    },
+                    "rocm-git": {
+                        "backend": "rocm",
+                        "macro": "llama-server-rocm-git",
+                        "source_type": "git",
+                        "git_url": "https://github.com/ggml-org/llama.cpp.git",
+                        "git_ref": "master",
+                        "configure_command": "cmake -S . -B build",
+                        "build_command": "cmake --build build -j2",
+                        "binary_glob": "build/bin/llama-server",
+                        "library_glob": "build/bin/*.so*",
+                        "apt_packages": ["git", "cmake"],
+                        "runtime_subdir": "rocm/git",
+                    },
+                }
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    write_generated_configs(tmp_path)
+    backend_catalog = json.loads(
+        (tmp_path / "config" / "generated" / "llama-swap" / "backend-runtime.catalog.json").read_text(encoding="utf-8")
+    )
+    by_macro = {item["macro"]: item for item in backend_catalog.get("variants", [])}
+
+    assert by_macro["llama-server-vulkan-url"]["source_type"] == "direct_url"
+    assert by_macro["llama-server-vulkan-url"]["download_url"] == "https://example.com/llama-vulkan.tar.gz"
+    assert by_macro["llama-server-rocm-git"]["source_type"] == "git"
+    assert by_macro["llama-server-rocm-git"]["git_url"] == "https://github.com/ggml-org/llama.cpp.git"
+    assert by_macro["llama-server-rocm-git"]["apt_packages"] == ["git", "cmake"]

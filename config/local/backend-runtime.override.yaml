@@ -1,0 +1,33 @@
+version: 1
+defaults: {}
+variants: {}
+# Example variants:
+# variants:
+#   rocm-b8429:
+#     backend: rocm
+#     macro: llama-server-rocm-b8429
+#     version: b8429
+#     runtime_subdir: rocm/b8429
+#
+#   vulkan-custom-url:
+#     backend: vulkan
+#     macro: llama-server-vulkan-custom
+#     source_type: direct_url
+#     download_url: https://example.com/llama-vulkan-custom.tar.gz
+#     archive_type: tar.gz
+#     runtime_subdir: vulkan/custom
+#
+#   rocm-built-from-git:
+#     backend: rocm
+#     macro: llama-server-rocm-git
+#     source_type: git
+#     git_url: https://github.com/ggml-org/llama.cpp.git
+#     git_ref: master
+#     configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_HIPBLAS=ON -DCMAKE_BUILD_TYPE=Release
+#     build_command: cmake --build build --config Release -j$(nproc)
+#     binary_glob: build/bin/llama-server
+#     library_glob: build/bin/*.so*
+#     apt_packages:
+#       - git
+#       - cmake
+#       - build-essential

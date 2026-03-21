@@ -1,0 +1,34 @@
+version: 1
+defaults:
+  source_type: github_release
+  repo_owner: ggml-org
+  repo_name: llama.cpp
+  version: ${LLAMA_VERSION}
+  enabled: true
+  always: false
+  base_backends:
+    - cpu
+    - cuda
+    - rocm
+    - vulkan
+variants:
+  cpu:
+    backend: cpu
+    macro: llama-server-cpu
+    runtime_subdir: cpu
+    asset_pattern: ubuntu-x64\.(tar\.gz|zip)$
+  cuda:
+    backend: cuda
+    macro: llama-server-cuda
+    runtime_subdir: cuda
+    asset_pattern: ubuntu-x64\.(tar\.gz|zip)$
+  rocm:
+    backend: rocm
+    macro: llama-server-rocm
+    runtime_subdir: rocm
+    asset_pattern: ubuntu-rocm.*x64\.(tar\.gz|zip)$
+  vulkan:
+    backend: vulkan
+    macro: llama-server-vulkan
+    runtime_subdir: vulkan
+    asset_pattern: ubuntu-vulkan.*x64\.(tar\.gz|zip)$

@@ -95,6 +95,8 @@ def test_validate_layered_configs_reports_type_conflicts(tmp_path: Path) -> None
         "config/local/llama-swap.override.yaml": {"models": []},
         "config/project/models.base.yaml": {"model_profiles": {}},
         "config/local/models.override.yaml": {"model_profiles": []},
+        "config/project/backend-runtime.base.yaml": {"variants": {}},
+        "config/local/backend-runtime.override.yaml": {"variants": []},
         "config/project/mcp.base.yaml": {"servers": []},
         "config/local/mcp.override.yaml": {"servers": {"bad": "type"}},
     }.items():
@@ -106,4 +108,5 @@ def test_validate_layered_configs_reports_type_conflicts(tmp_path: Path) -> None
     assert "models" in report["type_conflicts"]["stack"]
     assert "models" in report["type_conflicts"]["llama_swap"]
     assert "model_profiles" in report["type_conflicts"]["models"]
+    assert "variants" in report["type_conflicts"]["backend_runtime"]
     assert "servers" in report["type_conflicts"]["mcp"]

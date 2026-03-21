@@ -63,6 +63,7 @@ default_runtime_catalog_json() {
       "backend": "cpu",
       "macro": "llama-server-cpu",
       "version": "${_ver}",
+      "source_type": "github_release",
       "asset_pattern": "ubuntu-x64\\\\.(tar\\\\.gz|zip)$",
       "repo_owner": "ggml-org",
       "repo_name": "llama.cpp",
@@ -75,6 +76,7 @@ default_runtime_catalog_json() {
       "backend": "cuda",
       "macro": "llama-server-cuda",
       "version": "${_ver}",
+      "source_type": "github_release",
       "asset_pattern": "ubuntu-x64\\\\.(tar\\\\.gz|zip)$",
       "repo_owner": "ggml-org",
       "repo_name": "llama.cpp",
@@ -87,6 +89,7 @@ default_runtime_catalog_json() {
       "backend": "rocm",
       "macro": "llama-server-rocm",
       "version": "${_ver}",
+      "source_type": "github_release",
       "asset_pattern": "ubuntu-rocm.*x64\\\\.(tar\\\\.gz|zip)$",
       "repo_owner": "ggml-org",
       "repo_name": "llama.cpp",
@@ -99,6 +102,7 @@ default_runtime_catalog_json() {
       "backend": "vulkan",
       "macro": "llama-server-vulkan",
       "version": "${_ver}",
+      "source_type": "github_release",
       "asset_pattern": "ubuntu-vulkan.*x64\\\\.(tar\\\\.gz|zip)$",
       "repo_owner": "ggml-org",
       "repo_name": "llama.cpp",
@@ -149,6 +153,43 @@ ensure_release_metadata() {
         curl -fsSL "$_api_url" -o "$_target"
     fi
     echo "$_target"
+}
+
+default_git_configure_command() {
+    local _backend="$1"
+    case "$_backend" in
+        rocm) echo "cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_HIPBLAS=ON -DCMAKE_BUILD_TYPE=Release" ;;
+        vulkan) echo "cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_VULKAN=ON -DCMAKE_BUILD_TYPE=Release" ;;
+        cuda) echo "cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_CUDA=ON -DCMAKE_BUILD_TYPE=Release" ;;
+        *) echo "cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DCMAKE_BUILD_TYPE=Release" ;;
+    esac
+}
+
+default_git_build_command() {
+    echo "cmake --build build --config Release -j$(nproc)"
+}
+
+default_binary_glob() {
+    echo "build/bin/llama-server"
+}
+
+default_library_glob() {
+    echo "build/bin/*.so*"
+}
+
+detect_archive_type() {
+    local _url="$1"
+    local _hint="$2"
+    if [ -n "$_hint" ]; then
+        echo "$_hint"
+        return
+    fi
+    case "$_url" in
+        *.tar.gz|*.tgz) echo "tar.gz" ;;
+        *.tar.xz) echo "tar.xz" ;;
+        *.zip) echo "zip" ;;
+        *) echo "auto" ;;
+    esac
 }
 
 # ---------------------------------------------------------------------------
@@ -251,45 +292,151 @@ provision_variant() {
     local OWNER="$5"
     local REPO="$6"
     local RUNTIME_SUBDIR="$7"
+    local SOURCE_TYPE="$8"
+    local DOWNLOAD_URL="$9"
+    local ARCHIVE_TYPE="${10}"
+    local GIT_URL="${11}"
+    local GIT_REF="${12}"
+    local CONFIGURE_COMMAND="${13}"
+    local BUILD_COMMAND="${14}"
+    local BINARY_GLOB="${15}"
+    local LIBRARY_GLOB="${16}"
+    local APT_PACKAGES="${17}"
     local SUFFIX="$BE"
     [ "$SUFFIX" = "cpu" ] && SUFFIX="cpu"
-    local CURRENT_SIG="${CURRENT_SIG_PREFIX}|VARIANT=${NAME}|BACKEND=${BE}|VERSION=${VERSION}|REPO=${OWNER}/${REPO}|PATTERN=${PATTERN}|SUBDIR=${RUNTIME_SUBDIR}"
+    local CURRENT_SIG="${CURRENT_SIG_PREFIX}|VARIANT=${NAME}|BACKEND=${BE}|VERSION=${VERSION}|SOURCE=${SOURCE_TYPE}|REPO=${OWNER}/${REPO}|PATTERN=${PATTERN}|URL=${DOWNLOAD_URL}|GIT=${GIT_URL}@${GIT_REF}|SUBDIR=${RUNTIME_SUBDIR}|CFG=${CONFIGURE_COMMAND}|BUILD=${BUILD_COMMAND}|BIN_GLOB=${BINARY_GLOB}|LIB_GLOB=${LIBRARY_GLOB}|APT=${APT_PACKAGES}"
     local RUNTIME_DIR="$RUNTIME_ROOT/$RUNTIME_SUBDIR"
     local BIN_DIR="$RUNTIME_DIR/bin"
     local LIB_DIR="$RUNTIME_DIR/lib"
     local STATE_FILE="$RUNTIME_DIR/.hw_signature"
     local RELEASE_META=""
     local DL_URL=""
+    local _archive_type=""
 
     mkdir -p "$BIN_DIR" "$LIB_DIR"
 
     if [ ! -f "$STATE_FILE" ] || [ "$(cat "$STATE_FILE")" != "$CURRENT_SIG" ]; then
-        echo ">>> Provisioning ${NAME} (${BE}@${VERSION}) into $RUNTIME_DIR..."
+        echo ">>> Provisioning ${NAME} (${BE}@${VERSION}, source=${SOURCE_TYPE}) into $RUNTIME_DIR..."
         rm -rf "$BIN_DIR"/* "$LIB_DIR"/*
 
-        if ! RELEASE_META="$(ensure_release_metadata "$OWNER" "$REPO" "$VERSION")"; then
-            echo "  WARNING: failed to fetch release metadata for ${OWNER}/${REPO}@${VERSION} — skipping ${NAME}"
-            return
-        fi
-        DL_URL=$(jq -r --arg p "$PATTERN" '.assets[] | select(.name | test($p)) | .browser_download_url' "$RELEASE_META" 2>/dev/null | head -1 || true)
+        [ -n "$APT_PACKAGES" ] && ensure_apt_packages $APT_PACKAGES
+
+        case "$SOURCE_TYPE" in
+            github_release|"")
+                if ! RELEASE_META="$(ensure_release_metadata "$OWNER" "$REPO" "$VERSION")"; then
+                    echo "  WARNING: failed to fetch release metadata for ${OWNER}/${REPO}@${VERSION} — skipping ${NAME}"
+                    return
+                fi
+                DL_URL=$(jq -r --arg p "$PATTERN" '.assets[] | select(.name | test($p)) | .browser_download_url' "$RELEASE_META" 2>/dev/null | head -1 || true)
+                if [ -z "$DL_URL" ]; then
+                    echo "  WARNING: no asset found for pattern $PATTERN in ${OWNER}/${REPO}@${VERSION} — skipping ${NAME}"
+                    return
+                fi
+                ;;
+            direct_url)
+                DL_URL="$DOWNLOAD_URL"
+                if [ -z "$DL_URL" ]; then
+                    echo "  WARNING: direct_url variant '${NAME}' missing download_url — skipping"
+                    return
+                fi
+                ;;
+            git)
+                if [ -z "$GIT_URL" ]; then
+                    echo "  WARNING: git variant '${NAME}' missing git_url — skipping"
+                    return
+                fi
+                [ -z "$GIT_REF" ] && GIT_REF="master"
+                [ -z "$CONFIGURE_COMMAND" ] && CONFIGURE_COMMAND="$(default_git_configure_command "$BE")"
+                [ -z "$BUILD_COMMAND" ] && BUILD_COMMAND="$(default_git_build_command)"
+                [ -z "$BINARY_GLOB" ] && BINARY_GLOB="$(default_binary_glob)"
+                [ -z "$LIBRARY_GLOB" ] && LIBRARY_GLOB="$(default_library_glob)"
+                ensure_apt_packages git cmake build-essential pkg-config
+
+                local _git_build="/tmp/git_build_${NAME}_$$"
+                rm -rf "$_git_build"
+                mkdir -p "$_git_build"
+                echo "  Cloning $GIT_URL @ $GIT_REF"
+                git clone --depth 1 --branch "$GIT_REF" "$GIT_URL" "$_git_build/src"
+                (
+                    cd "$_git_build/src"
+                    bash -lc "$CONFIGURE_COMMAND"
+                    bash -lc "$BUILD_COMMAND"
+                )
+                local _binary_path=""
+                _binary_path=$(compgen -G "$_git_build/src/$BINARY_GLOB" | head -1 || true)
+                if [ -z "$_binary_path" ]; then
+                    echo "  WARNING: git build did not produce binary matching '$BINARY_GLOB' — skipping ${NAME}"
+                    rm -rf "$_git_build"
+                    return
+                fi
+                cp "$_binary_path" "$BIN_DIR/llama-server-$SUFFIX"
+                if compgen -G "$_git_build/src/$LIBRARY_GLOB" >/dev/null 2>&1; then
+                    cp $_git_build/src/$LIBRARY_GLOB "$LIB_DIR/" 2>/dev/null || true
+                fi
+                rm -rf "$_git_build"
+                sync_backend_plugins "$BIN_DIR" "$LIB_DIR"
+                echo "$CURRENT_SIG" > "$STATE_FILE"
+                echo "  ${NAME} provisioned: $BIN_DIR/llama-server-$SUFFIX"
+                return
+                ;;
+            *)
+                echo "  WARNING: unknown source_type '$SOURCE_TYPE' for variant '${NAME}' — skipping"
+                return
+                ;;
+        esac
 
         if [ -z "$DL_URL" ]; then
-            echo "  WARNING: no asset found for pattern $PATTERN in ${OWNER}/${REPO}@${VERSION} — skipping ${NAME}"
+            echo "  WARNING: no download URL resolved for ${NAME}; skipping"
             return
         fi
 
         echo "  Downloading from $DL_URL..."
         local _archive="/tmp/llama_${NAME}.archive"
         local _extract="/tmp/extract_${NAME}"
-        curl -L -o "$_archive" "$DL_URL"
+        curl -fsSL -o "$_archive" "$DL_URL"
         mkdir -p "$_extract"
-        if echo "$DL_URL" | grep -q "\.zip$"; then
-            unzip "$_archive" -d "$_extract"
+        _archive_type="$(detect_archive_type "$DL_URL" "$ARCHIVE_TYPE")"
+        case "$_archive_type" in
+            zip)
+                unzip "$_archive" -d "$_extract"
+                ;;
+            tar.gz|tgz|auto)
+                tar -xzf "$_archive" -C "$_extract"
+                ;;
+            tar.xz)
+                tar -xJf "$_archive" -C "$_extract"
+                ;;
+            none|raw|binary)
+                cp "$_archive" "$BIN_DIR/llama-server-$SUFFIX"
+                chmod +x "$BIN_DIR/llama-server-$SUFFIX"
+                rm -rf "$_archive" "$_extract"
+                sync_backend_plugins "$BIN_DIR" "$LIB_DIR"
+                echo "$CURRENT_SIG" > "$STATE_FILE"
+                echo "  ${NAME} provisioned: $BIN_DIR/llama-server-$SUFFIX"
+                return
+                ;;
+            *)
+                echo "  WARNING: unsupported archive_type '$_archive_type' for ${NAME} — skipping"
+                rm -rf "$_archive" "$_extract"
+                return
+                ;;
+        esac
+        if [ -n "$BINARY_GLOB" ]; then
+            local _binary_path=""
+            _binary_path=$(compgen -G "$_extract/$BINARY_GLOB" | head -1 || true)
+            if [ -n "$_binary_path" ]; then
+                cp "$_binary_path" "$BIN_DIR/llama-server-$SUFFIX"
+            fi
         else
-            tar -xzf "$_archive" -C "$_extract"
+            find "$_extract" -name "llama-server" -exec cp {} "$BIN_DIR/llama-server-$SUFFIX" \;
         fi
-        find "$_extract" -name "llama-server" -exec cp {} "$BIN_DIR/llama-server-$SUFFIX" \;
-        find "$_extract" -name "*.so*" -exec cp {} "$LIB_DIR/" \;
+        if [ -n "$LIBRARY_GLOB" ]; then
+            if compgen -G "$_extract/$LIBRARY_GLOB" >/dev/null 2>&1; then
+                cp $_extract/$LIBRARY_GLOB "$LIB_DIR/" 2>/dev/null || true
+            fi
+        else
+            find "$_extract" -name "*.so*" -exec cp {} "$LIB_DIR/" \;
+        fi
         rm -rf "$_archive" "$_extract"
 
         sync_backend_plugins "$BIN_DIR" "$LIB_DIR"
@@ -307,7 +454,7 @@ provision_variant() {
 echo "--- Provisioning llama.cpp runtime ---"
 load_runtime_catalog
 echo "  Runtime catalog variants:"
-jq -r '.variants[]? | "    - " + (.name // "<unnamed>") + " [" + (.backend // "?") + "@" + (.version // "latest") + "]"' "$EFFECTIVE_RUNTIME_CATALOG" || true
+jq -r '.variants[]? | "    - " + (.name // "<unnamed>") + " [" + (.backend // "?") + "@" + (.version // "latest") + ", source=" + (.source_type // "github_release") + "]"' "$EFFECTIVE_RUNTIME_CATALOG" || true
 
 mapfile -t VARIANT_ROWS < <(jq -c '.variants[]? | select((.enabled // true) == true)' "$EFFECTIVE_RUNTIME_CATALOG")
 
@@ -321,6 +468,16 @@ for ROW in "${VARIANT_ROWS[@]}"; do
     REPO="$(echo "$ROW" | jq -r '.repo_name // "llama.cpp"')"
     RUNTIME_SUBDIR="$(echo "$ROW" | jq -r '.runtime_subdir // ""')"
     ALWAYS="$(echo "$ROW" | jq -r '.always // false')"
+    SOURCE_TYPE="$(echo "$ROW" | jq -r '.source_type // "github_release"' | tr '[:upper:]' '[:lower:]')"
+    DOWNLOAD_URL="$(echo "$ROW" | jq -r '.download_url // ""')"
+    ARCHIVE_TYPE="$(echo "$ROW" | jq -r '.archive_type // ""')"
+    GIT_URL="$(echo "$ROW" | jq -r '.git_url // ""')"
+    GIT_REF="$(echo "$ROW" | jq -r '.git_ref // ""')"
+    CONFIGURE_COMMAND="$(echo "$ROW" | jq -r '.configure_command // ""')"
+    BUILD_COMMAND="$(echo "$ROW" | jq -r '.build_command // ""')"
+    BINARY_GLOB="$(echo "$ROW" | jq -r '.binary_glob // ""')"
+    LIBRARY_GLOB="$(echo "$ROW" | jq -r '.library_glob // ""')"
+    APT_PACKAGES="$(echo "$ROW" | jq -r '.apt_packages // [] | map(tostring) | join(" ")')"
 
     [ -z "$BACKEND" ] && continue
     [ -z "$NAME" ] && NAME="$BACKEND"
@@ -335,14 +492,17 @@ for ROW in "${VARIANT_ROWS[@]}"; do
     fi
 
     if should_provision_variant "$BACKEND" "$ALWAYS"; then
-        provision_variant "$NAME" "$BACKEND" "$VERSION" "$PATTERN" "$OWNER" "$REPO" "$RUNTIME_SUBDIR"
+        provision_variant \
+            "$NAME" "$BACKEND" "$VERSION" "$PATTERN" "$OWNER" "$REPO" "$RUNTIME_SUBDIR" \
+            "$SOURCE_TYPE" "$DOWNLOAD_URL" "$ARCHIVE_TYPE" "$GIT_URL" "$GIT_REF" \
+            "$CONFIGURE_COMMAND" "$BUILD_COMMAND" "$BINARY_GLOB" "$LIBRARY_GLOB" "$APT_PACKAGES"
         PROVISIONED_COUNT=$((PROVISIONED_COUNT + 1))
     fi
 done
 
 if [ "$PROVISIONED_COUNT" -eq 0 ]; then
     echo "  No runtime variants selected from catalog; provisioning cpu fallback"
-    provision_variant "cpu" "cpu" "${LLAMA_VERSION:-latest}" "ubuntu-x64\\.(tar\\.gz|zip)$" "ggml-org" "llama.cpp" "cpu"
+    provision_variant "cpu" "cpu" "${LLAMA_VERSION:-latest}" "ubuntu-x64\\.(tar\\.gz|zip)$" "ggml-org" "llama.cpp" "cpu" "github_release" "" "" "" "" "" "" "" "" ""
 fi
 
 # ---------------------------------------------------------------------------

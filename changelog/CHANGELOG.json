@@ -1662,5 +1662,37 @@
       "Provisioning script now reads the catalog to download multiple backend variants (e.g. rocm/vulkan versions) into dedicated runtime subdirectories.",
       "Watcher now restarts llama-cpp when runtime-catalog or env changes; regression tests and docs updated."
     ]
+  },
+  {
+    "id": "CHG-4981ce2a",
+    "agent": "codex",
+    "change_group": "backend-runtime-catalog",
+    "plugin_version": "unreleased",
+    "date": "2026-03-21",
+    "recorded_at": "2026-03-21T01:24:46.277295Z",
+    "summary_tags": [
+      "New Feature"
+    ],
+    "summary": "Separated backend runtime variant sources from model catalog and added multi-source backend provisioning.",
+    "details": [
+      "Added config/project/backend-runtime.base.yaml and config/local/backend-runtime.override.yaml as the dedicated backend source catalog.",
+      "Provisioning now supports github_release, direct_url, and git source types with versioned backend macros and generated runtime catalog output."
+    ]
+  },
+  {
+    "id": "CHG-4981ce2a-1",
+    "agent": "codex",
+    "change_group": "backend-onboarding-docs",
+    "plugin_version": "unreleased",
+    "date": "2026-03-21",
+    "recorded_at": "2026-03-21T01:30:28.657341Z",
+    "summary_tags": [
+      "Documentation Update"
+    ],
+    "summary": "Documented how to add backend runtime variants and aligned specs with separate backend runtime catalog.",
+    "details": [
+      "Added step-by-step backend variant onboarding in docker docs and runbook with github_release/direct_url/git examples.",
+      "Updated specs and postinstall seeding so backend-runtime.override.yaml is part of default local config templates."
+    ]
   }
 ]
