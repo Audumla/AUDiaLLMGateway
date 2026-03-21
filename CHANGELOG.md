@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.11.8](https://github.com/Audumla/AUDiaLLMGateway/compare/v0.11.7...v0.11.8) (2026-03-21)
+
+
+### Bug Fixes
+
+* added llamacpp versioning ([4981ce2](https://github.com/Audumla/AUDiaLLMGateway/commit/4981ce2ade4ac9c435d88800b23eafcb6cecc673))
+* back end catalog management ([2a44b15](https://github.com/Audumla/AUDiaLLMGateway/commit/2a44b155884e8d4ad8cb71a5c1bf361997e97702))
+* config updates ([4ec0251](https://github.com/Audumla/AUDiaLLMGateway/commit/4ec02515fc4ccb0cecbbeab5770bfb789a91e8fe))
+* gateway dashboard ([8afa380](https://github.com/Audumla/AUDiaLLMGateway/commit/8afa380193fbe157c2fad6d62a5caf39b4b2d706))
+
+## Changelog
+
 ## Unreleased
 
 ### Scaffolded a native Windows local LLM gateway workspace in AUDiaLLMGateway. (New Feature)
