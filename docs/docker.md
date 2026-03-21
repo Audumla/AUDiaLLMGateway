@@ -449,6 +449,42 @@ All variables read from `.env` at compose start time.
 | `LLAMA_VERSION` | No | `latest` | llama.cpp release tag to provision (e.g. `b4632`). |
 | `DOCKERHUB_USERNAME` | No | `example` | Override image registry username for self-hosted images. |
 
+### Versioned llama.cpp backend catalog
+
+You can provision multiple versions of the same backend (for example multiple
+ROCm and Vulkan builds) by adding `backend_runtime_variants` to
+`config/local/models.override.yaml`. Each variant generates:
+
+- a versioned llama-swap macro (for example `llama-server-rocm-b8429`)
+- an entry in `config/generated/llama-swap/backend-runtime.catalog.json`
+- a dedicated runtime path under `BACKEND_RUNTIME_ROOT` (for example
+  `rocm/b8429/` or `vulkan/b8500/`)
+
+Example:
+
+```yaml
+backend_runtime_variants:
+  - name: rocm-b8429
+    backend: rocm
+    macro: llama-server-rocm-b8429
+    version: b8429
+    runtime_subdir: rocm/b8429
+  - name: vulkan-b8429
+    backend: vulkan
+    macro: llama-server-vulkan-b8429
+    version: b8429
+    runtime_subdir: vulkan/b8429
+
+model_profiles:
+  tiny_qwen25_test:
+    deployments:
+      llamacpp_rocm_test:
+        label: local/tiny_qwen25_test_rocm_b8429
+        executable_macro: llama-server-rocm-b8429
+        profile: llamacpp_rocm_single_gpu1
+        llama_swap_model: tiny-qwen25-test-rocm-b8429
+```
+
 ---
 
 ## Model Files

@@ -632,6 +632,121 @@ def _infer_backend_from_deployment(deployment: dict[str, Any]) -> str:
     return os.environ.get("LLAMA_BACKEND", "auto").lower()
 
 
+def _resolve_env_token(value: Any, default: str) -> str:
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return default
+        match = ENV_PATTERN.fullmatch(text)
+        if match:
+            return os.environ.get(match.group(1), default)
+        return text
+    return default
+
+
+def _default_runtime_asset_pattern(backend: str) -> str:
+    patterns = {
+        "rocm": r"ubuntu-rocm.*x64\.(tar\.gz|zip)$",
+        "vulkan": r"ubuntu-vulkan.*x64\.(tar\.gz|zip)$",
+        "cuda": r"ubuntu-x64\.(tar\.gz|zip)$",
+        "cpu": r"ubuntu-x64\.(tar\.gz|zip)$",
+    }
+    return patterns.get(backend, patterns["cpu"])
+
+
+def _default_runtime_variant(backend: str, version: str) -> dict[str, Any]:
+    return {
+        "name": backend,
+        "backend": backend,
+        "macro": f"llama-server-{backend}",
+        "version": version,
+        "asset_pattern": _default_runtime_asset_pattern(backend),
+        "repo_owner": "ggml-org",
+        "repo_name": "llama.cpp",
+        "runtime_subdir": backend,
+        "enabled": True,
+    }
+
+
+def _collect_backend_runtime_variants(stack: StackConfig) -> list[dict[str, Any]]:
+    _, _, catalog = load_model_catalog(stack.root)
+    global_version = _resolve_env_token(os.environ.get("LLAMA_VERSION", "latest"), "latest")
+    llama_cpp_settings = stack.component_settings.get("llama_cpp", {})
+    default_owner = str(llama_cpp_settings.get("repo_owner", "ggml-org")).strip() or "ggml-org"
+    default_repo = str(llama_cpp_settings.get("repo_name", "llama.cpp")).strip() or "llama.cpp"
+
+    variants_by_macro: dict[str, dict[str, Any]] = {}
+    for backend in ("cpu", "cuda", "rocm", "vulkan"):
+        variant = _default_runtime_variant(backend, global_version)
+        variant["repo_owner"] = default_owner
+        variant["repo_name"] = default_repo
+        variants_by_macro[str(variant["macro"])] = variant
+
+    custom_variants = catalog.get("backend_runtime_variants", [])
+    if isinstance(custom_variants, list):
+        for raw_variant in custom_variants:
+            if not isinstance(raw_variant, dict):
+                continue
+            backend = str(raw_variant.get("backend", "")).strip().lower()
+            if not backend:
+                continue
+            name = str(raw_variant.get("name", "")).strip()
+            version = _resolve_env_token(raw_variant.get("version", global_version), global_version)
+            if not name:
+                if version in ("", "latest"):
+                    name = backend
+                else:
+                    name = f"{backend}-{version}"
+            runtime_subdir = str(raw_variant.get("runtime_subdir", "")).strip()
+            if not runtime_subdir:
+                runtime_subdir = backend if name == backend else f"{backend}/{name}"
+            macro = str(raw_variant.get("macro", "")).strip()
+            if not macro:
+                macro = f"llama-server-{name}"
+            variant = {
+                "name": name,
+                "backend": backend,
+                "macro": macro,
+                "version": version,
+                "asset_pattern": str(raw_variant.get("asset_pattern", _default_runtime_asset_pattern(backend))).strip(),
+                "repo_owner": str(raw_variant.get("repo_owner", default_owner)).strip() or default_owner,
+                "repo_name": str(raw_variant.get("repo_name", default_repo)).strip() or default_repo,
+                "runtime_subdir": runtime_subdir,
+                "enabled": bool(raw_variant.get("enabled", True)),
+                "always": bool(raw_variant.get("always", False)),
+            }
+            if raw_variant.get("command"):
+                variant["command"] = str(raw_variant.get("command", "")).strip()
+            variants_by_macro[macro] = variant
+
+    return list(variants_by_macro.values())
+
+
+def _runtime_variant_macro_command(variant: dict[str, Any]) -> str:
+    custom_command = str(variant.get("command", "")).strip()
+    if custom_command:
+        return custom_command
+
+    backend = str(variant.get("backend", "cpu")).strip().lower() or "cpu"
+    runtime_subdir = str(variant.get("runtime_subdir", backend)).strip() or backend
+    runtime_root = f"/app/runtime-root/{runtime_subdir}"
+    suffix = "cpu" if backend == "cpu" else backend
+    executable = f"{runtime_root}/bin/llama-server-{suffix}"
+    if backend == "rocm":
+        return (
+            f"env LD_LIBRARY_PATH={runtime_root}/lib:/opt/rocm/lib "
+            f"ROCBLAS_TENSILE_LIBPATH=/opt/rocm/lib/rocblas/library "
+            f"{executable}"
+        )
+    if backend == "vulkan":
+        return (
+            "env VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/radeon_icd.json "
+            f"LD_LIBRARY_PATH={runtime_root}/lib "
+            f"{executable}"
+        )
+    return executable
+
+
 def _synthesize_catalog_macros(catalog: dict[str, Any], macros: dict[str, Any], local_macros: dict[str, Any], backend: str = "auto") -> None:
     presets = catalog.get("presets", {})
     for section in ("gpu_profiles", "runtime_profiles"):
@@ -1033,22 +1148,22 @@ def build_llama_swap_config(stack: StackConfig) -> dict[str, Any]:
     # so llama-swap finds the right binaries and model files without PATH tricks.
     _is_docker = os.environ.get("AUDIA_DOCKER", "false").lower() == "true"
     if _is_docker:
+        runtime_variants = _collect_backend_runtime_variants(stack)
+        for variant in runtime_variants:
+            if not bool(variant.get("enabled", True)):
+                continue
+            macro_name = str(variant.get("macro", "")).strip()
+            if not macro_name or macro_name in local_macros:
+                continue
+            macros[macro_name] = _runtime_variant_macro_command(variant)
         if "llama-server" not in local_macros:
-            macros["llama-server"] = "/app/runtime-root/cpu/bin/llama-server-cpu"
-        docker_backend_macros = {
-            "cpu": "/app/runtime-root/cpu/bin/llama-server-cpu",
-            "cuda": "/app/runtime-root/cuda/bin/llama-server-cuda",
-            "rocm": "env LD_LIBRARY_PATH=/app/runtime-root/rocm/lib:/opt/rocm/lib "
-                    "ROCBLAS_TENSILE_LIBPATH=/opt/rocm/lib/rocblas/library "
-                    "/app/runtime-root/rocm/bin/llama-server-rocm",
-            "vulkan": "env VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/radeon_icd.json "
-                      "LD_LIBRARY_PATH=/app/runtime-root/vulkan/lib "
-                      "/app/runtime-root/vulkan/bin/llama-server-vulkan",
-        }
-        for _suffix, _value in docker_backend_macros.items():
-            _macro = f"llama-server-{_suffix}"
-            if _macro not in local_macros:
-                macros[_macro] = _value
+            # Keep legacy fallback macro stable for pre-existing deployments.
+            macros["llama-server"] = _runtime_variant_macro_command(
+                {
+                    "backend": "cpu",
+                    "runtime_subdir": "cpu",
+                }
+            )
         if "model-path" not in local_macros:
             macros["model-path"] = "--model /app/models"
         if "mmproj-path" not in local_macros:
@@ -1323,6 +1438,29 @@ def build_vllm_config(stack: StackConfig) -> dict[str, Any]:
                 "mode": model.mode,
             }
             for model in exposures
+        ],
+    }
+
+
+def build_backend_runtime_catalog(stack: StackConfig) -> dict[str, Any]:
+    variants = _collect_backend_runtime_variants(stack)
+    return {
+        "schema_version": 1,
+        "runtime_root": "/app/runtime-root",
+        "variants": [
+            {
+                "name": str(variant.get("name", "")),
+                "backend": str(variant.get("backend", "")),
+                "macro": str(variant.get("macro", "")),
+                "version": str(variant.get("version", "latest")),
+                "asset_pattern": str(variant.get("asset_pattern", "")),
+                "repo_owner": str(variant.get("repo_owner", "ggml-org")),
+                "repo_name": str(variant.get("repo_name", "llama.cpp")),
+                "runtime_subdir": str(variant.get("runtime_subdir", "")),
+                "enabled": bool(variant.get("enabled", True)),
+                "always": bool(variant.get("always", False)),
+            }
+            for variant in variants
         ],
     }
 
@@ -1747,6 +1885,15 @@ def write_vllm_config(root: str | Path) -> Path:
     return output_path
 
 
+def write_backend_runtime_catalog(root: str | Path) -> Path:
+    stack = load_stack_config(root)
+    output_path = stack.root / "config" / "generated" / "llama-swap" / "backend-runtime.catalog.json"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w", encoding="utf-8") as handle:
+        json.dump(build_backend_runtime_catalog(stack), handle, indent=2)
+    return output_path
+
+
 def write_mcp_client_config(root: str | Path) -> Path:
     stack = load_stack_config(root)
     output_path = stack.root / stack.mcp.generated_client_path
@@ -1808,6 +1955,7 @@ def validate_layered_configs(root: str | Path) -> dict[str, Any]:
 def write_generated_configs(root: str | Path) -> dict[str, Path]:
     return {
         "llama_swap": write_llama_swap_config(root),
+        "backend_runtime_catalog": write_backend_runtime_catalog(root),
         "litellm": write_litellm_config(root),
         "vllm": write_vllm_config(root),
         "mcp_client": write_mcp_client_config(root),

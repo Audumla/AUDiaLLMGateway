@@ -1645,5 +1645,22 @@
       "Added network.base_path handling in config loader and generated nginx namespace passthrough routes.",
       "Updated landing-page links/docs and added regression tests for base-path route generation."
     ]
+  },
+  {
+    "id": "CHG-8afa3801",
+    "agent": "codex",
+    "change_group": "backend-runtime-variant-catalog",
+    "plugin_version": "unreleased",
+    "date": "2026-03-21",
+    "recorded_at": "2026-03-21T00:58:59.059267Z",
+    "summary_tags": [
+      "New Feature"
+    ],
+    "summary": "Added versioned backend-runtime catalog support for Docker provisioning and macros.",
+    "details": [
+      "Gateway now generates backend-runtime.catalog.json and versioned llama-server macros from backend_runtime_variants.",
+      "Provisioning script now reads the catalog to download multiple backend variants (e.g. rocm/vulkan versions) into dedicated runtime subdirectories.",
+      "Watcher now restarts llama-cpp when runtime-catalog or env changes; regression tests and docs updated."
+    ]
   }
 ]
