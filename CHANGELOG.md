@@ -480,4 +480,12 @@
 - Fixed llama.cpp flash-attn arg rendering for YAML boolean values and corrected default model/runtime mappings.
 - Validated full nginx -> LiteLLM -> llama-swap matrix on 10.10.100.10 and documented ROCm/vLLM host-specific constraints.
 
+### Added regression tests for watcher resilience, config generation, and compose defaults. (Test Update)
+- Cover watcher generate-config failure path and restart/reload decision matrix.
+- Assert llama-swap/nginx generated config invariants and Docker defaults for Postgres plus AMD vLLM device env wiring.
+
+### Added configurable nginx base URL routing and defaulted it to /audia/llmgateway. (Configuration Cleanup)
+- Added network.base_path handling in config loader and generated nginx namespace passthrough routes.
+- Updated landing-page links/docs and added regression tests for base-path route generation.
+
 ---

@@ -173,6 +173,7 @@ def test_write_generated_configs_writes_yaml_and_json(tmp_path: Path) -> None:
     vllm_path = tmp_path / "config" / "generated" / "vllm" / "vllm.config.json"
     mcp_path = tmp_path / "config" / "generated" / "mcp" / "litellm.mcp.client.json"
     nginx_path = tmp_path / "config" / "generated" / "nginx" / "nginx.conf"
+    nginx_index_path = tmp_path / "config" / "generated" / "nginx" / "index.html"
     litellm_data = yaml.safe_load(litellm_path.read_text(encoding="utf-8").split("\n", 3)[3])
     mcp_data = json.loads(mcp_path.read_text(encoding="utf-8"))
 
@@ -181,6 +182,35 @@ def test_write_generated_configs_writes_yaml_and_json(tmp_path: Path) -> None:
     assert vllm_path.exists()
     assert "litellm-gateway" in mcp_data["servers"]
     assert nginx_path.exists()
+    assert nginx_index_path.exists()
+
+
+def test_write_generated_configs_includes_base_path_namespace_routes(tmp_path: Path) -> None:
+    source_root = Path(__file__).resolve().parents[1]
+    for rel_path in [
+        "config/project/stack.base.yaml",
+        "config/project/llama-swap.base.yaml",
+        "config/project/models.base.yaml",
+        "config/project/mcp.base.yaml",
+        "config/local/stack.override.yaml",
+        "config/local/llama-swap.override.yaml",
+        "config/local/models.override.yaml",
+        "config/local/mcp.override.yaml",
+    ]:
+        source = source_root / rel_path
+        target = tmp_path / rel_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+
+    write_generated_configs(tmp_path)
+    nginx_text = (tmp_path / "config" / "generated" / "nginx" / "nginx.conf").read_text(encoding="utf-8")
+    index_text = (tmp_path / "config" / "generated" / "nginx" / "index.html").read_text(encoding="utf-8")
+
+    assert "location = /audia/llmgateway {" in nginx_text
+    assert "location /audia/llmgateway/ {" in nginx_text
+    assert "proxy_pass http://127.0.0.1:8080;" in nginx_text
+    assert "href=\"/audia/llmgateway/v1/models\"" in index_text
+    assert "href=\"/audia/llmgateway/llamaswap/\"" in index_text
 
 
 def test_build_llama_swap_config_contains_generated_catalog_models() -> None:
@@ -200,6 +230,9 @@ def test_build_llama_swap_config_contains_generated_catalog_models() -> None:
     assert "--device Vulkan0" in generated_qwen_vision
     assert config["models"]["tiny-qwen25-test"]["cmd"].startswith("${llama-server-rocm} ")
     assert "--device ROCm0" in config["models"]["tiny-qwen25-test"]["cmd"]
+    assert "--flash-attn on" in config["macros"]["batch-args"]
+    assert "--flash-attn on" in config["macros"]["coder_args"]
+    assert "--flash-attn off" in config["macros"]["flash-off-args"]
     assert "coding_active" in config["groups"]
     assert "qwen3.5-27b-(96k-Q6)" in config["groups"]["coding_active"]["members"]
 
@@ -249,6 +282,36 @@ def test_write_generated_configs_uses_central_network_bindings(tmp_path: Path) -
     assert "listen       8088;" in nginx_text
     assert "server_name  gateway.local;" in nginx_text
     assert "--host 0.0.0.0" in llama_swap_text
+
+
+def test_write_generated_configs_includes_nginx_timeouts_and_llamaswap_ui_routes(tmp_path: Path) -> None:
+    source_root = Path(__file__).resolve().parents[1]
+    for rel_path in [
+        "config/project/stack.base.yaml",
+        "config/project/llama-swap.base.yaml",
+        "config/project/models.base.yaml",
+        "config/project/mcp.base.yaml",
+        "config/local/stack.override.yaml",
+        "config/local/llama-swap.override.yaml",
+        "config/local/models.override.yaml",
+        "config/local/mcp.override.yaml",
+    ]:
+        source = source_root / rel_path
+        target = tmp_path / rel_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+
+    write_generated_configs(tmp_path)
+    nginx_text = (tmp_path / "config" / "generated" / "nginx" / "nginx.conf").read_text(encoding="utf-8")
+
+    assert "proxy_connect_timeout 60s;" in nginx_text
+    assert "proxy_send_timeout 600s;" in nginx_text
+    assert "proxy_read_timeout 600s;" in nginx_text
+    assert "location = /llamaswap {" in nginx_text
+    assert "return 301 /llamaswap/ui/;" in nginx_text
+    assert "location /llamaswap/ui/ {" in nginx_text
+    assert "rewrite ^/llamaswap/ui/(.*)$ /ui/$1 break;" in nginx_text
+    assert "sub_filter 'href=\"/ui/' 'href=\"/llamaswap/ui/';" in nginx_text
 
 
 def test_write_generated_configs_uses_vllm_network_bindings_when_enabled(tmp_path: Path, monkeypatch) -> None:
