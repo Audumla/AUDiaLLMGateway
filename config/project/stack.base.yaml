@@ -225,6 +225,10 @@ models:
   project_config_path: config/project/models.base.yaml
   local_override_path: config/local/models.override.yaml
 
+backend_runtime:
+  project_config_path: config/project/backend-runtime.base.yaml
+  local_override_path: config/local/backend-runtime.override.yaml
+
 routing:
   future_fallbacks:
     local/qwen122_smart:

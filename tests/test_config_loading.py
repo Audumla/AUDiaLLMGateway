@@ -2,7 +2,12 @@ from pathlib import Path
 
 import yaml
 
-from src.launcher.config_loader import load_layered_yaml, load_model_catalog, load_stack_config
+from src.launcher.config_loader import (
+    load_backend_runtime_catalog,
+    load_layered_yaml,
+    load_model_catalog,
+    load_stack_config,
+)
 
 
 def test_load_stack_config_from_repo_fixture() -> None:
@@ -99,3 +104,14 @@ def test_load_model_catalog_from_repo_fixture() -> None:
     assert config.published_models[0].revision == "main"
     assert config.published_models[0].model_filename == "Qwen3.5-27B.Q6_K.gguf"
     assert "coding_active" in config.published_models[0].load_groups
+
+
+def test_load_backend_runtime_catalog_from_repo_fixture() -> None:
+    root = Path(__file__).resolve().parents[1]
+    _, _, catalog = load_backend_runtime_catalog(root)
+    config = load_stack_config(root)
+
+    assert "variants" in catalog
+    assert "rocm" in catalog["variants"]
+    assert config.backend_runtime_project_config_path == "config/project/backend-runtime.base.yaml"
+    assert config.backend_runtime_local_override_path == "config/local/backend-runtime.override.yaml"

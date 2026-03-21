@@ -43,9 +43,35 @@ This catalog is intended to hold shared model semantics that can survive backend
 - model artifacts
 - model source and download URLs
 - framework deployments such as `llama_cpp` and optional `vllm`
-- optional `backend_runtime_variants` for versioned llama.cpp backend binaries
-- exposed LiteLLM aliases
 - load groups for activities like coding, reasoning, or vision
+
+Backend runtime binary sources are configured separately in the backend runtime
+catalog:
+
+- `config/project/backend-runtime.base.yaml`
+- `config/local/backend-runtime.override.yaml`
+
+This catalog defines downloadable/buildable backend variants (`github_release`,
+`direct_url`, or `git`) and generates versioned runtime macros consumed by model
+deployments.
+
+## Add backend variant workflow
+
+To add a backend build variant without changing project defaults:
+
+1. Edit `config/local/backend-runtime.override.yaml` and add a new entry under
+   `variants`.
+2. Choose `source_type`:
+   - `github_release` for tagged GitHub release assets.
+   - `direct_url` for a fixed artifact URL.
+   - `git` for source build from a repository/ref.
+3. Reference the variant macro from a model deployment in
+   `config/local/models.override.yaml` via `executable_macro`.
+4. Regenerate configs:
+   - `python -m src.launcher.process_manager --root . generate-configs`
+5. Restart `llm-server-llamacpp` (or let watcher restart when enabled).
+6. Validate generated catalog:
+   - `config/generated/llama-swap/backend-runtime.catalog.json`
 
 Context presets should use human-friendly aliases like `32k`, `64k`, or `96k`. The generator can synthesize the backend context macro from the numeric token value instead of requiring an explicit `llama-swap` macro entry for every size.
 

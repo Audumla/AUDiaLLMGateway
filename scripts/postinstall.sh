@@ -118,6 +118,47 @@ EOF
     chmod 666 config/local/models.override.yaml
 fi
 
+# Seed backend runtime variant overrides (separate from model catalog).
+if [ ! -f config/local/backend-runtime.override.yaml ]; then
+    cat > config/local/backend-runtime.override.yaml <<'EOF'
+# AUDia LLM Gateway — backend runtime variant overrides.
+# Merged on top of config/project/backend-runtime.base.yaml.
+# After editing run: ./scripts/AUDiaLLMGateway.sh generate
+#               then: systemctl restart audia-gateway
+#
+# variants:
+#   rocm-b8429:
+#     backend: rocm
+#     macro: llama-server-rocm-b8429
+#     version: b8429
+#     runtime_subdir: rocm/b8429
+#
+#   vulkan-custom-url:
+#     backend: vulkan
+#     macro: llama-server-vulkan-custom
+#     source_type: direct_url
+#     download_url: https://example.com/llama-vulkan-custom.tar.gz
+#     archive_type: tar.gz
+#     runtime_subdir: vulkan/custom
+#
+#   rocm-built-from-git:
+#     backend: rocm
+#     macro: llama-server-rocm-git
+#     source_type: git
+#     git_url: https://github.com/ggml-org/llama.cpp.git
+#     git_ref: master
+#     configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_HIPBLAS=ON -DCMAKE_BUILD_TYPE=Release
+#     build_command: cmake --build build --config Release -j$(nproc)
+#     binary_glob: build/bin/llama-server
+#     library_glob: build/bin/*.so*
+#     apt_packages:
+#       - git
+#       - cmake
+#       - build-essential
+EOF
+    chmod 666 config/local/backend-runtime.override.yaml
+fi
+
 # Install Python venv and pip dependencies (hard failure — nothing works without this)
 ./scripts/AUDiaLLMGateway.sh install stack \
     || { echo "[error] Python stack install failed"; exit 1; }
