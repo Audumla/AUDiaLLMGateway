@@ -69,4 +69,4 @@ def test_regenerate_and_reload_restarts_gateway_and_vllm_on_env_change(monkeypat
 
     handler._regenerate_and_reload(["/app/config/local/env"])
 
-    assert actions == ["restart gateway", "restart vllm"]
+    assert actions == ["restart gateway", "restart llama-cpp", "restart vllm"]

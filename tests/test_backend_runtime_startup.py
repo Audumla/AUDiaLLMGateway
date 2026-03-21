@@ -34,6 +34,8 @@ def test_provision_runtime_launches_llama_swap_by_default() -> None:
     root = Path(__file__).resolve().parents[1]
     script = (root / "scripts" / "provision-runtime.sh").read_text(encoding="utf-8")
 
+    assert 'BACKEND_RUNTIME_CATALOG_PATH="${BACKEND_RUNTIME_CATALOG_PATH:-/app/config/backend-runtime.catalog.json}"' in script
+    assert "load_runtime_catalog" in script
     assert 'while [ ! -s "$DEFAULT_SWAP_CONFIG" ]; do' in script
     assert 'exec llama-swap -config "$DEFAULT_SWAP_CONFIG" -listen "$DEFAULT_SWAP_ADDR" -watch-config' in script
 

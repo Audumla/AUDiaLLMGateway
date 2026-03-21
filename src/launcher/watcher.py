@@ -23,6 +23,7 @@ except ImportError:  # pragma: no cover - exercised in lightweight local test en
 DOCKER_SOCKET_PATH = "/var/run/docker.sock"
 GENERATED_PATHS = {
     "llama_swap": "config/generated/llama-swap/llama-swap.generated.yaml",
+    "backend_runtime_catalog": "config/generated/llama-swap/backend-runtime.catalog.json",
     "litellm": "config/generated/litellm/litellm.config.yaml",
     "vllm": "config/generated/vllm/vllm.config.json",
     "nginx": "config/generated/nginx/nginx.conf",
@@ -158,10 +159,13 @@ class ConfigChangeHandler(FileSystemEventHandler):
         should_reload_nginx = bool({"nginx", "nginx_index"} & changed_outputs)
         should_restart_gateway = "litellm" in changed_outputs or "env" in changed_names
         should_restart_vllm = "vllm" in changed_outputs or "env" in changed_names
+        should_restart_llamacpp = "backend_runtime_catalog" in changed_outputs or "env" in changed_names
         if should_reload_nginx:
             self._safe_action("reload nginx", lambda: self.docker.signal_container("audia-nginx", "HUP"))
         if should_restart_gateway:
             self._safe_action("restart gateway", lambda: self.docker.restart_container("audia-gateway"))
+        if should_restart_llamacpp:
+            self._safe_action("restart llama-cpp", lambda: self.docker.restart_container("audia-llama-cpp"))
         if should_restart_vllm:
             self._safe_action("restart vllm", lambda: self.docker.restart_container("audia-vllm"))
 

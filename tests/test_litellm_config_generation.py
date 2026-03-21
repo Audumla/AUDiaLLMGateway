@@ -171,15 +171,20 @@ def test_write_generated_configs_writes_yaml_and_json(tmp_path: Path) -> None:
     output = write_generated_configs(tmp_path)
     litellm_path = tmp_path / "config" / "generated" / "litellm" / "litellm.config.yaml"
     vllm_path = tmp_path / "config" / "generated" / "vllm" / "vllm.config.json"
+    backend_catalog_path = tmp_path / "config" / "generated" / "llama-swap" / "backend-runtime.catalog.json"
     mcp_path = tmp_path / "config" / "generated" / "mcp" / "litellm.mcp.client.json"
     nginx_path = tmp_path / "config" / "generated" / "nginx" / "nginx.conf"
     nginx_index_path = tmp_path / "config" / "generated" / "nginx" / "index.html"
     litellm_data = yaml.safe_load(litellm_path.read_text(encoding="utf-8").split("\n", 3)[3])
+    backend_catalog = json.loads(backend_catalog_path.read_text(encoding="utf-8"))
     mcp_data = json.loads(mcp_path.read_text(encoding="utf-8"))
 
     assert output["llama_swap"].name == "llama-swap.generated.yaml"
+    assert output["backend_runtime_catalog"].name == "backend-runtime.catalog.json"
     assert litellm_data["litellm_settings"]["master_key"] == "os.environ/LITELLM_MASTER_KEY"
     assert vllm_path.exists()
+    assert backend_catalog["schema_version"] == 1
+    assert any(item["backend"] == "rocm" for item in backend_catalog["variants"])
     assert "litellm-gateway" in mcp_data["servers"]
     assert nginx_path.exists()
     assert nginx_index_path.exists()
@@ -437,3 +442,48 @@ def test_context_alias_can_generate_macro_without_explicit_llama_swap_macro(tmp_
     assert config["macros"]["context-40k-args"] == "--ctx-size 40960"
     assert "--device Vulkan0 --split-mode none" in config["models"]["alias-test-model"]["cmd"]
     assert "${context-40k-args}" in config["models"]["alias-test-model"]["cmd"]
+
+
+def test_backend_runtime_variants_generate_versioned_macros_and_catalog(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("AUDIA_DOCKER", "true")
+    source_root = Path(__file__).resolve().parents[1]
+    for rel_path in [
+        "config/project/stack.base.yaml",
+        "config/project/llama-swap.base.yaml",
+        "config/project/models.base.yaml",
+        "config/project/mcp.base.yaml",
+        "config/local/stack.override.yaml",
+        "config/local/llama-swap.override.yaml",
+        "config/local/models.override.yaml",
+        "config/local/mcp.override.yaml",
+    ]:
+        source = source_root / rel_path
+        target = tmp_path / rel_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+
+    models_override = tmp_path / "config" / "local" / "models.override.yaml"
+    data = yaml.safe_load(models_override.read_text(encoding="utf-8"))
+    data.setdefault("backend_runtime_variants", []).append(
+        {
+            "name": "rocm-b8429",
+            "backend": "rocm",
+            "macro": "llama-server-rocm-b8429",
+            "version": "b8429",
+            "runtime_subdir": "rocm/b8429",
+        }
+    )
+    models_override.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+
+    write_generated_configs(tmp_path)
+    llama_swap_text = (tmp_path / "config" / "generated" / "llama-swap" / "llama-swap.generated.yaml").read_text(encoding="utf-8")
+    backend_catalog = json.loads((tmp_path / "config" / "generated" / "llama-swap" / "backend-runtime.catalog.json").read_text(encoding="utf-8"))
+
+    assert "llama-server-rocm-b8429" in llama_swap_text
+    assert "/app/runtime-root/rocm/b8429/bin/llama-server-rocm" in llama_swap_text
+    assert any(
+        item.get("macro") == "llama-server-rocm-b8429"
+        and item.get("backend") == "rocm"
+        and item.get("version") == "b8429"
+        for item in backend_catalog.get("variants", [])
+    )
