@@ -707,8 +707,8 @@ def test_nginx_config_contains_all_required_proxy_routes(tmp_path: Path) -> None
     # LiteLLM admin UI
     assert "location = /ui {" in nginx_text
     assert "location /ui/ {" in nginx_text
-    # Health checks
-    assert "location = /health {" in nginx_text
+    # Health checks — /health is a prefix block so /health/liveliness etc. pass through
+    assert "location /health {" in nginx_text
     assert "location = /llamaswap-health {" in nginx_text
     # Root landing page
     assert "location = / {" in nginx_text
@@ -776,3 +776,27 @@ def test_nginx_config_no_base_path_omits_namespace_routes(tmp_path: Path) -> Non
 
     assert "location = /audia/llmgateway" not in nginx_text
     assert "location /audia/llmgateway/" not in nginx_text
+
+
+def test_nginx_health_is_prefix_route_not_exact_match(tmp_path: Path) -> None:
+    """/health must be a prefix location so /health/liveliness routes to LiteLLM."""
+    source_root = Path(__file__).resolve().parents[1]
+    _copy_config_files(source_root, tmp_path)
+
+    write_generated_configs(tmp_path)
+    nginx_text = (tmp_path / "config" / "generated" / "nginx" / "nginx.conf").read_text(encoding="utf-8")
+
+    # Prefix block present; exact-only block must NOT be present (would shadow sub-paths)
+    assert "location /health {" in nginx_text
+    assert "location = /health {" not in nginx_text
+
+
+def test_nginx_config_contains_docker_dns_resolver(tmp_path: Path) -> None:
+    """Generated nginx config must include the Docker DNS resolver for dynamic upstream re-resolution."""
+    source_root = Path(__file__).resolve().parents[1]
+    _copy_config_files(source_root, tmp_path)
+
+    write_generated_configs(tmp_path)
+    nginx_text = (tmp_path / "config" / "generated" / "nginx" / "nginx.conf").read_text(encoding="utf-8")
+
+    assert "resolver 127.0.0.11" in nginx_text
