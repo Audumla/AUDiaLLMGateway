@@ -22,6 +22,9 @@
 - backend runtime catalog must support source types: `github_release`, `direct_url`, and `git`
 - each runtime variant must produce a stable executable macro name that model deployments can reference
 - generated runtime catalog output must be written to `config/generated/llama-swap/backend-runtime.catalog.json`
+- backend runtime catalog must support reusable profile composition so source policy and build policy can be defined once and reused across variants
+- profile composition must support inheritance (`extends`) and per-variant override
+- runtime catalog must be able to express explicit AMD ROCm build targets (for example `gfx1030` and `gfx1100`) across multiple upstream repos
 
 ## Configuration
 
@@ -56,6 +59,12 @@ Optional controls:
 - `always`
 - `apt_packages`
 - `command` (manual override macro command)
+- `profile` / `profiles` (reusable runtime profile references)
+
+Optional profile controls:
+
+- `extends` (inherit from one or more profiles)
+- any source/build fields supported by variants (`source_type`, `git_url`, `configure_command`, etc.)
 
 ## Integration
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -174,6 +175,8 @@ class StackConfig:
     models_local_override_path: str
     backend_runtime_project_config_path: str
     backend_runtime_local_override_path: str
+    backend_support_project_config_path: str
+    backend_support_local_override_path: str
 
 
 def _normalize_base_path(value: Any) -> str:
@@ -304,11 +307,14 @@ def load_stack_config(root: str | Path) -> StackConfig:
     vllm_raw = component_settings.get("vllm", {}) if isinstance(component_settings, dict) else {}
     models_raw = raw.get("models", {})
     backend_runtime_raw = raw.get("backend_runtime", {})
+    backend_support_raw = raw.get("backend_support", {})
 
     if not isinstance(models_raw, dict):
         models_raw = {}
     if not isinstance(backend_runtime_raw, dict):
         backend_runtime_raw = {}
+    if not isinstance(backend_support_raw, dict):
+        backend_support_raw = {}
 
     if not models_raw:
         raise ValueError("stack config does not define a model catalog configuration")
@@ -471,6 +477,12 @@ def load_stack_config(root: str | Path) -> StackConfig:
             backend_runtime_local_override_path=str(
                 backend_runtime_raw.get("local_override_path", "config/local/backend-runtime.override.yaml")
             ),
+            backend_support_project_config_path=str(
+                backend_support_raw.get("project_config_path", "config/project/backend-support.base.yaml")
+            ),
+            backend_support_local_override_path=str(
+                backend_support_raw.get("local_override_path", "config/local/backend-support.override.yaml")
+            ),
         )
         published_models = _catalog_published_models(temp_stack)
     return StackConfig(
@@ -495,6 +507,12 @@ def load_stack_config(root: str | Path) -> StackConfig:
         ),
         backend_runtime_local_override_path=str(
             backend_runtime_raw.get("local_override_path", "config/local/backend-runtime.override.yaml")
+        ),
+        backend_support_project_config_path=str(
+            backend_support_raw.get("project_config_path", "config/project/backend-support.base.yaml")
+        ),
+        backend_support_local_override_path=str(
+            backend_support_raw.get("local_override_path", "config/local/backend-support.override.yaml")
         ),
     )
 
@@ -556,6 +574,29 @@ def load_backend_runtime_catalog(root: str | Path) -> tuple[dict[str, Any], dict
     # - list style variants append project + local
     if isinstance(project_variants, list) and isinstance(local_variants, list):
         merged["variants"] = [*project_variants, *local_variants]
+
+    return project_data, local_data, merged
+
+
+def load_backend_support_matrix(root: str | Path) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    root_path = Path(root).resolve()
+    _, _, stack_merged = load_layered_yaml(root_path, "config/project/stack.base.yaml", "config/local/stack.override.yaml")
+    backend_support_raw = stack_merged.get("backend_support", {})
+    if not isinstance(backend_support_raw, dict):
+        backend_support_raw = {}
+    project_path = root_path / str(backend_support_raw.get("project_config_path", "config/project/backend-support.base.yaml"))
+    local_path = root_path / str(backend_support_raw.get("local_override_path", "config/local/backend-support.override.yaml"))
+    if not project_path.exists():
+        return {}, {}, {}
+
+    project_data = _load_yaml(project_path)
+    local_data = _load_yaml(local_path) if local_path.exists() else {}
+    merged = deep_merge(project_data, local_data)
+
+    project_rules = project_data.get("rules")
+    local_rules = local_data.get("rules")
+    if isinstance(project_rules, list) and isinstance(local_rules, list):
+        merged["rules"] = [*project_rules, *local_rules]
 
     return project_data, local_data, merged
 
@@ -636,6 +677,8 @@ def _render_llama_cpp_options(options: dict[str, Any], backend: str = "auto") ->
         # Handle 'device' flag specially for backend compatibility
         if key == "device":
             count = len(value) if isinstance(value, list) else 1
+            list_items = value if isinstance(value, list) else []
+            list_is_numeric = isinstance(value, list) and all(str(item).strip().isdigit() for item in list_items)
             if backend == "vulkan":
                 # Vulkan expects --device Vulkan0,Vulkan1,… (names from models.base.yaml)
                 parts.append(f"--device {_format_llama_cpp_option_value(value)}")
@@ -643,11 +686,15 @@ def _render_llama_cpp_options(options: dict[str, Any], backend: str = "auto") ->
                 # Preserve explicitly mapped ROCm/HIP device names when provided.
                 if isinstance(value, str) and value.strip():
                     parts.append(f"--device {value}")
+                elif isinstance(value, list) and not list_is_numeric:
+                    parts.append(f"--device {_format_llama_cpp_option_value(value)}")
                 else:
                     parts.append(f"--device {','.join(f'HIP{i}' for i in range(count))}")
             elif backend == "cuda":
                 if isinstance(value, str) and value.strip():
                     parts.append(f"--device {value}")
+                elif isinstance(value, list) and not list_is_numeric:
+                    parts.append(f"--device {_format_llama_cpp_option_value(value)}")
                 else:
                     parts.append(f"--device {','.join(f'CUDA{i}' for i in range(count))}")
             elif backend == "metal":
@@ -675,6 +722,174 @@ def _infer_backend_from_deployment(deployment: dict[str, Any]) -> str:
         if executable_macro.endswith(f"-{backend_name}"):
             return backend_name
     return os.environ.get("LLAMA_BACKEND", "auto").lower()
+
+
+def _parse_llama_cpp_release(value: str) -> int | None:
+    if not value:
+        return None
+    match = re.search(r"b(\d+)", str(value))
+    if not match:
+        return None
+    try:
+        return int(match.group(1))
+    except ValueError:
+        return None
+
+
+def _resolve_model_architecture(profile: dict[str, Any], support_matrix: dict[str, Any]) -> str:
+    architecture = str(profile.get("architecture", "")).strip()
+    if architecture:
+        return architecture
+    family = str(profile.get("family", "")).strip()
+    aliases = support_matrix.get("architecture_aliases", {})
+    if isinstance(aliases, dict) and family in aliases:
+        return str(aliases.get(family, "")).strip()
+    return ""
+
+
+def _matches_rule_value(rule_value: Any, actual_value: str) -> bool:
+    if rule_value is None:
+        return True
+    if isinstance(rule_value, list):
+        return str(actual_value) in {str(item) for item in rule_value if str(item).strip()}
+    return str(rule_value).strip() == str(actual_value).strip()
+
+
+def _rule_matches(rule: dict[str, Any], context: dict[str, str]) -> bool:
+    if not isinstance(rule, dict):
+        return False
+    for key, rule_value in rule.items():
+        if key not in context:
+            return False
+        actual = context.get(key, "")
+        if not actual:
+            return False
+        if not _matches_rule_value(rule_value, actual):
+            return False
+    return True
+
+
+def _build_backend_support_context(stack: StackConfig) -> dict[str, Any]:
+    _, _, support = load_backend_support_matrix(stack.root)
+    if not support:
+        return {}
+    variants = _collect_backend_runtime_variants(stack)
+    variants_by_macro = {
+        str(variant.get("macro")): variant
+        for variant in variants
+        if str(variant.get("macro", "")).strip()
+    }
+    defaults = support.get("defaults", {}) if isinstance(support.get("defaults"), dict) else {}
+    rules = support.get("rules", []) if isinstance(support.get("rules"), list) else []
+    return {
+        "support": support,
+        "defaults": defaults,
+        "rules": rules,
+        "variants_by_macro": variants_by_macro,
+    }
+
+
+def _apply_backend_support_matrix(
+    support_ctx: dict[str, Any],
+    profile_name: str,
+    deployment_name: str,
+    profile: dict[str, Any],
+    deployment: dict[str, Any],
+) -> dict[str, Any]:
+    if not support_ctx:
+        return deployment
+
+    support = support_ctx.get("support", {})
+    defaults = support_ctx.get("defaults", {})
+    rules = support_ctx.get("rules", [])
+    variants_by_macro = support_ctx.get("variants_by_macro", {})
+
+    architecture = _resolve_model_architecture(profile, support)
+    if not architecture:
+        return deployment
+
+    executable_macro = str(deployment.get("executable_macro", "")).strip()
+    variant = variants_by_macro.get(executable_macro)
+    if not variant:
+        action = str(defaults.get("on_unknown", "warn")).strip().lower()
+        if action == "disable":
+            deployment["enabled"] = False
+        elif action == "error":
+            raise ValueError(
+                f"Backend support matrix: unknown runtime variant for '{profile_name}.{deployment_name}' "
+                f"(macro '{executable_macro}')"
+            )
+        elif action == "warn":
+            warnings.warn(
+                f"Backend support matrix: unknown runtime variant for '{profile_name}.{deployment_name}' "
+                f"(macro '{executable_macro}'), leaving enabled.",
+                RuntimeWarning,
+            )
+        return deployment
+
+    backend_name = str(variant.get("backend", "")).strip()
+    variant_name = str(variant.get("name", "")).strip()
+    variant_version = str(variant.get("version", "")).strip()
+    variant_version_num = _parse_llama_cpp_release(variant_version)
+
+    context = {
+        "architecture": architecture,
+        "backend": backend_name,
+        "backend_variant": variant_name,
+        "backend_macro": executable_macro,
+    }
+
+    for rule in rules:
+        when = rule.get("when", {})
+        if not _rule_matches(when, context):
+            continue
+        require = rule.get("require", {}) if isinstance(rule.get("require"), dict) else {}
+        min_release = _parse_llama_cpp_release(str(require.get("llama_cpp_min_release", "")).strip())
+        max_release = _parse_llama_cpp_release(str(require.get("llama_cpp_max_release", "")).strip())
+
+        unknown = False
+        incompatible = False
+        if min_release is not None:
+            if variant_version_num is None:
+                unknown = True
+            elif variant_version_num < min_release:
+                incompatible = True
+        if max_release is not None:
+            if variant_version_num is None:
+                unknown = True
+            elif variant_version_num > max_release:
+                incompatible = True
+
+        if not incompatible and not unknown:
+            continue
+
+        action = str(
+            rule.get(
+                "on_incompatible",
+                defaults.get("on_incompatible", "disable"),
+            )
+        ).strip().lower()
+        if unknown:
+            action = str(rule.get("on_unknown", defaults.get("on_unknown", action))).strip().lower()
+
+        if action == "disable":
+            deployment["enabled"] = False
+        elif action == "error":
+            raise ValueError(
+                f"Backend support matrix: '{profile_name}.{deployment_name}' "
+                f"requires llama.cpp {require} but backend '{variant_name}' "
+                f"has version '{variant_version or 'unknown'}'."
+            )
+        elif action == "warn":
+            warnings.warn(
+                f"Backend support matrix: '{profile_name}.{deployment_name}' requires {require}, "
+                f"backend '{variant_name}' has version '{variant_version or 'unknown'}' "
+                f"(action={action}).",
+                RuntimeWarning,
+            )
+        return deployment
+
+    return deployment
 
 
 def _resolve_env_token(value: Any, default: str) -> str:
@@ -732,6 +947,63 @@ def _iter_backend_runtime_variants(raw_variants: Any) -> list[tuple[str, dict[st
     return []
 
 
+def _iter_backend_runtime_profiles(raw_profiles: Any) -> list[tuple[str, dict[str, Any]]]:
+    if isinstance(raw_profiles, dict):
+        return [
+            (str(name), value if isinstance(value, dict) else {})
+            for name, value in raw_profiles.items()
+        ]
+    if isinstance(raw_profiles, list):
+        result: list[tuple[str, dict[str, Any]]] = []
+        for idx, value in enumerate(raw_profiles):
+            if not isinstance(value, dict):
+                continue
+            name = str(value.get("name", "")).strip() or f"profile-{idx + 1}"
+            result.append((name, value))
+        return result
+    return []
+
+
+def _as_named_list(value: Any) -> list[str]:
+    if isinstance(value, str):
+        item = value.strip()
+        return [item] if item else []
+    if isinstance(value, list):
+        items: list[str] = []
+        for entry in value:
+            item = str(entry).strip()
+            if item:
+                items.append(item)
+        return items
+    return []
+
+
+def _resolve_backend_runtime_profile(
+    profile_name: str,
+    profiles: dict[str, dict[str, Any]],
+    cache: dict[str, dict[str, Any]],
+    stack: tuple[str, ...] = (),
+) -> dict[str, Any]:
+    if profile_name in cache:
+        return cache[profile_name]
+    if profile_name in stack:
+        chain = " -> ".join([*stack, profile_name])
+        raise ValueError(f"Backend runtime profile cycle detected: {chain}")
+    profile = profiles.get(profile_name)
+    if not isinstance(profile, dict):
+        raise ValueError(f"Backend runtime profile '{profile_name}' is not defined")
+
+    merged: dict[str, Any] = {}
+    for parent_name in _as_named_list(profile.get("extends", [])):
+        parent = _resolve_backend_runtime_profile(parent_name, profiles, cache, (*stack, profile_name))
+        merged = deep_merge(merged, parent)
+
+    profile_payload = {k: v for k, v in profile.items() if k not in {"name", "extends"}}
+    merged = deep_merge(merged, profile_payload)
+    cache[profile_name] = merged
+    return merged
+
+
 def _collect_backend_runtime_variants(stack: StackConfig) -> list[dict[str, Any]]:
     _, _, catalog = load_backend_runtime_catalog(stack.root)
     global_version = _resolve_env_token(os.environ.get("LLAMA_VERSION", "latest"), "latest")
@@ -751,6 +1023,12 @@ def _collect_backend_runtime_variants(stack: StackConfig) -> list[dict[str, Any]
         default_backends = ["cpu", "cuda", "rocm", "vulkan"]
 
     variants_by_macro: dict[str, dict[str, Any]] = {}
+    profile_entries = {
+        str(name).strip(): value
+        for name, value in _iter_backend_runtime_profiles(catalog.get("profiles"))
+        if str(name).strip()
+    }
+    resolved_profiles: dict[str, dict[str, Any]] = {}
 
     variants_config = catalog.get("variants")
     if not variants_config:
@@ -769,35 +1047,49 @@ def _collect_backend_runtime_variants(stack: StackConfig) -> list[dict[str, Any]
         return list(variants_by_macro.values())
 
     for entry_name, raw_variant in _iter_backend_runtime_variants(variants_config):
-        source = raw_variant.get("source", {})
+        profile_names: list[str] = []
+        profile_names.extend(_as_named_list(raw_variant.get("profile")))
+        profile_names.extend(_as_named_list(raw_variant.get("profiles")))
+        deduped_profile_names: list[str] = []
+        for profile_name in profile_names:
+            if profile_name not in deduped_profile_names:
+                deduped_profile_names.append(profile_name)
+
+        profile_overlay: dict[str, Any] = {}
+        for profile_name in deduped_profile_names:
+            resolved = _resolve_backend_runtime_profile(profile_name, profile_entries, resolved_profiles)
+            profile_overlay = deep_merge(profile_overlay, resolved)
+
+        variant_input = deep_merge(profile_overlay, raw_variant)
+        source = variant_input.get("source", {})
         if not isinstance(source, dict):
             source = {}
 
-        name = str(raw_variant.get("name", "")).strip() or entry_name.strip()
-        backend = str(raw_variant.get("backend", "")).strip().lower()
+        name = str(variant_input.get("name", "")).strip() or entry_name.strip()
+        backend = str(variant_input.get("backend", "")).strip().lower()
         if not backend:
             backend = str(source.get("backend", "")).strip().lower()
         if not backend:
             continue
 
         version = _resolve_env_token(
-            raw_variant.get("version", source.get("version", default_version)),
+            variant_input.get("version", source.get("version", default_version)),
             default_version,
         )
-        source_type = str(raw_variant.get("source_type", source.get("type", default_source_type))).strip().lower()
+        source_type = str(variant_input.get("source_type", source.get("type", default_source_type))).strip().lower()
         if not source_type:
             source_type = "github_release"
 
         if not name:
             name = backend if version in ("", "latest") else f"{backend}-{version}"
 
-        runtime_subdir = str(raw_variant.get("runtime_subdir", source.get("runtime_subdir", ""))).strip().strip("/")
+        runtime_subdir = str(variant_input.get("runtime_subdir", source.get("runtime_subdir", ""))).strip().strip("/")
         if not runtime_subdir:
             runtime_subdir = backend if name == backend else f"{backend}/{name}"
         if default_runtime_subdir_prefix:
             runtime_subdir = f"{default_runtime_subdir_prefix}/{runtime_subdir}"
 
-        macro = str(raw_variant.get("macro", source.get("macro", ""))).strip()
+        macro = str(variant_input.get("macro", source.get("macro", ""))).strip()
         if not macro:
             macro = f"llama-server-{name}"
 
@@ -808,36 +1100,49 @@ def _collect_backend_runtime_variants(stack: StackConfig) -> list[dict[str, Any]
             "version": version,
             "source_type": source_type,
             "asset_pattern": str(
-                raw_variant.get(
+                variant_input.get(
                     "asset_pattern",
                     source.get("asset_pattern", default_asset_pattern or _default_runtime_asset_pattern(backend)),
                 )
             ).strip(),
-            "repo_owner": str(raw_variant.get("repo_owner", source.get("repo_owner", default_owner))).strip() or default_owner,
-            "repo_name": str(raw_variant.get("repo_name", source.get("repo_name", default_repo))).strip() or default_repo,
-            "download_url": str(raw_variant.get("download_url", source.get("url", ""))).strip(),
-            "archive_type": str(raw_variant.get("archive_type", source.get("archive_type", ""))).strip(),
-            "git_url": str(raw_variant.get("git_url", source.get("repo_url", ""))).strip(),
-            "git_ref": str(raw_variant.get("git_ref", source.get("ref", version))).strip() or version,
+            "repo_owner": str(variant_input.get("repo_owner", source.get("repo_owner", default_owner))).strip() or default_owner,
+            "repo_name": str(variant_input.get("repo_name", source.get("repo_name", default_repo))).strip() or default_repo,
+            "download_url": str(variant_input.get("download_url", source.get("url", ""))).strip(),
+            "archive_type": str(variant_input.get("archive_type", source.get("archive_type", ""))).strip(),
+            "git_url": str(variant_input.get("git_url", source.get("repo_url", ""))).strip(),
+            "git_ref": str(variant_input.get("git_ref", source.get("ref", version))).strip() or version,
             "configure_command": str(
-                raw_variant.get("configure_command", source.get("configure_command", ""))
+                variant_input.get("configure_command", source.get("configure_command", ""))
             ).strip(),
-            "build_command": str(raw_variant.get("build_command", source.get("build_command", ""))).strip(),
-            "binary_glob": str(raw_variant.get("binary_glob", source.get("binary_glob", ""))).strip(),
-            "library_glob": str(raw_variant.get("library_glob", source.get("library_glob", ""))).strip(),
+            "build_command": str(variant_input.get("build_command", source.get("build_command", ""))).strip(),
+            "binary_glob": str(variant_input.get("binary_glob", source.get("binary_glob", ""))).strip(),
+            "library_glob": str(variant_input.get("library_glob", source.get("library_glob", ""))).strip(),
+            "source_subdir": str(variant_input.get("source_subdir", source.get("source_subdir", "."))).strip() or ".",
+            "build_root_subdir": str(
+                variant_input.get("build_root_subdir", source.get("build_root_subdir", ""))
+            ).strip(),
+            "pre_configure_command": str(
+                variant_input.get("pre_configure_command", source.get("pre_configure_command", ""))
+            ).strip(),
             "runtime_subdir": runtime_subdir,
-            "enabled": bool(raw_variant.get("enabled", source.get("enabled", default_enabled))),
-            "always": bool(raw_variant.get("always", source.get("always", default_always))),
+            "enabled": bool(variant_input.get("enabled", source.get("enabled", default_enabled))),
+            "always": bool(variant_input.get("always", source.get("always", default_always))),
+            "profile_names": deduped_profile_names,
         }
+        build_env = variant_input.get("build_env", source.get("build_env", {}))
+        if isinstance(build_env, dict):
+            variant["build_env"] = {str(k): str(v) for k, v in build_env.items() if str(k).strip()}
+        else:
+            variant["build_env"] = {}
 
-        apt_packages = raw_variant.get("apt_packages", source.get("apt_packages", []))
+        apt_packages = variant_input.get("apt_packages", source.get("apt_packages", []))
         if isinstance(apt_packages, str):
             variant["apt_packages"] = [item.strip() for item in apt_packages.split() if item.strip()]
         elif isinstance(apt_packages, list):
             variant["apt_packages"] = [str(item).strip() for item in apt_packages if str(item).strip()]
 
-        if raw_variant.get("command") or source.get("command"):
-            variant["command"] = str(raw_variant.get("command", source.get("command", ""))).strip()
+        if variant_input.get("command") or source.get("command"):
+            variant["command"] = str(variant_input.get("command", source.get("command", ""))).strip()
 
         variants_by_macro[macro] = variant
 
@@ -933,13 +1238,22 @@ def _generated_llama_swap_models(stack: StackConfig, macros: dict[str, Any]) -> 
     generated: dict[str, Any] = {}
     frameworks = catalog.get("frameworks", {})
     profiles = catalog.get("model_profiles", {})
+    support_ctx = _build_backend_support_context(stack)
 
     for profile_name, profile in profiles.items():
         defaults = profile.get("defaults", {})
         artifacts = profile.get("artifacts", {})
         deployments = profile.get("deployments", {})
         for deployment_name, deployment in deployments.items():
-            resolved_deployment = _resolve_model_deployment(catalog, str(profile_name), str(deployment_name), deployment)
+            resolved_deployment = _resolve_model_deployment_with_support(
+                stack,
+                catalog,
+                str(profile_name),
+                str(deployment_name),
+                deployment,
+                profile,
+                support_ctx,
+            )
             if not resolved_deployment.get("enabled", True):
                 continue
             if str(resolved_deployment.get("transport", "llama-swap")) != "llama-swap":
@@ -1042,8 +1356,22 @@ def _resolve_model_deployment(
     return deep_merge(profile_data, deployment)
 
 
+def _resolve_model_deployment_with_support(
+    stack: StackConfig,
+    catalog: dict[str, Any],
+    profile_name: str,
+    deployment_name: str,
+    deployment: dict[str, Any],
+    profile: dict[str, Any],
+    support_ctx: dict[str, Any],
+) -> dict[str, Any]:
+    resolved = _resolve_model_deployment(catalog, profile_name, deployment_name, deployment)
+    return _apply_backend_support_matrix(support_ctx, profile_name, deployment_name, profile, resolved)
+
+
 def _generated_llama_swap_groups(stack: StackConfig) -> dict[str, Any]:
     _, _, catalog = load_model_catalog(stack.root)
+    support_ctx = _build_backend_support_context(stack)
 
     # Build lookup for published llama-swap deployments:
     #   label -> llama_swap_model_id
@@ -1052,7 +1380,15 @@ def _generated_llama_swap_groups(stack: StackConfig) -> dict[str, Any]:
     enabled_model_ids: set[str] = set()
     for profile_name, profile in catalog.get("model_profiles", {}).items():
         for dep_name, dep in profile.get("deployments", {}).items():
-            resolved_dep = _resolve_model_deployment(catalog, str(profile_name), str(dep_name), dep)
+            resolved_dep = _resolve_model_deployment_with_support(
+                stack,
+                catalog,
+                str(profile_name),
+                str(dep_name),
+                dep,
+                profile,
+                support_ctx,
+            )
             if not resolved_dep.get("enabled", True):
                 continue
             if str(resolved_dep.get("transport", "llama-swap")) != "llama-swap":
@@ -1095,7 +1431,19 @@ def _generated_llama_swap_groups(stack: StackConfig) -> dict[str, Any]:
                 continue
             profile = catalog.get("model_profiles", {}).get(profile_name, {})
             raw_deployment = profile.get("deployments", {}).get(deployment_name, {})
-            deployment = _resolve_model_deployment(catalog, profile_name, deployment_name, raw_deployment) if isinstance(raw_deployment, dict) else {}
+            deployment = (
+                _resolve_model_deployment_with_support(
+                    stack,
+                    catalog,
+                    profile_name,
+                    deployment_name,
+                    raw_deployment,
+                    profile,
+                    support_ctx,
+                )
+                if isinstance(raw_deployment, dict)
+                else {}
+            )
             label = str(deployment.get("label", "")).strip()
             llama_swap_model = str(member.get("llama_swap_model", deployment.get("llama_swap_model", label or deployment_name))).strip()
             if llama_swap_model and llama_swap_model in enabled_model_ids:
@@ -1117,6 +1465,7 @@ def _generated_llama_swap_groups(stack: StackConfig) -> dict[str, Any]:
 
 def _catalog_published_models(stack: StackConfig) -> list[PublishedModel]:
     _, _, catalog = load_model_catalog(stack.root)
+    support_ctx = _build_backend_support_context(stack)
     profiles = catalog.get("model_profiles", {})
     load_groups = catalog.get("load_groups", {})
     result: list[PublishedModel] = []
@@ -1133,7 +1482,15 @@ def _catalog_published_models(stack: StackConfig) -> list[PublishedModel]:
         for deployment_name, raw_deployment in deployments.items():
             if not isinstance(raw_deployment, dict):
                 continue
-            deployment = _resolve_model_deployment(catalog, str(profile_name), str(deployment_name), raw_deployment)
+            deployment = _resolve_model_deployment_with_support(
+                stack,
+                catalog,
+                str(profile_name),
+                str(deployment_name),
+                raw_deployment,
+                profile,
+                support_ctx,
+            )
             if not deployment.get("enabled", True):
                 continue
             label = str(deployment.get("label", "")).strip()
@@ -1591,10 +1948,15 @@ def build_backend_runtime_catalog(stack: StackConfig) -> dict[str, Any]:
                 "build_command": str(variant.get("build_command", "")),
                 "binary_glob": str(variant.get("binary_glob", "")),
                 "library_glob": str(variant.get("library_glob", "")),
+                "source_subdir": str(variant.get("source_subdir", ".")),
+                "build_root_subdir": str(variant.get("build_root_subdir", "")),
+                "build_env": dict(variant.get("build_env", {})),
+                "pre_configure_command": str(variant.get("pre_configure_command", "")),
                 "apt_packages": [str(item) for item in variant.get("apt_packages", []) if str(item).strip()],
                 "runtime_subdir": str(variant.get("runtime_subdir", "")),
                 "enabled": bool(variant.get("enabled", True)),
                 "always": bool(variant.get("always", False)),
+                "profile_names": [str(item) for item in variant.get("profile_names", []) if str(item).strip()],
             }
             for variant in variants
         ],
@@ -1728,6 +2090,8 @@ def build_nginx_config(stack: StackConfig) -> str:
     litellm_key = _read_local_env_var(stack, stack.litellm.master_key_env)
     litellm_auth_header = f'\n            proxy_set_header Authorization "Bearer {litellm_key}";' if litellm_key else ""
     base_path = stack.network.base_path
+    _nginx_cfg_rel = str(stack.reverse_proxy.get("nginx", {}).get("config_path", "config/generated/nginx/nginx.conf")) if isinstance(stack.reverse_proxy, dict) else "config/generated/nginx/nginx.conf"
+    nginx_static_root = (stack.root / _nginx_cfg_rel).parent.as_posix()
     base_namespace_routes = ""
     if base_path:
         escaped_base = re.escape(base_path)
@@ -1948,7 +2312,7 @@ http {{
         }}
 
         location = / {{
-            root /app/static;
+            root {nginx_static_root};
             try_files /index.html =404;
             default_type text/html;
         }}
@@ -2076,6 +2440,7 @@ def validate_layered_configs(root: str | Path) -> dict[str, Any]:
     mcp_base, mcp_local, _ = load_mcp_registry(root)
     models_base, models_local, _ = load_model_catalog(root)
     backend_runtime_base, backend_runtime_local, _ = load_backend_runtime_catalog(root)
+    backend_support_base, backend_support_local, _ = load_backend_support_matrix(root)
     stack_base, stack_local, _ = load_layered_yaml(root, "config/project/stack.base.yaml", "config/local/stack.override.yaml")
     state_path = stack_base.get("project", {}).get("installer", {}).get("state_path", "state/install-state.json")
     return {
@@ -2086,6 +2451,7 @@ def validate_layered_configs(root: str | Path) -> dict[str, Any]:
             "mcp": type_conflicts(mcp_base, mcp_local),
             "models": type_conflicts(models_base, models_local),
             "backend_runtime": type_conflicts(backend_runtime_base, backend_runtime_local),
+            "backend_support": type_conflicts(backend_support_base, backend_support_local),
         },
         "state_path": str(Path(root).resolve() / state_path),
     }

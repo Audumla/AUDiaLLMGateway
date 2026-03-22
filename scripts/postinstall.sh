@@ -9,7 +9,7 @@ cd /opt/AUDiaLLMGateway
 chmod +x scripts/*.sh scripts/*.ps1 scripts/*.cmd 2>/dev/null || true
 
 # Ensure runtime directories exist
-mkdir -p state config/local
+mkdir -p state config/local config/data/backend-runtime config/data/backend-build
 
 # config/local/ is a protected path — updates never overwrite it.
 # Make it and its files editable by all local users (home-lab default).
@@ -148,7 +148,12 @@ if [ ! -f config/local/backend-runtime.override.yaml ]; then
 #     git_url: https://github.com/ggml-org/llama.cpp.git
 #     git_ref: master
 #     configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_HIPBLAS=ON -DCMAKE_BUILD_TYPE=Release
-#     build_command: cmake --build build --config Release -j$(nproc)
+#     build_command: cmake --build build --config Release --parallel
+#     source_subdir: .
+#     build_root_subdir: rocm/git-main
+#     build_env:
+#       CMAKE_BUILD_PARALLEL_LEVEL: "8"
+#     pre_configure_command: cmake --version
 #     binary_glob: build/bin/llama-server
 #     library_glob: build/bin/*.so*
 #     apt_packages:
