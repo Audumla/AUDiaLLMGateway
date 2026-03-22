@@ -1,14 +1,5 @@
 # Changelog
 
-## [0.12.1](https://github.com/example/AUDiaLLMGateway/compare/v0.12.0...v0.12.1) (2026-03-22)
-
-
-### Bug Fixes
-
-* llamacpp backend rules and expansion ([e06e3f4](https://github.com/example/AUDiaLLMGateway/commit/e06e3f4f786151e33e574c5f98e6ee7531e43906))
-
-## Changelog
-
 ## Unreleased
 
 ### Scaffolded a native Windows local LLM gateway workspace in AUDiaLLMGateway. (New Feature)
@@ -529,5 +520,9 @@
 - build_nginx_config hardcoded 'root /app/static' in the landing-page location block — path that never exists on native installs or in Docker — causing 404 on GET / (and GET /audia/llmgateway/ via base-path passthrough).
 - Fixed by computing nginx_static_root from stack.reverse_proxy nginx config_path so the root directive always resolves to the directory where write_nginx_config writes index.html.
 - Added 6 regression tests in test_litellm_config_generation.py covering: static root path does not use /app/static, all required proxy routes present, proxy headers on upstream blocks, landing-page links prefixed with base_path, base-path passthrough rewrite, and no-base-path omits namespace routes.
+
+### Added device alias mapping for GPU presets and deployment options. (Configuration Cleanup)
+- Implemented device alias expansion in config generation so readable names map to ROCm/Vulkan device IDs.
+- Documented device_aliases usage in runbook.
 
 ---
