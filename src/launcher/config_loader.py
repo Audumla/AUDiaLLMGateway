@@ -1201,6 +1201,7 @@ def _runtime_variant_macro_command(variant: dict[str, Any]) -> str:
 
 def _synthesize_catalog_macros(catalog: dict[str, Any], macros: dict[str, Any], local_macros: dict[str, Any], backend: str = "auto") -> None:
     presets = catalog.get("presets", {})
+    device_aliases = presets.get("device_aliases", {})
     for section in ("gpu_profiles", "runtime_profiles"):
         for preset_name, preset in presets.get(section, {}).items():
             if not isinstance(preset, dict):
@@ -2120,7 +2121,15 @@ def build_nginx_config(stack: StackConfig) -> str:
     litellm_auth_header = f'\n            proxy_set_header Authorization "Bearer {litellm_key}";' if litellm_key else ""
     base_path = stack.network.base_path
     _nginx_cfg_rel = str(stack.reverse_proxy.get("nginx", {}).get("config_path", "config/generated/nginx/nginx.conf")) if isinstance(stack.reverse_proxy, dict) else "config/generated/nginx/nginx.conf"
-    nginx_static_root = (stack.root / _nginx_cfg_rel).parent.as_posix()
+    _configured_static_root = str(stack.reverse_proxy.get("nginx", {}).get("static_root", "")) if isinstance(stack.reverse_proxy, dict) else ""
+    if _configured_static_root:
+        nginx_static_root = _configured_static_root
+    elif os.environ.get("AUDIA_DOCKER", "false").lower() == "true":
+        # In Docker the generated nginx dir is volume-mounted into the nginx
+        # container at /app/static — use that fixed path.
+        nginx_static_root = "/app/static"
+    else:
+        nginx_static_root = (stack.root / _nginx_cfg_rel).parent.as_posix()
     base_namespace_routes = ""
     if base_path:
         escaped_base = re.escape(base_path)
