@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.12.3](https://github.com/example/AUDiaLLMGateway/compare/v0.12.2...v0.12.3) (2026-03-22)
+
+
+### Bug Fixes
+
+* add libatomic1 to backend base image for lemonade llama.cpp binary ([cae66d8](https://github.com/example/AUDiaLLMGateway/commit/cae66d89b2f83588c5e5252c69ea98db77e9ad52))
+* device_aliases NameError and Docker-aware nginx static root ([03a31ef](https://github.com/example/AUDiaLLMGateway/commit/03a31ef84f4d6718d45894b10d40cb1510a744fb))
+* nginx health prefix route and Docker DNS resolver ([0365d86](https://github.com/example/AUDiaLLMGateway/commit/0365d866f419e4ab0303c81d8176ee9565b7d072))
+
+
+### Documentation
+
+* update nginx and vLLM specs for health prefix route and compose profiles ([77dbbd4](https://github.com/example/AUDiaLLMGateway/commit/77dbbd4c223449e9817d31f5a0b06ea988cd5010))
+
 ## [0.12.2](https://github.com/example/AUDiaLLMGateway/compare/v0.12.1...v0.12.2) (2026-03-22)
 
 
