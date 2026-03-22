@@ -127,6 +127,20 @@ Context presets should use human-friendly aliases like `32k`, `64k`, or `96k`. T
 
 GPU and runtime presets should also be expressed in the catalog as structured `llama.cpp` option maps. The generator translates those into `llama-swap` macros, so the backend substrate does not own the preset semantics.
 
+You can also define human-friendly device aliases once and reuse them across
+GPU presets and deployments:
+
+```yaml
+presets:
+  device_aliases:
+    gpu_7900_a: ROCm0
+    gpu_7900_b: ROCm1
+    gpu_6900: ROCm2
+    vk_6900: Vulkan0
+    vk_7900_a: Vulkan1
+    vk_7900_b: Vulkan2
+```
+
 This is the current greenfield schema. The default project config no longer carries older compatibility forms for model exposure or context naming.
 
 `config/project/models.base.yaml` is an empty scaffold for shipped defaults.
