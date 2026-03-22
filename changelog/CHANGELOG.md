@@ -521,4 +521,8 @@
 - Fixed by computing nginx_static_root from stack.reverse_proxy nginx config_path so the root directive always resolves to the directory where write_nginx_config writes index.html.
 - Added 6 regression tests in test_litellm_config_generation.py covering: static root path does not use /app/static, all required proxy routes present, proxy headers on upstream blocks, landing-page links prefixed with base_path, base-path passthrough rewrite, and no-base-path omits namespace routes.
 
+### Added device alias mapping for GPU presets and deployment options. (Configuration Cleanup)
+- Implemented device alias expansion in config generation so readable names map to ROCm/Vulkan device IDs.
+- Documented device_aliases usage in runbook.
+
 ---

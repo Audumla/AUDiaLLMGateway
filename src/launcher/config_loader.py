@@ -648,6 +648,7 @@ def _catalog_named_macro(catalog: dict[str, Any], section: str, preset_name: str
     macro_name = str(preset.get("llama_swap_macro", "")).strip()
     if not macro_name:
         raise ValueError(f"Model catalog preset '{section}.{preset_name}' does not define llama_swap_macro")
+    device_aliases = catalog.get("presets", {}).get("device_aliases", {})
     backend_options = preset.get("llama_cpp_options_by_backend", {})
     has_backend_specific = (
         isinstance(backend_options, dict)
@@ -669,6 +670,30 @@ def _format_llama_cpp_option_value(value: Any) -> str:
     if isinstance(value, bool):
         return "true" if value else "false"
     return str(value)
+
+
+def _apply_device_aliases(options: dict[str, Any], aliases: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(options, dict) or not options:
+        return options
+    if not isinstance(aliases, dict) or not aliases:
+        return options
+    if "device" not in options:
+        return options
+    value = options.get("device")
+    if isinstance(value, str):
+        mapped = aliases.get(value)
+        if mapped is not None:
+            return {**options, "device": mapped}
+        return options
+    if isinstance(value, list):
+        mapped_list: list[Any] = []
+        for item in value:
+            if isinstance(item, str) and item in aliases:
+                mapped_list.append(aliases[item])
+            else:
+                mapped_list.append(item)
+        return {**options, "device": mapped_list}
+    return options
 
 
 def _render_llama_cpp_options(options: dict[str, Any], backend: str = "auto") -> str:
@@ -1220,6 +1245,7 @@ def _synthesize_catalog_macros(catalog: dict[str, Any], macros: dict[str, Any], 
                             f"Model catalog preset '{section}.{preset_name}' must define non-empty "
                             f"llama_cpp_options_by_backend.{backend_name} to synthesize macro '{backend_macro_name}'"
                         )
+                    options = _apply_device_aliases(options, device_aliases)
                     macros[backend_macro_name] = _render_llama_cpp_options(options, backend=str(backend_name))
                 continue
 
@@ -1230,6 +1256,7 @@ def _synthesize_catalog_macros(catalog: dict[str, Any], macros: dict[str, Any], 
                 raise ValueError(
                     f"Model catalog preset '{section}.{preset_name}' must define llama_cpp_options to synthesize macro '{macro_name}'"
                 )
+            options = _apply_device_aliases(options, device_aliases)
             macros[macro_name] = _render_llama_cpp_options(options, backend=backend)
 
 
@@ -1239,6 +1266,7 @@ def _generated_llama_swap_models(stack: StackConfig, macros: dict[str, Any]) -> 
     frameworks = catalog.get("frameworks", {})
     profiles = catalog.get("model_profiles", {})
     support_ctx = _build_backend_support_context(stack)
+    device_aliases = catalog.get("presets", {}).get("device_aliases", {})
 
     for profile_name, profile in profiles.items():
         defaults = profile.get("defaults", {})
@@ -1307,7 +1335,8 @@ def _generated_llama_swap_models(stack: StackConfig, macros: dict[str, Any]) -> 
             if gpu_name:
                 lines.append(_catalog_named_macro(catalog, "gpu_profiles", gpu_name, backend=deployment_backend))
             elif isinstance(llama_cpp_options, dict) and llama_cpp_options:
-                lines.append(_render_llama_cpp_options(llama_cpp_options, backend=deployment_backend))
+                resolved_options = _apply_device_aliases(llama_cpp_options, device_aliases)
+                lines.append(_render_llama_cpp_options(resolved_options, backend=deployment_backend))
             for preset_name in runtime_presets:
                 lines.append(_catalog_named_macro(catalog, "runtime_profiles", preset_name, backend=deployment_backend))
             for macro_ref in additional_macros:
