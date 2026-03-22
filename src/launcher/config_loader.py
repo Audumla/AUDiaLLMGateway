@@ -2209,6 +2209,11 @@ http {{
     uwsgi_temp_path        /tmp/nginx-uwsgi;
     scgi_temp_path         /tmp/nginx-scgi;
 
+    # Re-resolve upstream hostnames every 30s so nginx picks up new container
+    # IPs after a gateway restart without requiring a full nginx restart.
+    # 127.0.0.11 is Docker's embedded DNS; ignored in non-Docker environments.
+    resolver 127.0.0.11 valid=30s ipv6=off;
+
     upstream litellm_upstream {{
         server {stack.network.litellm_host}:{stack.network.litellm_port};
         keepalive 16;
@@ -2312,8 +2317,8 @@ http {{
             proxy_request_buffering off;
         }}
 
-        location = /health {{
-            proxy_pass http://litellm_upstream/health;
+        location /health {{
+            proxy_pass http://litellm_upstream;
             proxy_http_version 1.1;
             proxy_set_header Host $http_host;{litellm_auth_header}
         }}
