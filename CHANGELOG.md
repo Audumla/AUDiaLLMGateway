@@ -1,14 +1,5 @@
 # Changelog
 
-## [0.12.2](https://github.com/Audumla/AUDiaLLMGateway/compare/v0.12.1...v0.12.2) (2026-03-22)
-
-
-### Bug Fixes
-
-* added labels to gpus in config ([887bfed](https://github.com/Audumla/AUDiaLLMGateway/commit/887bfed61ff6fe8b8c158653086292556e30c959))
-
-## Changelog
-
 ## Unreleased
 
 ### Scaffolded a native Windows local LLM gateway workspace in AUDiaLLMGateway. (New Feature)
@@ -533,5 +524,26 @@
 ### Added device alias mapping for GPU presets and deployment options. (Configuration Cleanup)
 - Implemented device alias expansion in config generation so readable names map to ROCm/Vulkan device IDs.
 - Documented device_aliases usage in runbook.
+
+### Fix nginx health route to prefix match so /health/liveliness routes correctly (Bug Fix)
+- location = /health was an exact match, causing /health/liveliness and other sub-paths to return 404 from nginx's default static file handler instead of proxying to LiteLLM
+- Changed to prefix 'location /health' so all /health/* paths route to litellm_upstream
+
+### Add Docker DNS resolver to nginx config to prevent 502 after gateway container restart (Bug Fix)
+- nginx upstream blocks cache DNS at startup; when the gateway container is recreated with a new IP, nginx returns 502 until manually reloaded
+- Added 'resolver 127.0.0.11 valid=30s' to nginx http block so Docker's embedded DNS is used for re-resolution after restarts
+
+### Add nginx tests for health prefix route and Docker DNS resolver directive (Test Update)
+- test_nginx_health_is_prefix_route_not_exact_match: asserts location /health is prefix (not exact), so /health/liveliness routes through
+- test_nginx_config_contains_docker_dns_resolver: asserts resolver 127.0.0.11 is present in generated config
+- Updated test_nginx_config_contains_all_required_proxy_routes to expect prefix /health not exact = /health
+
+### Disable vLLM on live server: stop container and lock COMPOSE_PROFILES=watcher in .env (Configuration Cleanup)
+- audia-vllm was running despite AUDIA_ENABLE_VLLM=false because it had unless-stopped restart policy from a previous compose up with --profile vllm
+- Stopped the container and added COMPOSE_PROFILES=watcher to live .env so docker compose up will not start vLLM on next stack restart
+
+### Update nginx and vLLM specs for health prefix route, Docker DNS resolver, and vLLM compose profiles (Documentation Update)
+- spec-401-nginx-reverse-proxy: /health is now documented as prefix location; Docker DNS resolver note added
+- spec-251-vllm-runtime: clarified vLLM is not started by default and requires COMPOSE_PROFILES=watcher,vllm and AUDIA_ENABLE_VLLM=true
 
 ---
