@@ -501,4 +501,24 @@
 - Added step-by-step backend variant onboarding in docker docs and runbook with github_release/direct_url/git examples.
 - Updated specs and postinstall seeding so backend-runtime.override.yaml is part of default local config templates.
 
+### Added reusable backend-runtime profiles and AMD-targeted ROCm variants (New Feature)
+- Added profile composition (profile/profiles/extends) to backend runtime catalog resolution and generated catalog output.
+- Added default backend-runtime profiles and disabled sample variants for gfx1030/gfx1100 using ROCm official and lemonade sources.
+- Updated README/runbook/docker docs + llama.cpp runtime spec and added regression tests for profile-based runtime variants.
+
+### Added isolated backend build-root catalog plumbing, validated generation tests, and executed live qwen27 backend performance matrix on 10.10.100.10. (Performance Improvement)
+- Extended backend-runtime variant schema and generated catalog output with source_subdir/build_root_subdir/build_env/pre_configure_command.
+- Updated compose/docs/postinstall templates for persistent BACKEND_BUILD_ROOT and profile-based backend source builds.
+- Ran local smoke/regression tests (26 passed) plus live 2-pass benchmark across Vulkan and ROCm variant labels; captured pass/fail and latency report artifacts.
+
+### Added config-driven backend support matrix for model/backend compatibility. (New Feature)
+- Added backend-support base and override config files with version-based rules.
+- Wired compatibility checks into config generation and publishing, using backend runtime catalog versions.
+- Documented backend support matrix usage and version requirements in runbook and Docker docs.
+
+### Fix nginx root serving: computed static root from config path; add 6 routing regression tests (Bug Fix, Test Update)
+- build_nginx_config hardcoded 'root /app/static' in the landing-page location block — path that never exists on native installs or in Docker — causing 404 on GET / (and GET /audia/llmgateway/ via base-path passthrough).
+- Fixed by computing nginx_static_root from stack.reverse_proxy nginx config_path so the root directive always resolves to the directory where write_nginx_config writes index.html.
+- Added 6 regression tests in test_litellm_config_generation.py covering: static root path does not use /app/static, all required proxy routes present, proxy headers on upstream blocks, landing-page links prefixed with base_path, base-path passthrough rewrite, and no-base-path omits namespace routes.
+
 ---

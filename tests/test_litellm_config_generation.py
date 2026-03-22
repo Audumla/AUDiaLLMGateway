@@ -6,6 +6,7 @@ import yaml
 from src.launcher.config_loader import (
     build_llama_swap_config,
     build_litellm_config,
+    build_nginx_config,
     build_vllm_config,
     load_stack_config,
     write_generated_configs,
@@ -561,3 +562,217 @@ def test_backend_runtime_catalog_supports_direct_url_and_git_sources(tmp_path: P
     assert by_macro["llama-server-rocm-git"]["source_type"] == "git"
     assert by_macro["llama-server-rocm-git"]["git_url"] == "https://github.com/ggml-org/llama.cpp.git"
     assert by_macro["llama-server-rocm-git"]["apt_packages"] == ["git", "cmake"]
+
+
+def test_backend_runtime_catalog_supports_reusable_profiles(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("AUDIA_DOCKER", "true")
+    source_root = Path(__file__).resolve().parents[1]
+    for rel_path in [
+        "config/project/stack.base.yaml",
+        "config/project/llama-swap.base.yaml",
+        "config/project/models.base.yaml",
+        "config/project/backend-runtime.base.yaml",
+        "config/project/mcp.base.yaml",
+        "config/local/stack.override.yaml",
+        "config/local/llama-swap.override.yaml",
+        "config/local/models.override.yaml",
+        "config/local/backend-runtime.override.yaml",
+        "config/local/mcp.override.yaml",
+    ]:
+        source = source_root / rel_path
+        target = tmp_path / rel_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+
+    runtime_override = tmp_path / "config" / "local" / "backend-runtime.override.yaml"
+    runtime_override.write_text(
+        yaml.safe_dump(
+            {
+                "profiles": {
+                    "source-ggml-git": {
+                        "source_type": "git",
+                        "git_url": "https://github.com/ggml-org/llama.cpp.git",
+                        "git_ref": "master",
+                    },
+                    "rocm-gfx1100": {
+                        "backend": "rocm",
+                        "configure_command": "cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_HIPBLAS=ON -DAMDGPU_TARGETS=gfx1100 -DCMAKE_BUILD_TYPE=Release",
+                        "build_command": "cmake --build build --config Release -j2",
+                        "source_subdir": ".",
+                        "build_root_subdir": "rocm/gfx1100/main",
+                        "build_env": {"CMAKE_BUILD_PARALLEL_LEVEL": "2"},
+                        "pre_configure_command": "cmake --version",
+                        "binary_glob": "build/bin/llama-server",
+                        "library_glob": "build/bin/*.so*",
+                        "apt_packages": ["git", "cmake", "build-essential"],
+                    },
+                },
+                "variants": {
+                    "rocm-gfx1100-main": {
+                        "profiles": ["source-ggml-git", "rocm-gfx1100"],
+                        "macro": "llama-server-rocm-gfx1100-main",
+                        "runtime_subdir": "rocm/gfx1100/main",
+                    }
+                },
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    write_generated_configs(tmp_path)
+    backend_catalog = json.loads(
+        (tmp_path / "config" / "generated" / "llama-swap" / "backend-runtime.catalog.json").read_text(encoding="utf-8")
+    )
+    by_macro = {item["macro"]: item for item in backend_catalog.get("variants", [])}
+
+    entry = by_macro["llama-server-rocm-gfx1100-main"]
+    assert entry["backend"] == "rocm"
+    assert entry["source_type"] == "git"
+    assert entry["git_url"] == "https://github.com/ggml-org/llama.cpp.git"
+    assert "-DAMDGPU_TARGETS=gfx1100" in entry["configure_command"]
+    assert entry["profile_names"] == ["source-ggml-git", "rocm-gfx1100"]
+    assert entry["source_subdir"] == "."
+    assert entry["build_root_subdir"] == "rocm/gfx1100/main"
+    assert entry["build_env"]["CMAKE_BUILD_PARALLEL_LEVEL"] == "2"
+    assert entry["pre_configure_command"] == "cmake --version"
+
+
+# ---------------------------------------------------------------------------
+# Nginx routing regression tests
+# ---------------------------------------------------------------------------
+
+_NGINX_CONFIG_FILES = [
+    "config/project/stack.base.yaml",
+    "config/project/llama-swap.base.yaml",
+    "config/project/models.base.yaml",
+    "config/project/backend-runtime.base.yaml",
+    "config/project/mcp.base.yaml",
+    "config/local/stack.override.yaml",
+    "config/local/llama-swap.override.yaml",
+    "config/local/models.override.yaml",
+    "config/local/backend-runtime.override.yaml",
+    "config/local/mcp.override.yaml",
+]
+
+
+def _copy_config_files(source_root: Path, tmp_path: Path) -> None:
+    for rel_path in _NGINX_CONFIG_FILES:
+        source = source_root / rel_path
+        target = tmp_path / rel_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+
+
+def test_nginx_static_root_uses_generated_directory_not_app_static(tmp_path: Path) -> None:
+    """Root location must serve index.html from the generated nginx directory.
+
+    Regression: the f-string previously hardcoded '/app/static' which never
+    exists on native installs or in Docker (nothing copies files there).
+    The root must be the directory where write_nginx_config writes index.html.
+    """
+    source_root = Path(__file__).resolve().parents[1]
+    _copy_config_files(source_root, tmp_path)
+
+    write_generated_configs(tmp_path)
+    nginx_text = (tmp_path / "config" / "generated" / "nginx" / "nginx.conf").read_text(encoding="utf-8")
+
+    # The hardcoded wrong path must not appear.
+    assert "/app/static" not in nginx_text, "nginx must not use the hardcoded /app/static root"
+
+    # The generated directory (where index.html is actually written) must be the root.
+    expected_static_root = (tmp_path / "config" / "generated" / "nginx").as_posix()
+    assert f"root {expected_static_root};" in nginx_text, (
+        f"nginx root should be {expected_static_root!r}; found:\n{nginx_text}"
+    )
+
+
+def test_nginx_config_contains_all_required_proxy_routes(tmp_path: Path) -> None:
+    """All declared proxy routes must be present in the generated nginx config."""
+    source_root = Path(__file__).resolve().parents[1]
+    _copy_config_files(source_root, tmp_path)
+
+    write_generated_configs(tmp_path)
+    nginx_text = (tmp_path / "config" / "generated" / "nginx" / "nginx.conf").read_text(encoding="utf-8")
+
+    # Primary API route
+    assert "location /v1/ {" in nginx_text
+    # LiteLLM namespace
+    assert "location = /litellm {" in nginx_text
+    assert "location /litellm/ {" in nginx_text
+    # llama-swap namespace and UI sub-routes
+    assert "location = /llamaswap {" in nginx_text
+    assert "location /llamaswap/ui/ {" in nginx_text
+    assert "location /llamaswap/ {" in nginx_text
+    # LiteLLM admin UI
+    assert "location = /ui {" in nginx_text
+    assert "location /ui/ {" in nginx_text
+    # Health checks
+    assert "location = /health {" in nginx_text
+    assert "location = /llamaswap-health {" in nginx_text
+    # Root landing page
+    assert "location = / {" in nginx_text
+    # Base-path passthrough (default base_path is /audia/llmgateway)
+    assert "location = /audia/llmgateway {" in nginx_text
+    assert "location /audia/llmgateway/ {" in nginx_text
+
+
+def test_nginx_config_proxy_headers_on_all_upstream_routes(tmp_path: Path) -> None:
+    """Every upstream proxy block must set the standard forwarding headers."""
+    source_root = Path(__file__).resolve().parents[1]
+    _copy_config_files(source_root, tmp_path)
+
+    write_generated_configs(tmp_path)
+    nginx_text = (tmp_path / "config" / "generated" / "nginx" / "nginx.conf").read_text(encoding="utf-8")
+
+    assert "proxy_set_header Host $http_host;" in nginx_text
+    assert "proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;" in nginx_text
+    assert "proxy_set_header X-Forwarded-Proto $scheme;" in nginx_text
+    assert "proxy_set_header Upgrade $http_upgrade;" in nginx_text
+
+
+def test_nginx_landing_page_root_redirect_uses_base_path(tmp_path: Path) -> None:
+    """The generated index.html must redirect all links through the configured base_path."""
+    source_root = Path(__file__).resolve().parents[1]
+    _copy_config_files(source_root, tmp_path)
+
+    write_generated_configs(tmp_path)
+    index_text = (tmp_path / "config" / "generated" / "nginx" / "index.html").read_text(encoding="utf-8")
+
+    # Base-path-prefixed links must be present; bare /v1 links must not appear.
+    assert 'href="/audia/llmgateway/v1/models"' in index_text
+    assert 'href="/audia/llmgateway/litellm/"' in index_text
+    assert 'href="/audia/llmgateway/llamaswap/"' in index_text
+    assert 'href="/audia/llmgateway/health"' in index_text
+    assert 'href="/v1/models"' not in index_text, "bare /v1/models link must not appear when base_path is set"
+
+
+def test_nginx_config_base_path_passthrough_rewrites_correctly(tmp_path: Path) -> None:
+    """The base-path passthrough block must rewrite the prefix off and proxy internally."""
+    source_root = Path(__file__).resolve().parents[1]
+    _copy_config_files(source_root, tmp_path)
+
+    write_generated_configs(tmp_path)
+    nginx_text = (tmp_path / "config" / "generated" / "nginx" / "nginx.conf").read_text(encoding="utf-8")
+
+    assert "rewrite ^/audia/llmgateway/(.*)$ /$1 break;" in nginx_text
+    assert "proxy_pass http://127.0.0.1:8080;" in nginx_text
+
+
+def test_nginx_config_no_base_path_omits_namespace_routes(tmp_path: Path) -> None:
+    """When base_path is cleared, no namespace passthrough block should be generated."""
+    source_root = Path(__file__).resolve().parents[1]
+    _copy_config_files(source_root, tmp_path)
+
+    # Override stack to remove base_path
+    override_path = tmp_path / "config" / "local" / "stack.override.yaml"
+    import yaml as _yaml
+    existing = _yaml.safe_load(override_path.read_text(encoding="utf-8")) or {}
+    existing.setdefault("network", {})["base_path"] = ""
+    override_path.write_text(_yaml.safe_dump(existing), encoding="utf-8")
+
+    write_generated_configs(tmp_path)
+    nginx_text = (tmp_path / "config" / "generated" / "nginx" / "nginx.conf").read_text(encoding="utf-8")
+
+    assert "location = /audia/llmgateway" not in nginx_text
+    assert "location /audia/llmgateway/" not in nginx_text

@@ -7,12 +7,78 @@
 set -e
 
 RUNTIME_ROOT="${RUNTIME_ROOT:-/app/runtime-root}"
+BUILD_ROOT="${BUILD_ROOT:-/app/runtime-build-root}"
 DEFAULT_SWAP_CONFIG="${LLAMA_SWAP_CONFIG_PATH:-/app/config/llama-swap.generated.yaml}"
 DEFAULT_SWAP_ADDR="${LLAMA_SWAP_LISTEN_ADDR:-0.0.0.0:41080}"
 DEFAULT_SWAP_WAIT_SECONDS="${LLAMA_SWAP_CONFIG_WAIT_SECONDS:-120}"
 BACKEND_RUNTIME_CATALOG_PATH="${BACKEND_RUNTIME_CATALOG_PATH:-/app/config/backend-runtime.catalog.json}"
 BACKEND_RUNTIME_CATALOG_WAIT_SECONDS="${BACKEND_RUNTIME_CATALOG_WAIT_SECONDS:-45}"
 EFFECTIVE_RUNTIME_CATALOG="/tmp/backend-runtime.catalog.json"
+
+retry_cmd() {
+    local _attempts="$1"
+    local _sleep_seconds="$2"
+    shift 2
+    local _try=1
+    while true; do
+        if "$@"; then
+            return 0
+        fi
+        if [ "$_try" -ge "$_attempts" ]; then
+            return 1
+        fi
+        echo "  Retry $_try/$_attempts failed for: $*"
+        sleep "$_sleep_seconds"
+        _try=$((_try + 1))
+    done
+}
+
+retry_git_clone() {
+    local _url="$1"
+    local _ref="$2"
+    local _dest="$3"
+    retry_cmd 5 3 git clone --depth 1 --branch "$_ref" "$_url" "$_dest"
+}
+
+retry_curl_download() {
+    local _url="$1"
+    local _output="$2"
+    retry_cmd 5 2 curl -fLsS --connect-timeout 10 --retry 3 --retry-delay 2 --retry-all-errors -o "$_output" "$_url"
+}
+
+run_configured_command() {
+    local _cmd="$1"
+    local _env_json="${2:-{}}"
+    if [ -z "$_cmd" ]; then
+        return 0
+    fi
+    # Execute command via Python subprocess(shell=False) so unescaped shell metacharacters
+    # in arguments (e.g. -DAMDGPU_TARGETS=gfx1030;gfx1100) are treated as plain arg text.
+    python3 - "$_cmd" "$_env_json" <<'PY'
+import os
+import shlex
+import subprocess
+import sys
+import json
+
+cmd = sys.argv[1]
+env_json = sys.argv[2] if len(sys.argv) > 2 else "{}"
+# Support common build shorthand used in catalog commands.
+cmd = cmd.replace("$(nproc)", str(os.cpu_count() or 1))
+argv = shlex.split(cmd, posix=True)
+if not argv:
+    raise SystemExit(0)
+env = os.environ.copy()
+try:
+    extra = json.loads(env_json) if env_json else {}
+except Exception:
+    extra = {}
+if isinstance(extra, dict):
+    for key, value in extra.items():
+        env[str(key)] = str(value)
+subprocess.run(argv, check=True, env=env)
+PY
+}
 
 sync_backend_plugins() {
     local _bin_dir="$1"
@@ -150,7 +216,9 @@ ensure_release_metadata() {
     if [ ! -s "$_target" ]; then
         local _api_url="https://api.github.com/repos/${_owner}/${_repo}/releases/latest"
         [ "$_version" != "latest" ] && _api_url="https://api.github.com/repos/${_owner}/${_repo}/releases/tags/${_version}"
-        curl -fsSL "$_api_url" -o "$_target"
+        if ! retry_curl_download "$_api_url" "$_target"; then
+            return 1
+        fi
     fi
     echo "$_target"
 }
@@ -256,6 +324,7 @@ $HAS_VULKAN && RUNTIME_PACKAGES+=(libvulkan1 mesa-vulkan-drivers vulkan-tools)
 ensure_apt_packages "${RUNTIME_PACKAGES[@]}"
 
 mkdir -p "$RUNTIME_ROOT"
+mkdir -p "$BUILD_ROOT"
 
 is_backend_available() {
     local _backend="$1"
@@ -302,9 +371,13 @@ provision_variant() {
     local BINARY_GLOB="${15}"
     local LIBRARY_GLOB="${16}"
     local APT_PACKAGES="${17}"
+    local SOURCE_SUBDIR="${18}"
+    local BUILD_ROOT_SUBDIR="${19}"
+    local BUILD_ENV_JSON="${20}"
+    local PRE_CONFIGURE_COMMAND="${21}"
     local SUFFIX="$BE"
     [ "$SUFFIX" = "cpu" ] && SUFFIX="cpu"
-    local CURRENT_SIG="${CURRENT_SIG_PREFIX}|VARIANT=${NAME}|BACKEND=${BE}|VERSION=${VERSION}|SOURCE=${SOURCE_TYPE}|REPO=${OWNER}/${REPO}|PATTERN=${PATTERN}|URL=${DOWNLOAD_URL}|GIT=${GIT_URL}@${GIT_REF}|SUBDIR=${RUNTIME_SUBDIR}|CFG=${CONFIGURE_COMMAND}|BUILD=${BUILD_COMMAND}|BIN_GLOB=${BINARY_GLOB}|LIB_GLOB=${LIBRARY_GLOB}|APT=${APT_PACKAGES}"
+    local CURRENT_SIG="${CURRENT_SIG_PREFIX}|VARIANT=${NAME}|BACKEND=${BE}|VERSION=${VERSION}|SOURCE=${SOURCE_TYPE}|REPO=${OWNER}/${REPO}|PATTERN=${PATTERN}|URL=${DOWNLOAD_URL}|GIT=${GIT_URL}@${GIT_REF}|SUBDIR=${RUNTIME_SUBDIR}|SRC_SUBDIR=${SOURCE_SUBDIR}|BUILD_SUBDIR=${BUILD_ROOT_SUBDIR}|BUILD_ENV=${BUILD_ENV_JSON}|PRE_CFG=${PRE_CONFIGURE_COMMAND}|CFG=${CONFIGURE_COMMAND}|BUILD=${BUILD_COMMAND}|BIN_GLOB=${BINARY_GLOB}|LIB_GLOB=${LIBRARY_GLOB}|APT=${APT_PACKAGES}"
     local RUNTIME_DIR="$RUNTIME_ROOT/$RUNTIME_SUBDIR"
     local BIN_DIR="$RUNTIME_DIR/bin"
     local LIB_DIR="$RUNTIME_DIR/lib"
@@ -312,10 +385,11 @@ provision_variant() {
     local RELEASE_META=""
     local DL_URL=""
     local _archive_type=""
+    local EXPECTED_BIN="$BIN_DIR/llama-server-$SUFFIX"
 
     mkdir -p "$BIN_DIR" "$LIB_DIR"
 
-    if [ ! -f "$STATE_FILE" ] || [ "$(cat "$STATE_FILE")" != "$CURRENT_SIG" ]; then
+    if [ ! -f "$STATE_FILE" ] || [ "$(cat "$STATE_FILE")" != "$CURRENT_SIG" ] || [ ! -x "$EXPECTED_BIN" ]; then
         echo ">>> Provisioning ${NAME} (${BE}@${VERSION}, source=${SOURCE_TYPE}) into $RUNTIME_DIR..."
         rm -rf "$BIN_DIR"/* "$LIB_DIR"/*
 
@@ -350,28 +424,46 @@ provision_variant() {
                 [ -z "$BUILD_COMMAND" ] && BUILD_COMMAND="$(default_git_build_command)"
                 [ -z "$BINARY_GLOB" ] && BINARY_GLOB="$(default_binary_glob)"
                 [ -z "$LIBRARY_GLOB" ] && LIBRARY_GLOB="$(default_library_glob)"
-                ensure_apt_packages git cmake build-essential pkg-config
+                ensure_apt_packages git cmake build-essential pkg-config libcurl4-openssl-dev
+                [ -z "$SOURCE_SUBDIR" ] && SOURCE_SUBDIR="."
+                [ -z "$BUILD_ROOT_SUBDIR" ] && BUILD_ROOT_SUBDIR="$NAME"
 
-                local _git_build="/tmp/git_build_${NAME}_$$"
+                local _git_build="${BUILD_ROOT}/${BUILD_ROOT_SUBDIR}"
                 rm -rf "$_git_build"
                 mkdir -p "$_git_build"
                 echo "  Cloning $GIT_URL @ $GIT_REF"
-                git clone --depth 1 --branch "$GIT_REF" "$GIT_URL" "$_git_build/src"
-                (
-                    cd "$_git_build/src"
-                    bash -lc "$CONFIGURE_COMMAND"
-                    bash -lc "$BUILD_COMMAND"
-                )
+                if ! retry_git_clone "$GIT_URL" "$GIT_REF" "$_git_build/src"; then
+                    echo "  WARNING: git clone failed for ${NAME} after retries (URL=$GIT_URL REF=$GIT_REF) — skipping"
+                    rm -rf "$_git_build"
+                    return
+                fi
+                local _workdir="$_git_build/src/$SOURCE_SUBDIR"
+                if [ ! -d "$_workdir" ]; then
+                    echo "  WARNING: source_subdir '$SOURCE_SUBDIR' not found for ${NAME} — skipping"
+                    rm -rf "$_git_build"
+                    return
+                fi
+                if ! (
+                    cd "$_workdir"
+                    run_configured_command "$PRE_CONFIGURE_COMMAND" "$BUILD_ENV_JSON"
+                    run_configured_command "$CONFIGURE_COMMAND" "$BUILD_ENV_JSON"
+                    run_configured_command "$BUILD_COMMAND" "$BUILD_ENV_JSON"
+                ); then
+                    echo "  WARNING: git build failed for ${NAME}; skipping this variant"
+                    rm -rf "$_git_build"
+                    return
+                fi
                 local _binary_path=""
-                _binary_path=$(compgen -G "$_git_build/src/$BINARY_GLOB" | head -1 || true)
+                _binary_path=$(compgen -G "$_workdir/$BINARY_GLOB" | head -1 || true)
                 if [ -z "$_binary_path" ]; then
                     echo "  WARNING: git build did not produce binary matching '$BINARY_GLOB' — skipping ${NAME}"
                     rm -rf "$_git_build"
                     return
                 fi
                 cp "$_binary_path" "$BIN_DIR/llama-server-$SUFFIX"
-                if compgen -G "$_git_build/src/$LIBRARY_GLOB" >/dev/null 2>&1; then
-                    cp $_git_build/src/$LIBRARY_GLOB "$LIB_DIR/" 2>/dev/null || true
+                chmod +x "$BIN_DIR/llama-server-$SUFFIX"
+                if compgen -G "$_workdir/$LIBRARY_GLOB" >/dev/null 2>&1; then
+                    cp $_workdir/$LIBRARY_GLOB "$LIB_DIR/" 2>/dev/null || true
                 fi
                 rm -rf "$_git_build"
                 sync_backend_plugins "$BIN_DIR" "$LIB_DIR"
@@ -393,7 +485,11 @@ provision_variant() {
         echo "  Downloading from $DL_URL..."
         local _archive="/tmp/llama_${NAME}.archive"
         local _extract="/tmp/extract_${NAME}"
-        curl -fsSL -o "$_archive" "$DL_URL"
+        if ! retry_curl_download "$DL_URL" "$_archive"; then
+            echo "  WARNING: failed to download runtime asset for ${NAME} after retries — skipping"
+            rm -rf "$_archive" "$_extract"
+            return
+        fi
         mkdir -p "$_extract"
         _archive_type="$(detect_archive_type "$DL_URL" "$ARCHIVE_TYPE")"
         case "$_archive_type" in
@@ -426,9 +522,13 @@ provision_variant() {
             _binary_path=$(compgen -G "$_extract/$BINARY_GLOB" | head -1 || true)
             if [ -n "$_binary_path" ]; then
                 cp "$_binary_path" "$BIN_DIR/llama-server-$SUFFIX"
+                chmod +x "$BIN_DIR/llama-server-$SUFFIX"
             fi
         else
             find "$_extract" -name "llama-server" -exec cp {} "$BIN_DIR/llama-server-$SUFFIX" \;
+            if [ -f "$BIN_DIR/llama-server-$SUFFIX" ]; then
+                chmod +x "$BIN_DIR/llama-server-$SUFFIX"
+            fi
         fi
         if [ -n "$LIBRARY_GLOB" ]; then
             if compgen -G "$_extract/$LIBRARY_GLOB" >/dev/null 2>&1; then
@@ -478,6 +578,10 @@ for ROW in "${VARIANT_ROWS[@]}"; do
     BINARY_GLOB="$(echo "$ROW" | jq -r '.binary_glob // ""')"
     LIBRARY_GLOB="$(echo "$ROW" | jq -r '.library_glob // ""')"
     APT_PACKAGES="$(echo "$ROW" | jq -r '.apt_packages // [] | map(tostring) | join(" ")')"
+    SOURCE_SUBDIR="$(echo "$ROW" | jq -r '.source_subdir // "."')"
+    BUILD_ROOT_SUBDIR="$(echo "$ROW" | jq -r '.build_root_subdir // ""')"
+    BUILD_ENV_JSON="$(echo "$ROW" | jq -c '.build_env // {}')"
+    PRE_CONFIGURE_COMMAND="$(echo "$ROW" | jq -r '.pre_configure_command // ""')"
 
     [ -z "$BACKEND" ] && continue
     [ -z "$NAME" ] && NAME="$BACKEND"
@@ -495,7 +599,8 @@ for ROW in "${VARIANT_ROWS[@]}"; do
         provision_variant \
             "$NAME" "$BACKEND" "$VERSION" "$PATTERN" "$OWNER" "$REPO" "$RUNTIME_SUBDIR" \
             "$SOURCE_TYPE" "$DOWNLOAD_URL" "$ARCHIVE_TYPE" "$GIT_URL" "$GIT_REF" \
-            "$CONFIGURE_COMMAND" "$BUILD_COMMAND" "$BINARY_GLOB" "$LIBRARY_GLOB" "$APT_PACKAGES"
+            "$CONFIGURE_COMMAND" "$BUILD_COMMAND" "$BINARY_GLOB" "$LIBRARY_GLOB" "$APT_PACKAGES" \
+            "$SOURCE_SUBDIR" "$BUILD_ROOT_SUBDIR" "$BUILD_ENV_JSON" "$PRE_CONFIGURE_COMMAND"
         PROVISIONED_COUNT=$((PROVISIONED_COUNT + 1))
     fi
 done

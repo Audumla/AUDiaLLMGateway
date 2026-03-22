@@ -41,7 +41,9 @@ For guided Docker setup on Linux, use:
 
 The provisioned `llama.cpp` runtimes are persisted on the host under
 `./config/data/backend-runtime/<backend>/` by default, one directory per backend,
-so you can inspect, back up, or repair the downloaded binaries directly.
+so you can inspect, back up, or repair the downloaded binaries directly. Source
+build worktrees for git variants are persisted under
+`./config/data/backend-build/` (`BACKEND_BUILD_ROOT` in `.env`).
 
 The root [`docker-compose.yml`](docker-compose.yml) is deployment-oriented and
 pulls published images only, so a remote host can stay a clean Docker Compose
@@ -182,14 +184,19 @@ definitions in:
 
 Each variant can use `github_release`, `direct_url`, or `git` source types and
 produces a versioned backend macro (for example `llama-server-rocm-b8429`) that
-you can reference in model deployments.
+you can reference in model deployments. Variants can now reuse shared
+`profiles` (for source/build policy), so you can define `gfx1030` and `gfx1100`
+ROCm build settings once and apply them to multiple sources (upstream, ROCm
+official, lemonade fork, preview refs).
 
 How to add a new backend variant:
 
-1. Add a variant under `config/local/backend-runtime.override.yaml`.
-2. Reference its macro in `config/local/models.override.yaml` deployment
+1. (Optional) Add reusable `profiles` under `config/local/backend-runtime.override.yaml`.
+2. Add a variant under `config/local/backend-runtime.override.yaml` and reference
+   one or more profiles via `profile` or `profiles`.
+3. Reference its macro in `config/local/models.override.yaml` deployment
    (`executable_macro: <macro>`).
-3. Regenerate and restart:
+4. Regenerate and restart:
    - `python -m src.launcher.process_manager --root . generate-configs`
    - `docker compose restart llm-server-llamacpp` (Docker)
 

@@ -75,6 +75,7 @@ DATABASE_URL=postgresql://audia:audia-dev-password@llm-db-postgres:5432/litellm
 MODEL_ROOT=./models
 MODEL_HF_ROOT=./models-hf
 BACKEND_RUNTIME_ROOT=./config/data/backend-runtime
+BACKEND_BUILD_ROOT=./config/data/backend-build
 
 # Optional vLLM backend
 AUDIA_ENABLE_VLLM=false
@@ -99,7 +100,7 @@ That helper:
 - detects whether the host looks like NVIDIA, AMD, Vulkan-only, or CPU-only
 - prompts for the main Docker settings
 - writes `.env`
-- creates visible host directories for `models`, `models-hf`, `BACKEND_RUNTIME_ROOT`, and PostgreSQL data
+- creates visible host directories for `models`, `models-hf`, `BACKEND_RUNTIME_ROOT`, `BACKEND_BUILD_ROOT`, and PostgreSQL data
 
 ### 2. Place your model files
 
@@ -179,7 +180,8 @@ This uses the root `docker-compose.yml`. On first start, the backend container
 downloads and caches the appropriate llama.cpp binary. Subsequent starts reuse the
 host-mounted runtime base directory at `BACKEND_RUNTIME_ROOT` (default:
 `./config/data/backend-runtime`), with one sibling directory per backend such as
-`vulkan/`, `rocm/`, `cuda/`, or `cpu/`.
+`vulkan/`, `rocm/`, `cuda/`, or `cpu/`. Source-build worktrees are persisted separately
+under `BACKEND_BUILD_ROOT` (default `./config/data/backend-build`).
 
 Full compose definition: [`docker-compose.yml`](../docker-compose.yml)
 
@@ -237,6 +239,7 @@ services:
       - ./models:/app/models:ro
       - ./config/generated/llama-swap:/app/config:ro
       - ${BACKEND_RUNTIME_ROOT:-./config/data/backend-runtime}:/app/runtime-root
+      - ${BACKEND_BUILD_ROOT:-./config/data/backend-build}:/app/runtime-build-root
     deploy:
       resources:
         reservations:
@@ -297,6 +300,7 @@ services:
       - ./models:/app/models:ro
       - ./config/generated/llama-swap:/app/config:ro
       - ${BACKEND_RUNTIME_ROOT:-./config/data/backend-runtime}:/app/runtime-root
+      - ${BACKEND_BUILD_ROOT:-./config/data/backend-build}:/app/runtime-build-root
     devices:
       - /dev/kfd:/dev/kfd
       - /dev/dri:/dev/dri
@@ -375,6 +379,7 @@ services:
       - ./models:/app/models:ro
       - ./config/generated/llama-swap:/app/config:ro
       - ${BACKEND_RUNTIME_ROOT:-./config/data/backend-runtime}:/app/runtime-root
+      - ${BACKEND_BUILD_ROOT:-./config/data/backend-build}:/app/runtime-build-root
     networks:
       - internal
     restart: unless-stopped
@@ -433,6 +438,7 @@ All variables read from `.env` at compose start time.
 | `MODEL_ROOT` | No | `./models` | Host path to model directory. Mounted read-only into the backend. |
 | `MODEL_HF_ROOT` | No | `./models-hf` | Host path for Hugging Face cache and raw tensor weights used by vLLM. |
 | `BACKEND_RUNTIME_ROOT` | No | `./config/data/backend-runtime` | Host path base for the provisioned `llama.cpp` runtimes. Each backend is stored in its own subdirectory such as `cpu/`, `rocm/`, `vulkan/`, or `cuda/`. |
+| `BACKEND_BUILD_ROOT` | No | `./config/data/backend-build` | Host path for isolated git/source build worktrees used by runtime variants with `source_type: git`. |
 | `AUDIA_ENABLE_VLLM` | No | `false` | Enables vLLM-backed LiteLLM routes and watcher-managed vLLM restarts. Requires `--profile vllm`. |
 | `GATEWAY_PORT` | No | `4000` | Host port published for the LiteLLM gateway. |
 | `NGINX_PORT` | No | `8080` | Host port published for the nginx reverse proxy. |
@@ -462,41 +468,45 @@ ROCm and Vulkan builds) by adding variants in
 - a dedicated runtime path under `BACKEND_RUNTIME_ROOT` (for example
   `rocm/b8429/` or `vulkan/b8500/`)
 
+`backend-runtime` now supports reusable `profiles`, so source policy and build
+policy can be composed per variant. This is useful for AMD cards where you want
+explicit `gfx1100` and `gfx1030` builds across multiple upstreams.
+
 Example:
 
 ```yaml
-variants:
-  rocm-b8429:
+profiles:
+  build-rocm-gfx1030-gfx1100:
     backend: rocm
-    macro: llama-server-rocm-b8429
-    version: b8429
-    runtime_subdir: rocm/b8429
-  vulkan-b8429:
-    backend: vulkan
-    macro: llama-server-vulkan-b8429
-    version: b8429
-    runtime_subdir: vulkan/b8429
-  vulkan-custom-url:
-    backend: vulkan
-    macro: llama-server-vulkan-custom
-    source_type: direct_url
-    download_url: https://example.com/llama-vulkan-custom.tar.gz
-    archive_type: tar.gz
-    runtime_subdir: vulkan/custom
-  rocm-built-from-git:
-    backend: rocm
-    macro: llama-server-rocm-git
-    source_type: git
-    git_url: https://github.com/ggml-org/llama.cpp.git
-    git_ref: master
-    configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_HIPBLAS=ON -DCMAKE_BUILD_TYPE=Release
-    build_command: cmake --build build --config Release -j$(nproc)
+    configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_HIPBLAS=ON -DAMDGPU_TARGETS=gfx1030;gfx1100 -DCMAKE_HIP_ARCHITECTURES=gfx1030;gfx1100 -DCMAKE_BUILD_TYPE=Release
+    build_command: cmake --build build --config Release --parallel
     binary_glob: build/bin/llama-server
     library_glob: build/bin/*.so*
     apt_packages:
       - git
       - cmake
       - build-essential
+
+  source-rocm-official-preview:
+    source_type: git
+    git_url: https://github.com/ROCm/llama.cpp.git
+    git_ref: rocm-7.11.0-preview
+
+  source-lemonade:
+    source_type: git
+    git_url: https://github.com/lemonade-sdk/llamacpp-rocm.git
+    git_ref: main
+
+variants:
+  rocm-gfx1100-preview:
+    profiles: [source-rocm-official-preview, build-rocm-gfx1030-gfx1100]
+    macro: llama-server-rocm-gfx1100-preview
+    runtime_subdir: rocm/gfx1100/preview
+
+  rocm-gfx1100-lemonade:
+    profiles: [source-lemonade, build-rocm-gfx1030-gfx1100]
+    macro: llama-server-rocm-gfx1100-lemonade
+    runtime_subdir: rocm/gfx1100/lemonade
 
 model_profiles:
   tiny_qwen25_test:
@@ -508,17 +518,46 @@ model_profiles:
         llama_swap_model: tiny-qwen25-test-rocm-b8429
 ```
 
+### Backend support matrix
+
+Compatibility between model architectures and backend variants is defined in
+`config/project/backend-support.base.yaml` and `config/local/backend-support.override.yaml`.
+This matrix is applied during config generation, so incompatible deployments are
+disabled (or warned/error’d) without hardcoding backend-specific rules.
+To enforce version-based rules, ensure each backend variant has a concrete
+`version: b####` instead of `latest`.
+
+Example rule (Qwen 3.5 requires `b8153+`):
+
+```yaml
+defaults:
+  on_incompatible: disable
+  on_unknown: warn
+
+architecture_aliases:
+  qwen3.5: qwen35
+
+rules:
+  - name: qwen35-min-b8153
+    when:
+      architecture: [qwen35, qwen35moe]
+    require:
+      llama_cpp_min_release: b8153
+```
+
 ### Add a new backend variant
 
 Use this flow whenever you want to add a new backend build (new version, alternate
 repo, direct artifact URL, or source build):
 
-1. Add a variant in `config/local/backend-runtime.override.yaml`.
-2. Point one or more model deployments at that macro in `config/local/models.override.yaml`
+1. (Optional) Add shared profiles in `config/local/backend-runtime.override.yaml`.
+2. Add a variant in `config/local/backend-runtime.override.yaml` and reference
+   one or more profiles with `profile` or `profiles`.
+3. Point one or more model deployments at that macro in `config/local/models.override.yaml`
    using `executable_macro`.
-3. Regenerate configs.
-4. Restart `llm-server-llamacpp` (or let watcher restart it if running).
-5. Verify the variant appears in generated runtime catalog and responds.
+4. Regenerate configs.
+5. Restart `llm-server-llamacpp` (or let watcher restart it if running).
+6. Verify the variant appears in generated runtime catalog and responds.
 
 Minimal examples:
 
@@ -549,7 +588,7 @@ variants:
     git_url: https://github.com/ggml-org/llama.cpp.git
     git_ref: master
     configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_HIPBLAS=ON -DCMAKE_BUILD_TYPE=Release
-    build_command: cmake --build build --config Release -j$(nproc)
+    build_command: cmake --build build --config Release --parallel
     binary_glob: build/bin/llama-server
     library_glob: build/bin/*.so*
     apt_packages:
@@ -662,6 +701,7 @@ The update preserves:
 - `config/local/` — your local overrides
 - `models/` — your model files
 - `config/data/backend-runtime/<backend>/` — cached llama.cpp binaries and backend plugins
+- `config/data/backend-build/` — isolated source-build worktrees for backend variants
 - `config/data/postgres/` — LiteLLM metadata database
 - `.env` — your environment file
 
@@ -711,6 +751,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 | Volume / path | Contents | Managed by |
 | ------------- | -------- | ---------- |
 | `./config/data/backend-runtime/<backend>` (under bind-mounted base) | Provisioned llama.cpp binaries and backend plugins (~500 MB) | Installer on first start |
+| `./config/data/backend-build` (bind mount) | Source-build worktrees and intermediate build outputs for git variants | Backend container during provisioning |
 | `./config/data/postgres` (bind mount) | PostgreSQL data for LiteLLM UI/auth metadata | PostgreSQL container |
 | `./models` (bind mount) | GGUF model files | You |
 | `./models-hf` (bind mount) | Hugging Face cache and raw tensor weights for vLLM | You / vLLM |

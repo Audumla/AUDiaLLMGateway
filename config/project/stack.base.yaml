@@ -229,6 +229,10 @@ backend_runtime:
   project_config_path: config/project/backend-runtime.base.yaml
   local_override_path: config/local/backend-runtime.override.yaml
 
+backend_support:
+  project_config_path: config/project/backend-support.base.yaml
+  local_override_path: config/local/backend-support.override.yaml
+
 routing:
   future_fallbacks:
     local/qwen122_smart:

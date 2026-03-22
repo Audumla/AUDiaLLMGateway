@@ -1,33 +1,43 @@
 version: 1
 defaults: {}
+profiles: {}
 variants: {}
 # Example variants:
-# variants:
-#   rocm-b8429:
+# profiles:
+#   build-rocm-gfx1030-gfx1100:
 #     backend: rocm
-#     macro: llama-server-rocm-b8429
-#     version: b8429
-#     runtime_subdir: rocm/b8429
-#
-#   vulkan-custom-url:
-#     backend: vulkan
-#     macro: llama-server-vulkan-custom
-#     source_type: direct_url
-#     download_url: https://example.com/llama-vulkan-custom.tar.gz
-#     archive_type: tar.gz
-#     runtime_subdir: vulkan/custom
-#
-#   rocm-built-from-git:
-#     backend: rocm
-#     macro: llama-server-rocm-git
-#     source_type: git
-#     git_url: https://github.com/ggml-org/llama.cpp.git
-#     git_ref: master
-#     configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_HIPBLAS=ON -DCMAKE_BUILD_TYPE=Release
-#     build_command: cmake --build build --config Release -j$(nproc)
+#     configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_HIPBLAS=ON -DAMDGPU_TARGETS=gfx1030;gfx1100 -DCMAKE_HIP_ARCHITECTURES=gfx1030;gfx1100 -DCMAKE_BUILD_TYPE=Release
+#     build_command: cmake --build build --config Release --parallel
 #     binary_glob: build/bin/llama-server
 #     library_glob: build/bin/*.so*
 #     apt_packages:
 #       - git
 #       - cmake
 #       - build-essential
+#
+#   source-rocm-official-preview:
+#     source_type: git
+#     git_url: https://github.com/ROCm/llama.cpp.git
+#     git_ref: rocm-7.11.0-preview
+#
+#   source-lemonade-rocm:
+#     source_type: git
+#     git_url: https://github.com/lemonade-sdk/llamacpp-rocm.git
+#     git_ref: main
+#
+# variants:
+#   rocm-gfx1100-rocm-preview:
+#     profiles:
+#       - source-rocm-official-preview
+#       - build-rocm-gfx1030-gfx1100
+#     macro: llama-server-rocm-gfx1100-rocm-preview
+#     runtime_subdir: rocm/gfx1100/rocm-preview
+#     enabled: true
+#
+#   rocm-gfx1030-lemonade:
+#     profiles:
+#       - source-lemonade-rocm
+#       - build-rocm-gfx1030-gfx1100
+#     macro: llama-server-rocm-gfx1030-lemonade
+#     runtime_subdir: rocm/gfx1030/lemonade
+#     enabled: true

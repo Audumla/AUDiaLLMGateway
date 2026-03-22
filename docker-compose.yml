@@ -82,12 +82,14 @@ services:
       - LLAMA_VERSION=${LLAMA_VERSION:-latest}
       # Override auto-detection: auto | cuda | rocm | vulkan | cpu
       - LLAMA_BACKEND=${LLAMA_BACKEND:-auto}
+      - BUILD_ROOT=/app/runtime-build-root
       # Optional: restrict Vulkan to specific ICD (e.g. /usr/share/vulkan/icd.d/radeon_icd.json for AMD)
       - VK_ICD_FILENAMES=${VK_ICD_FILENAMES:-}
     volumes:
       - ${MODEL_ROOT:-./models}:/app/models:ro
       - ./config/generated/llama-swap:/app/config:ro
       - ${BACKEND_RUNTIME_ROOT:-./config/data/backend-runtime}:/app/runtime-root
+      - ${BACKEND_BUILD_ROOT:-./config/data/backend-build}:/app/runtime-build-root
     devices:
       - /dev/kfd:/dev/kfd
       - /dev/dri:/dev/dri
