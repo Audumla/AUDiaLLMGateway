@@ -55,23 +55,73 @@ This catalog defines downloadable/buildable backend variants (`github_release`,
 `direct_url`, or `git`) and generates versioned runtime macros consumed by model
 deployments.
 
+Backend compatibility is defined in a separate backend support matrix:
+
+- `config/project/backend-support.base.yaml`
+- `config/local/backend-support.override.yaml`
+
+This matrix is the only place that encodes model/backend compatibility (for
+example, `qwen35` requiring `llama.cpp` releases at or above `b8153`). The code
+does not hardcode backend-specific rules — it evaluates the matrix against the
+model catalog and backend runtime catalog at generation time.
+
+For release-based rules, set an explicit `version` on each backend variant so
+the matrix can compare `b####` tags. If a variant reports `latest` or an
+unknown version, the matrix uses `on_unknown`.
+
 ## Add backend variant workflow
 
 To add a backend build variant without changing project defaults:
 
-1. Edit `config/local/backend-runtime.override.yaml` and add a new entry under
-   `variants`.
-2. Choose `source_type`:
+1. Edit `config/local/backend-runtime.override.yaml`.
+2. Add reusable entries under `profiles` for source/build policy (optional but recommended).
+3. Add a variant under `variants` that references one or more profiles with
+   `profile` or `profiles`.
+4. Choose `source_type`:
    - `github_release` for tagged GitHub release assets.
    - `direct_url` for a fixed artifact URL.
    - `git` for source build from a repository/ref.
-3. Reference the variant macro from a model deployment in
+5. Reference the variant macro from a model deployment in
    `config/local/models.override.yaml` via `executable_macro`.
-4. Regenerate configs:
+6. Regenerate configs:
    - `python -m src.launcher.process_manager --root . generate-configs`
-5. Restart `llm-server-llamacpp` (or let watcher restart when enabled).
-6. Validate generated catalog:
+7. Restart `llm-server-llamacpp` (or let watcher restart when enabled).
+8. Validate generated catalog:
    - `config/generated/llama-swap/backend-runtime.catalog.json`
+
+Example (`gfx1100` on ROCm official preview, plus `gfx1030` on lemonade):
+
+```yaml
+profiles:
+  build-rocm-gfx1030-gfx1100:
+    backend: rocm
+    configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_HIPBLAS=ON -DAMDGPU_TARGETS=gfx1030;gfx1100 -DCMAKE_HIP_ARCHITECTURES=gfx1030;gfx1100 -DCMAKE_BUILD_TYPE=Release
+    build_command: cmake --build build --config Release --parallel
+    binary_glob: build/bin/llama-server
+    library_glob: build/bin/*.so*
+    apt_packages: [git, cmake, build-essential]
+
+  source-rocm-preview:
+    source_type: git
+    git_url: https://github.com/ROCm/llama.cpp.git
+    git_ref: rocm-7.11.0-preview
+
+  source-lemonade:
+    source_type: git
+    git_url: https://github.com/lemonade-sdk/llamacpp-rocm.git
+    git_ref: main
+
+variants:
+  rocm-gfx1100-preview:
+    profiles: [source-rocm-preview, build-rocm-gfx1030-gfx1100]
+    macro: llama-server-rocm-gfx1100-preview
+    runtime_subdir: rocm/gfx1100/preview
+
+  rocm-gfx1030-lemonade:
+    profiles: [source-lemonade, build-rocm-gfx1030-gfx1100]
+    macro: llama-server-rocm-gfx1030-lemonade
+    runtime_subdir: rocm/gfx1030/lemonade
+```
 
 Context presets should use human-friendly aliases like `32k`, `64k`, or `96k`. The generator can synthesize the backend context macro from the numeric token value instead of requiring an explicit `llama-swap` macro entry for every size.
 

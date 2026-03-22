@@ -11,6 +11,38 @@ defaults:
     - cuda
     - rocm
     - vulkan
+profiles:
+  source-ggml-release:
+    source_type: github_release
+    repo_owner: ggml-org
+    repo_name: llama.cpp
+  source-ggml-git:
+    source_type: git
+    git_url: https://github.com/ggml-org/llama.cpp.git
+    git_ref: master
+  source-rocm-official-current:
+    source_type: git
+    git_url: https://github.com/ROCm/llama.cpp.git
+    git_ref: main
+  source-rocm-official-preview:
+    source_type: git
+    git_url: https://github.com/ROCm/llama.cpp.git
+    git_ref: ${ROCM_LLAMA_CPP_PREVIEW_REF}
+  source-lemonade-rocm:
+    source_type: git
+    git_url: https://github.com/lemonade-sdk/llamacpp-rocm.git
+    git_ref: main
+  build-rocm-gfx1030-gfx1100:
+    backend: rocm
+    configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_HIPBLAS=ON -DAMDGPU_TARGETS=gfx1030;gfx1100 -DCMAKE_HIP_ARCHITECTURES=gfx1030;gfx1100 -DCMAKE_BUILD_TYPE=Release
+    build_command: cmake --build build --config Release --parallel
+    binary_glob: build/bin/llama-server
+    library_glob: build/bin/*.so*
+    apt_packages:
+      - git
+      - cmake
+      - build-essential
+      - pkg-config
 variants:
   cpu:
     backend: cpu
@@ -32,3 +64,31 @@ variants:
     macro: llama-server-vulkan
     runtime_subdir: vulkan
     asset_pattern: ubuntu-vulkan.*x64\.(tar\.gz|zip)$
+  rocm-gfx1100-official-current:
+    profiles:
+      - source-rocm-official-current
+      - build-rocm-gfx1030-gfx1100
+    macro: llama-server-rocm-gfx1100-official-current
+    runtime_subdir: rocm/gfx1100/official-current
+    enabled: false
+  rocm-gfx1100-official-preview:
+    profiles:
+      - source-rocm-official-preview
+      - build-rocm-gfx1030-gfx1100
+    macro: llama-server-rocm-gfx1100-official-preview
+    runtime_subdir: rocm/gfx1100/official-preview
+    enabled: false
+  rocm-gfx1030-official-current:
+    profiles:
+      - source-rocm-official-current
+      - build-rocm-gfx1030-gfx1100
+    macro: llama-server-rocm-gfx1030-official-current
+    runtime_subdir: rocm/gfx1030/official-current
+    enabled: false
+  rocm-gfx1030-lemonade-main:
+    profiles:
+      - source-lemonade-rocm
+      - build-rocm-gfx1030-gfx1100
+    macro: llama-server-rocm-gfx1030-lemonade-main
+    runtime_subdir: rocm/gfx1030/lemonade-main
+    enabled: false
