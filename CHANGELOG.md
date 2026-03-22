@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.12.1](https://github.com/Audumla/AUDiaLLMGateway/compare/v0.12.0...v0.12.1) (2026-03-22)
+
+
+### Bug Fixes
+
+* llamacpp backend rules and expansion ([e06e3f4](https://github.com/Audumla/AUDiaLLMGateway/commit/e06e3f4f786151e33e574c5f98e6ee7531e43906))
+
+## Changelog
+
 ## Unreleased
 
 ### Scaffolded a native Windows local LLM gateway workspace in AUDiaLLMGateway. (New Feature)
