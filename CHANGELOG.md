@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.12.2](https://github.com/example/AUDiaLLMGateway/compare/v0.12.1...v0.12.2) (2026-03-22)
+
+
+### Bug Fixes
+
+* added labels to gpus in config ([887bfed](https://github.com/example/AUDiaLLMGateway/commit/887bfed61ff6fe8b8c158653086292556e30c959))
+
+## Changelog
+
 ## Unreleased
 
 ### Scaffolded a native Windows local LLM gateway workspace in AUDiaLLMGateway. (New Feature)
