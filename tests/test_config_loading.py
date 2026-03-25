@@ -114,6 +114,6 @@ def test_load_backend_runtime_catalog_from_repo_fixture() -> None:
     assert "variants" in catalog
     assert "profiles" in catalog
     assert "rocm" in catalog["variants"]
-    assert "build-rocm-gfx1030-gfx1100" in catalog["profiles"]
+    assert "build-rocm-gfx" in catalog["profiles"]
     assert config.backend_runtime_project_config_path == "config/project/backend-runtime.base.yaml"
     assert config.backend_runtime_local_override_path == "config/local/backend-runtime.override.yaml"

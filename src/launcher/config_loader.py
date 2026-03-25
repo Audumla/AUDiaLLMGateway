@@ -2317,6 +2317,57 @@ http {{
             proxy_request_buffering off;
         }}
 
+        # llama-swap API routes called with absolute paths from the UI JavaScript.
+        # The JS bundle uses root-level paths (e.g. /logs, /api/events) regardless
+        # of the base URL the UI is served from, so we must forward them explicitly.
+        location = /activity {{
+            proxy_pass http://llamaswap_upstream/activity;
+            proxy_http_version 1.1;
+            proxy_set_header Host $http_host;
+            proxy_buffering off;
+        }}
+
+        location = /logs {{
+            proxy_pass http://llamaswap_upstream/logs;
+            proxy_http_version 1.1;
+            proxy_set_header Host $http_host;
+            proxy_buffering off;
+        }}
+
+        location = /models {{
+            proxy_pass http://llamaswap_upstream/models;
+            proxy_http_version 1.1;
+            proxy_set_header Host $http_host;
+            proxy_buffering off;
+        }}
+
+        location /api/ {{
+            proxy_pass http://llamaswap_upstream;
+            proxy_http_version 1.1;
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
+            proxy_buffering off;
+            proxy_request_buffering off;
+        }}
+
+        location /upstream/ {{
+            proxy_pass http://llamaswap_upstream;
+            proxy_http_version 1.1;
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_buffering off;
+            proxy_request_buffering off;
+        }}
+
+        location /dev/ {{
+            proxy_pass http://llamaswap_upstream;
+            proxy_http_version 1.1;
+            proxy_set_header Host $http_host;
+            proxy_buffering off;
+        }}
+
         location /health {{
             proxy_pass http://litellm_upstream;
             proxy_http_version 1.1;
