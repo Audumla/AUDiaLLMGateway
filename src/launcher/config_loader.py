@@ -2251,11 +2251,7 @@ http {{
         }}
 
         location = /litellm {{
-            return 301 /litellm/ui/;
-        }}
-
-        location = /litellm/ {{
-            return 301 /litellm/ui/;
+            return 301 /litellm/;
         }}
 
         location /litellm/ {{
