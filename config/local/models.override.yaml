@@ -81,6 +81,15 @@ presets:
       vllm:
         tensor_parallel_size: 1
         pipeline_parallel_size: 1
+    vllm_rocm_tensor_parallel_2:
+      framework: vllm
+      transport: direct
+      vllm_backend: rocm
+      vllm:
+        tensor_parallel_size: 2
+        pipeline_parallel_size: 1
+        gpu_memory_utilization: 0.90
+        max_model_len: 8192
   runtime_profiles:
     jinja:
       llama_swap_macro: jinja-args
@@ -251,24 +260,37 @@ model_profiles:
   vllm_default:
     mode: chat
     family: qwen2.5
-    purpose: Persistent high-throughput model served directly by the optional vLLM backend
+    purpose: Lightweight persistent model served by optional vLLM backend
     defaults:
       context_preset: 32k
-      vllm:
-        gpu_memory_utilization: ${VLLM_GPU_MEM}
-        max_model_len: ${VLLM_MAX_LEN}
     artifacts:
       revision: main
       source_page_url: https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct
-      model_filename: ${VLLM_MODEL}
+      model_filename: Qwen2.5-0.5B-Instruct
       model_url: https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct
     deployments:
-      vllm_primary:
+      vllm_single_gpu:
         label: local/vllm_default
         profile: vllm_rocm_single_gpu1
-        backend_model_name: ${VLLM_MODEL}
+        backend_model_name: Qwen2.5-0.5B-Instruct
+  vllm_qwen72b_distributed:
+    mode: chat
+    family: qwen2.5
+    purpose: High-performance 72B model using tensor parallelism across 2 AMD 7900 XTX GPUs
+    defaults:
+      context_preset: 32k
+    artifacts:
+      revision: main
+      source_page_url: https://huggingface.co/Qwen/Qwen2.5-72B-Instruct
+      model_filename: Qwen2.5-72B-Instruct
+      model_url: https://huggingface.co/Qwen/Qwen2.5-72B-Instruct
+    deployments:
+      vllm_distributed:
+        label: local/vllm_qwen72b_distributed
+        profile: vllm_rocm_tensor_parallel_2
+        backend_model_name: Qwen2.5-72B-Instruct
         vllm:
-          visible_devices: ${VLLM_VISIBLE_DEVICES}
+          visible_devices: "0,1"
   tiny_qwen25_test:
     mode: chat
     family: qwen2.5
