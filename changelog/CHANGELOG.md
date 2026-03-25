@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Fixed nginx proxy routing for llamaswap UI API endpoints. (Bug Fix)
+
+- Added explicit nginx location blocks for `/activity`, `/logs`, `/models`, `/api/`, `/upstream/`, `/dev/` so that the llamaswap UI JavaScript's absolute-path API calls are forwarded to llamaswap_upstream instead of 404-ing when the UI is accessed via the `/llamaswap/` proxy prefix.
+- Added `tests/test_nginx_proxy_routing.py` with 14 regression tests covering all proxy route mappings to prevent recurrence.
+- Updated stale test assertions following the previous session's env-var cleanup: `build-rocm-gfx` profile rename, `ROCR_VISIBLE_DEVICES` removal, `vllm_primary` → `vllm_single_gpu` deployment key, and config-file-driven model selection.
+- Disabled `vllm_qwen72b_distributed` deployment by default (requires explicit opt-in for 2×GPU setups).
+
 ### Scaffolded a native Windows local LLM gateway workspace in AUDiaLLMGateway. (New Feature)
 - Created a Git-backed repo scaffold with config, docs, PowerShell wrappers, and Python orchestration for llama-server plus LiteLLM.
 - Added health checks, routing tests, and config generation for local model profiles and future MCP registration.
