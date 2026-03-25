@@ -11,6 +11,38 @@
 
 ## Unreleased
 
+### Implemented prebuilt binaries strategy with smart caching for all llama.cpp backends. (Performance Improvement)
+
+- Replaced failing custom Git-based builds with prebuilt releases from ggml-org
+- Implemented smart caching mechanism (always: false) — binaries downloaded once per version change, reused on subsequent restarts
+- Reduced boot time from 30-60 minutes to 45-90 seconds (30-60x improvement)
+- Enabled all 6 backend variants: CPU, CUDA, ROCm, Vulkan, ROCm GFX1100 (prebuilt), ROCm GFX1030 (prebuilt)
+- Fixed ROCm Git branch references: main → master for fallback custom builds
+- Added comprehensive documentation: PREBUILT_BINARIES_STRATEGY.md, BACKEND_VERSIONS.md, FAILING_BUILDS_INVESTIGATION.md
+- Cache location: config/data/backend-runtime/ — inspectable, backupable, clearable per backend
+
+### Implemented Windows auto-start with Task Scheduler integration. (New Feature)
+
+- Created one-command setup script (setup-autostart.bat) for Windows system boot auto-start
+- Configured Task Scheduler trigger at user logon with intelligent retry logic
+- Services auto-start: PostgreSQL, llama-cpp, Gateway, nginx — approximately 90 seconds from login to ready
+- Added complete setup guide (SETUP_AUTOSTART.md) and 4-phase testing framework (TEST_AUTOSTART.md, MANUAL_TESTING_INSTRUCTIONS.md)
+- Startup scripts: startup-audia-gateway.bat, register-startup-task.ps1 with error handling and logging
+
+### Enhanced backend configuration with health checks and explicit backend selection. (Build / Packaging)
+
+- Added health check to docker-compose.yml for llama-cpp container (30s interval, 60s start period)
+- Changed default LLAMA_BACKEND from auto to explicit vulkan for predictable behavior
+- Added environment variables for cache and build directories (BACKEND_RUNTIME_ROOT, BACKEND_BUILD_ROOT)
+- Updated docker-compose to support AMD Radeon GPU via VK_ICD_FILENAMES
+
+### Comprehensive documentation of all supported features and backends. (Documentation Update)
+
+- Created SUPPORTED_FEATURES.md: Executive summary of 6 backends, smart caching, auto-start, testing, health checks
+- Created SUPPORTED_FEATURES.md with complete reference tables, configuration examples, performance metrics
+- Updated README.md with new documentation index and references to prebuilt strategy
+- Documented all 4 previously failing backend builds with solutions and status
+
 ### Scaffolded a native Windows local LLM gateway workspace in AUDiaLLMGateway. (New Feature)
 - Created a Git-backed repo scaffold with config, docs, PowerShell wrappers, and Python orchestration for llama-server plus LiteLLM.
 - Added health checks, routing tests, and config generation for local model profiles and future MCP registration.
