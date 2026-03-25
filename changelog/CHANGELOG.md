@@ -10,7 +10,7 @@
 ### Renamed the local LLM gateway workspace from AUDiaLLMEnvironment to AUDiaLLMGateway. (Documentation Update)
 - Renamed the repo directory to AUDiaLLMGateway.
 - Updated README and changelog references to the new project name.
-- Re-ran tests and config generation from the renamed path.
+- Re-ran tests and config generation from the renamed path. 
 
 ### Added the first mid-level project spec for AUDiaLLMGateway. (Documentation Update)
 - Created a specifications folder with a mid-level phase 1 gateway spec.
