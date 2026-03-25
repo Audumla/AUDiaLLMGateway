@@ -1,0 +1,122 @@
+================================================================================
+AUDia LLM Gateway - Auto-Start Quick Reference
+================================================================================
+
+QUICK SETUP (1 minute)
+================================================================================
+1. Right-click Command Prompt or PowerShell
+2. Select "Run as Administrator"
+3. Copy and paste:
+   cd /d h:\development\projects\AUDia\AUDiaLLMGateway\scripts && setup-autostart.bat
+4. Follow prompts
+5. Done! Restart your computer to test.
+
+FILES CREATED
+================================================================================
+scripts/startup-audia-gateway.bat  → Main startup script (runs compose)
+scripts/register-startup-task.ps1  → Registers Windows scheduled task
+scripts/setup-autostart.bat         → Quick setup wrapper (requires admin)
+SETUP_AUTOSTART.md                  → Detailed setup guide
+AUTOSTART_QUICKSTART.txt            → This file
+
+QUICK REFERENCE COMMANDS
+================================================================================
+
+TEST STARTUP SCRIPT (before enabling auto-start):
+  cd h:\development\projects\AUDia\AUDiaLLMGateway
+  scripts\startup-audia-gateway.bat
+
+VERIFY TASK WAS CREATED:
+  tasksched.msc
+  (Look for "AUDia-LLM-Gateway-Startup" in Task Scheduler)
+
+VIEW STARTUP LOGS:
+  type h:\development\projects\AUDia\AUDiaLLMGateway\logs\startup.log
+
+CHECK SERVICES RUNNING:
+  docker compose ps
+
+TEST AFTER REBOOT:
+  curl http://localhost:4000/health/liveliness
+  curl http://localhost:41080/health
+  docker compose ps
+
+REMOVE AUTO-START:
+  tasksched.msc → Find task → Right-click Delete
+
+MANUAL SETUP (if automated setup fails)
+================================================================================
+See: SETUP_AUTOSTART.md → Manual Setup section
+
+TROUBLESHOOTING
+================================================================================
+Services don't start after reboot?
+  1. Check logs: type logs\startup.log
+  2. Verify Docker Desktop auto-start is enabled
+  3. Check Task Scheduler for task status
+  4. See: SETUP_AUTOSTART.md → Troubleshooting section
+
+Task doesn't appear in Task Scheduler?
+  1. Run setup script as Administrator
+  2. Check: tasksched.msc exists
+  3. Look in Task Scheduler Library → AUDia folder
+
+Docker takes too long to start?
+  1. Open Docker Desktop and wait for full startup
+  2. Increase timeout in startup-audia-gateway.bat
+  3. Enable "Start Docker Desktop when you log in" in Settings
+
+WHAT HAPPENS AT BOOT
+================================================================================
+1. Windows starts
+2. You log in
+3. Task Scheduler triggers the startup task
+4. Batch script runs:
+   a. Waits for Docker daemon (max 60 seconds)
+   b. Navigates to project directory
+   c. Runs: docker compose up -d
+   d. Logs all output to: logs/startup.log
+5. Services start in this order:
+   - PostgreSQL (database)
+   - llama-cpp (inference server)
+   - AUDia Gateway (API)
+   - nginx (reverse proxy)
+6. All services are ready for requests
+
+MONITORING
+================================================================================
+Real-time logs:
+  docker compose logs -f
+
+Check service health:
+  docker compose ps
+
+Model availability:
+  curl http://localhost:41080/models
+
+Test inference:
+  curl -X POST http://localhost:41080/v1/chat/completions \
+    -H "Content-Type: application/json" \
+    -d '{"model":"qwen3.5-27b-(96k-Q6)","messages":[{"role":"user","content":"hello"}],"max_tokens":20}'
+
+DOCUMENTATION
+================================================================================
+DOCKER_AUTOSTART.md       → Complete setup guide with all options
+SETUP_AUTOSTART.md        → Step-by-step setup and troubleshooting
+SERVER_DIAGNOSTICS.md     → Server health and configuration details
+CLAUDE.md                 → Project instructions and requirements
+
+SUPPORT
+================================================================================
+If setup fails:
+  1. Check: SETUP_AUTOSTART.md → Troubleshooting section
+  2. Review: logs/startup.log
+  3. Verify: docker compose ps
+  4. Test manually: scripts/startup-audia-gateway.bat
+
+For detailed setup options:
+  See: SETUP_AUTOSTART.md (sections: Manual Setup, Advanced Configuration)
+
+================================================================================
+Last Updated: 2026-03-25
+================================================================================
