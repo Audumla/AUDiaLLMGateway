@@ -2251,7 +2251,13 @@ http {{
         }}
 
         location = /litellm {{
-            return 301 /litellm/;
+            return 301 /litellm/ui/;
+        }}
+
+        # Bare /litellm/ redirects to the dashboard — LiteLLM's root / is the
+        # Swagger API docs, not the UI.  The dashboard lives at /ui/.
+        location = /litellm/ {{
+            return 301 /litellm/ui/;
         }}
 
         location /litellm/ {{
@@ -2403,6 +2409,21 @@ http {{
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
             proxy_buffering off;
+        }}
+
+        # LiteLLM Swagger UI assets (served at root / by LiteLLM).
+        # Required when accessing /litellm/ or the Swagger docs directly.
+        location /swagger/ {{
+            proxy_pass http://litellm_upstream;
+            proxy_http_version 1.1;
+            proxy_set_header Host $http_host;
+            proxy_buffering off;
+        }}
+
+        location = /openapi.json {{
+            proxy_pass http://litellm_upstream/openapi.json;
+            proxy_http_version 1.1;
+            proxy_set_header Host $http_host;
         }}
 
         location = / {{

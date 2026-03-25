@@ -125,6 +125,30 @@ def test_litellm_ui_routes_to_litellm(nginx_cfg: str) -> None:
     assert _has_location(nginx_cfg, "/ui/", "litellm_upstream")
 
 
+def test_litellm_bare_path_redirects_to_ui(nginx_cfg: str) -> None:
+    """Bare /litellm and /litellm/ must redirect to the dashboard (/litellm/ui/).
+
+    Regression: LiteLLM's root / serves the Swagger API docs, NOT the dashboard.
+    Without an explicit redirect, /litellm/ shows a broken Swagger page instead
+    of the dashboard that users expect.
+    """
+    assert "location = /litellm" in nginx_cfg
+    assert "return 301 /litellm/ui/" in nginx_cfg
+    # The exact /litellm/ must also redirect, not fall through to the prefix block
+    assert re.search(r"location\s*=\s*/litellm/\s*\{[^}]*return 301 /litellm/ui/", nginx_cfg, re.DOTALL)
+
+
+def test_swagger_assets_routed_to_litellm(nginx_cfg: str) -> None:
+    """/swagger/ assets and /openapi.json must reach litellm_upstream.
+
+    LiteLLM serves its Swagger UI from /swagger/ and schema from /openapi.json.
+    Without these routes both the Swagger UI and any direct-URL access to the
+    LiteLLM API docs would return 404.
+    """
+    assert _has_location(nginx_cfg, "/swagger/", "litellm_upstream")
+    assert _has_location(nginx_cfg, "= /openapi.json", "litellm_upstream")
+
+
 # ---------------------------------------------------------------------------
 # Consistency: all expected upstreams declared
 # ---------------------------------------------------------------------------
