@@ -2251,13 +2251,7 @@ http {{
         }}
 
         location = /litellm {{
-            return 301 /litellm/ui/;
-        }}
-
-        # Bare /litellm/ redirects to the dashboard — LiteLLM's root / is the
-        # Swagger API docs, not the UI.  The dashboard lives at /ui/.
-        location = /litellm/ {{
-            return 301 /litellm/ui/;
+            return 301 /litellm/;
         }}
 
         location /litellm/ {{
