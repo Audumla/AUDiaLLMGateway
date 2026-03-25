@@ -81,10 +81,10 @@ services:
     environment:
       - LLAMA_VERSION=${LLAMA_VERSION:-latest}
       # Override auto-detection: auto | cuda | rocm | vulkan | cpu
-      - LLAMA_BACKEND=${LLAMA_BACKEND:-auto}
+      - LLAMA_BACKEND=${LLAMA_BACKEND:-vulkan}
       - BUILD_ROOT=/app/runtime-build-root
       # Optional: restrict Vulkan to specific ICD (e.g. /usr/share/vulkan/icd.d/radeon_icd.json for AMD)
-      - VK_ICD_FILENAMES=${VK_ICD_FILENAMES:-}
+      - VK_ICD_FILENAMES=${VK_ICD_FILENAMES:-/usr/share/vulkan/icd.d/radeon_icd.json}
     volumes:
       - ${MODEL_ROOT:-./models}:/app/models:ro
       - ./config/generated/llama-swap:/app/config:ro
@@ -98,6 +98,12 @@ services:
       - render
     privileged: true
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:41008/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
 
   # --- vLLM High-Performance Backend (optional — start with: docker compose --profile vllm up) ---
   # Uses the AUDia vLLM wrapper image so deployment stays image-only even when

@@ -1,7 +1,19 @@
 version: 1
-defaults: {}
-profiles: {}
-variants: {}
+defaults:
+  # Only auto-detect and provision the running backend to reduce boot time
+  always: false
+
+# Disable expensive lemonade builds that fail during startup
+variants:
+  rocm-gfx1030-lemonade-main:
+    enabled: false
+  rocm-gfx1100-official-preview:
+    enabled: false
+  rocm-gfx1030-official-current:
+    enabled: false
+  rocm-gfx1100-official-current:
+    enabled: false
+
 # Example variants:
 # profiles:
 #   build-rocm-gfx1030-gfx1100:
