@@ -53,3 +53,5 @@ GEMINI.md
 .clinerules
 .github/copilot-instructions.md
 # --- end agent-system ---
+.aider*
+.env
