@@ -65,8 +65,8 @@ docker compose --profile vllm up -d
 ```
 
 For AMD hosts, use the unified AMD compose profile from [docs/docker.md](docs/docker.md),
-set `LLAMA_BACKEND=auto`, and route individual `llama.cpp` models with explicit
-`executable_macro` values such as `llama-server-vulkan` and `llama-server-rocm`.
+set `LLAMA_BACKEND=auto` or explicitly to `vulkan`/`rocm`, and route individual `llama.cpp` models with explicit
+`executable_macro` values such as `llama-server-vulkan`, `llama-server-rocm`, `llama-server-rocm-gfx1100`, or `llama-server-rocm-gfx1030`.
 
 See [docs/docker.md](docs/docker.md) for all deployment profiles (Universal, NVIDIA, AMD Vulkan/ROCm, External Proxy).
 
@@ -75,6 +75,8 @@ For local source-based Docker development, use:
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 ```
+
+**Smart Binary Caching:** Backend binaries use prebuilt releases from ggml-org with smart caching — binaries are downloaded once per version change and reused on subsequent restarts. See [PREBUILT_BINARIES_STRATEGY.md](PREBUILT_BINARIES_STRATEGY.md) for details.
 
 ### Native install
 
@@ -92,9 +94,26 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 
 See [docs/runbook.md](docs/runbook.md) for the full native install and operations guide.
 
+### Windows Auto-Start Setup
+
+Services can be configured to auto-start on system logon:
+
+```batch
+# Run as Administrator
+cd scripts
+setup-autostart.bat
+# Restart computer
+```
+
+Services auto-start on next logon (PostgreSQL, llama-cpp, gateway, nginx). See [SETUP_AUTOSTART.md](SETUP_AUTOSTART.md) for details and troubleshooting.
+
 ---
 
 ## Documentation
+
+**[📖 Full Documentation Index →](DOCUMENTATION_INDEX.md)** — Comprehensive guide to all docs organized by use case and reader type.
+
+### Core Docs
 
 | Document | Contents |
 | -------- | -------- |
@@ -104,6 +123,30 @@ See [docs/runbook.md](docs/runbook.md) for the full native install and operation
 | [docs/architecture.md](docs/architecture.md) | System design — runtime, config, and installer topology |
 | [docs/reverse-proxy.md](docs/reverse-proxy.md) | nginx routes, config generation, upstream layout |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | Common issues and fixes |
+
+### Backend & Performance
+
+| Document | Contents |
+| -------- | -------- |
+| [SUPPORTED_FEATURES.md](SUPPORTED_FEATURES.md) | All supported backends (6 variants), versions, features, and status |
+| [PREBUILT_BINARIES_STRATEGY.md](PREBUILT_BINARIES_STRATEGY.md) | Prebuilt binary distribution with smart caching (45-90s boot time) |
+| [BACKEND_VERSIONS.md](BACKEND_VERSIONS.md) | Complete backend version reference and compatibility |
+| [FAILING_BUILDS_INVESTIGATION.md](FAILING_BUILDS_INVESTIGATION.md) | Root cause analysis and solutions for previously failing builds |
+
+### Setup & Testing
+
+| Document | Contents |
+| -------- | -------- |
+| [SETUP_AUTOSTART.md](SETUP_AUTOSTART.md) | Windows Task Scheduler auto-start setup guide |
+| [MANUAL_TESTING_INSTRUCTIONS.md](MANUAL_TESTING_INSTRUCTIONS.md) | 4-phase manual testing procedures |
+| [TEST_AUTOSTART.md](TEST_AUTOSTART.md) | Comprehensive testing framework with success criteria |
+| [DOCKER_AUTOSTART.md](DOCKER_AUTOSTART.md) | Docker configuration for auto-start behavior |
+
+### Diagnostics
+
+| Document | Contents |
+| -------- | -------- |
+| [SERVER_DIAGNOSTICS.md](SERVER_DIAGNOSTICS.md) | Server health report and boot diagnostics |
 
 ---
 
