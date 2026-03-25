@@ -125,14 +125,15 @@ def test_litellm_ui_routes_to_litellm(nginx_cfg: str) -> None:
     assert _has_location(nginx_cfg, "/ui/", "litellm_upstream")
 
 
-def test_litellm_bare_path_redirects_to_prefix(nginx_cfg: str) -> None:
-    """Bare /litellm must redirect to /litellm/ (the proxied LiteLLM root).
+def test_litellm_bare_path_redirects_to_ui(nginx_cfg: str) -> None:
+    """Bare /litellm and /litellm/ must redirect to the dashboard (/litellm/ui/).
 
-    /litellm/ strips the prefix and proxies to litellm_upstream root, which
-    serves the Swagger/OpenAPI catalog — the same page as direct port access.
+    LiteLLM's root / serves the Swagger API docs, not the dashboard.
+    Explicit redirects ensure users land on the dashboard, not the Swagger page.
     """
     assert "location = /litellm" in nginx_cfg
-    assert "return 301 /litellm/" in nginx_cfg
+    assert "return 301 /litellm/ui/" in nginx_cfg
+    assert re.search(r"location\s*=\s*/litellm/\s*\{[^}]*return 301 /litellm/ui/", nginx_cfg, re.DOTALL)
 
 
 def test_swagger_assets_routed_to_litellm(nginx_cfg: str) -> None:
