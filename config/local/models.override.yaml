@@ -286,6 +286,8 @@ model_profiles:
       model_url: https://huggingface.co/Qwen/Qwen2.5-72B-Instruct
     deployments:
       vllm_distributed:
+        # Disabled by default — enable explicitly when 2x AMD 7900 XTX GPUs are available
+        enabled: false
         label: local/vllm_qwen72b_distributed
         profile: vllm_rocm_tensor_parallel_2
         backend_model_name: Qwen2.5-72B-Instruct

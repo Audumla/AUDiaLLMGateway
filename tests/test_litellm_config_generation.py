@@ -46,25 +46,18 @@ def test_build_litellm_config_adds_vllm_routes_when_enabled(monkeypatch) -> None
 
 
 def test_build_vllm_config_uses_model_catalog_runtime_overrides(monkeypatch) -> None:
+    # Model/GPU config is now driven by config files (models.override.yaml),
+    # not env vars.  Env vars that were previously used (VLLM_MODEL, etc.) are
+    # no longer the primary source.
     root = Path(__file__).resolve().parents[1]
     monkeypatch.setenv("AUDIA_ENABLE_VLLM", "true")
-    monkeypatch.setenv("VLLM_MODEL", "Qwen/Qwen3-0.6B")
-    monkeypatch.setenv("VLLM_GPU_MEM", "0.91")
-    monkeypatch.setenv("VLLM_MAX_LEN", "8192")
-    monkeypatch.setenv("VLLM_TENSOR_PARALLEL_SIZE", "1")
-    monkeypatch.setenv("VLLM_PIPELINE_PARALLEL_SIZE", "1")
-    monkeypatch.setenv("VLLM_VISIBLE_DEVICES", "")
 
     stack = load_stack_config(root)
     config = build_vllm_config(stack)
     startup = config["startup"]
 
-    assert startup["model"] == "Qwen/Qwen3-0.6B"
-    assert startup["gpu_memory_utilization"] == 0.91
-    assert startup["max_model_len"] == 8192
-    assert startup["tensor_parallel_size"] == 1
-    assert startup["pipeline_parallel_size"] == 1
-    assert "visible_devices" in startup
+    # Model name comes from vllm_default.backend_model_name in models.override.yaml
+    assert startup["model"] == "Qwen2.5-0.5B-Instruct"
     assert "extra_args" in startup
 
 
@@ -95,8 +88,8 @@ def test_build_vllm_config_supports_vllm_preset(tmp_path: Path, monkeypatch) -> 
         "tensor_parallel_size": 2,
         "pipeline_parallel_size": 1,
     }
-    data["model_profiles"]["vllm_default"]["deployments"]["vllm_primary"]["vllm_preset"] = "dual_split"
-    data["model_profiles"]["vllm_default"]["deployments"]["vllm_primary"]["vllm"] = {
+    data["model_profiles"]["vllm_default"]["deployments"]["vllm_single_gpu"]["vllm_preset"] = "dual_split"
+    data["model_profiles"]["vllm_default"]["deployments"]["vllm_single_gpu"]["vllm"] = {
         "visible_devices": "0,1",
     }
     models_override.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
@@ -144,7 +137,7 @@ def test_build_vllm_config_supports_gpu_profile_backend_block(tmp_path: Path, mo
             "visible_devices": "0,1",
         },
     }
-    data["model_profiles"]["vllm_default"]["deployments"]["vllm_primary"]["profile"] = "vllm_split_tp2"
+    data["model_profiles"]["vllm_default"]["deployments"]["vllm_single_gpu"]["profile"] = "vllm_split_tp2"
     models_override.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
 
     stack = load_stack_config(tmp_path)
