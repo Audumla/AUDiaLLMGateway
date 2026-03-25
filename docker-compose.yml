@@ -42,11 +42,6 @@ services:
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-local-dev}
       - DATABASE_URL=${DATABASE_URL:-postgresql://${POSTGRES_USER:-audia}:${POSTGRES_PASSWORD:-audia-dev-password}@llm-db-postgres:5432/${POSTGRES_DB:-litellm}}
       - AUDIA_DOCKER=true
-      - LLAMA_BACKEND=${LLAMA_BACKEND:-auto}
-      - AUDIA_ENABLE_VLLM=${AUDIA_ENABLE_VLLM:-false}
-      - VLLM_MODEL=${VLLM_MODEL:-Qwen/Qwen2.5-0.5B-Instruct}
-      - VLLM_GPU_MEM=${VLLM_GPU_MEM:-1.0}
-      - VLLM_MAX_LEN=${VLLM_MAX_LEN:-4096}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4000/health/liveliness"]
       interval: 15s
@@ -80,8 +75,6 @@ services:
     container_name: audia-llama-cpp
     environment:
       - LLAMA_VERSION=${LLAMA_VERSION:-latest}
-      # Override auto-detection: auto | cuda | rocm | vulkan | cpu
-      - LLAMA_BACKEND=${LLAMA_BACKEND:-vulkan}
       - BUILD_ROOT=/app/runtime-build-root
       # Optional: restrict Vulkan to specific ICD (e.g. /usr/share/vulkan/icd.d/radeon_icd.json for AMD)
       - VK_ICD_FILENAMES=${VK_ICD_FILENAMES:-/usr/share/vulkan/icd.d/radeon_icd.json}
@@ -119,11 +112,8 @@ services:
     ports:
       - "${VLLM_PORT:-41090}:8000"
     environment:
-      - AUDIA_ENABLE_VLLM=${AUDIA_ENABLE_VLLM:-false}
       - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN:-}
       - VLLM_MOCK_MODE=${VLLM_MOCK_MODE:-false}
-      - ROCR_VISIBLE_DEVICES=${VLLM_VISIBLE_DEVICES:-0}
-      - HIP_VISIBLE_DEVICES=${VLLM_VISIBLE_DEVICES:-0}
     volumes:
       - ${MODEL_HF_ROOT:-./models-hf}:/root/.cache/huggingface:rw
       - ./config/generated/vllm:/app/config/generated/vllm:ro
@@ -148,11 +138,6 @@ services:
     environment:
       - DATABASE_URL=${DATABASE_URL:-postgresql://${POSTGRES_USER:-audia}:${POSTGRES_PASSWORD:-audia-dev-password}@llm-db-postgres:5432/${POSTGRES_DB:-litellm}}
       - AUDIA_DOCKER=true
-      - LLAMA_BACKEND=${LLAMA_BACKEND:-auto}
-      - AUDIA_ENABLE_VLLM=${AUDIA_ENABLE_VLLM:-false}
-      - VLLM_MODEL=${VLLM_MODEL:-Qwen/Qwen2.5-0.5B-Instruct}
-      - VLLM_GPU_MEM=${VLLM_GPU_MEM:-1.0}
-      - VLLM_MAX_LEN=${VLLM_MAX_LEN:-4096}
     healthcheck:
       disable: true
     security_opt:
