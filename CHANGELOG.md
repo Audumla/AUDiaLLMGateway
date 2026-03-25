@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.1](https://github.com/Audumla/AUDiaLLMGateway/compare/v0.13.0...v0.13.1) (2026-03-25)
+
+
+### Bug Fixes
+
+* config update ([0ed0d62](https://github.com/Audumla/AUDiaLLMGateway/commit/0ed0d62ac49e5fb061ce9cd957395018600fcdff))
+
 ## [0.13.0](https://github.com/Audumla/AUDiaLLMGateway/compare/v0.12.3...v0.13.0) (2026-03-25)
 
 
