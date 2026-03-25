@@ -37,13 +37,20 @@ def test_compose_wires_default_postgres_for_gateway_auth() -> None:
     assert "llm-db-postgres" in services["llm-gateway"].get("depends_on", {})
 
 
-def test_compose_wires_vllm_visible_devices_for_amd_runtime() -> None:
+def test_compose_vllm_does_not_hardcode_visible_devices() -> None:
+    # GPU visible-device selection moved to models.override.yaml under the
+    # vllm deployment profile (visible_devices key).  docker-compose must not
+    # set ROCR_VISIBLE_DEVICES / HIP_VISIBLE_DEVICES to avoid overriding the
+    # config-system values and to keep deployment concerns separate.
     services = _load_compose_services()
-    vllm = services["llm-server-vllm"]
-    vllm_env = _env_map(vllm)
+    vllm_env = _env_map(services["llm-server-vllm"])
 
-    assert vllm_env.get("ROCR_VISIBLE_DEVICES") == "${VLLM_VISIBLE_DEVICES:-0}"
-    assert vllm_env.get("HIP_VISIBLE_DEVICES") == "${VLLM_VISIBLE_DEVICES:-0}"
+    assert "ROCR_VISIBLE_DEVICES" not in vllm_env, (
+        "ROCR_VISIBLE_DEVICES belongs in models.override.yaml, not docker-compose"
+    )
+    assert "HIP_VISIBLE_DEVICES" not in vllm_env, (
+        "HIP_VISIBLE_DEVICES belongs in models.override.yaml, not docker-compose"
+    )
 
 
 def test_compose_persists_llamacpp_runtime_root_to_host_path() -> None:
