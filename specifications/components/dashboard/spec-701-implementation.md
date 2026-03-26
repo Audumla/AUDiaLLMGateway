@@ -212,15 +212,53 @@ Tier 1: All data extracted from `/v1/models` endpoint (single HTTP call every 15
 
 Tier 2: For each model where `requests_processing > 0`, scrape `/metrics` at 10s interval:
 
+**Per-Model Metrics:**
+
 | Metric Name | Type | Labels | Source | Description |
 |-------------|------|--------|--------|-------------|
-| `gateway_llamacpp_prompt_tokens_total{model_name}` | counter | `model_name` | `/metrics` on backend port | Total prompt tokens processed |
-| `gateway_llamacpp_tokens_predicted_total{model_name}` | counter | `model_name` | `/metrics` on backend port | Total generation tokens processed |
-| `gateway_llamacpp_prompt_tokens_per_second{model_name}` | gauge | `model_name` | `/metrics` on backend port | Prompt throughput (tokens/s) |
-| `gateway_llamacpp_predicted_tokens_per_second{model_name}` | gauge | `model_name` | `/metrics` on backend port | Generation throughput (tokens/s) |
-| `gateway_llamacpp_kv_cache_usage_ratio{model_name}` | gauge | `model_name` | `/metrics` on backend port | KV cache usage (0.0-1.0) |
-| `gateway_llamacpp_kv_cache_tokens{model_name}` | gauge | `model_name` | `/metrics` on backend port | Number of tokens in KV cache |
-| `gateway_llamacpp_request_latency_seconds{model_name}` | histogram | `model_name` | `/metrics` on backend port | Request latency distribution |
+| `gateway_llamacpp_prompt_tokens_total{model_name="..."}` | counter | `model_name` | `/metrics` on backend port | Total prompt tokens processed |
+| `gateway_llamacpp_tokens_predicted_total{model_name="..."}` | counter | `model_name` | `/metrics` on backend port | Total generation tokens processed |
+| `gateway_llamacpp_prompt_tokens_per_second{model_name="..."}` | gauge | `model_name` | `/metrics` on backend port | Prompt throughput (tokens/s) |
+| `gateway_llamacpp_predicted_tokens_per_second{model_name="..."}` | gauge | `model_name` | `/metrics` on backend port | Generation throughput (tokens/s) |
+| `gateway_llamacpp_kv_cache_usage_ratio{model_name="..."}` | gauge | `model_name` | `/metrics` on backend port | KV cache usage (0.0-1.0) |
+| `gateway_llamacpp_kv_cache_tokens{model_name="..."}` | gauge | `model_name` | `/metrics` on backend port | Number of tokens in KV cache |
+| `gateway_llamacpp_request_latency_seconds{model_name="..."}` | histogram | `model_name` | `/metrics` on backend port | Request latency distribution |
+
+**Aggregate Metrics (Sum of all active models):**
+
+| Metric Name | Type | Labels | Computation | Description |
+|-------------|------|--------|-------------|-------------|
+| `gateway_llamacpp_prompt_tokens_total{model_name="active"}` | counter | `model_name="active"` | `sum(all per-model)` | Total prompt tokens across all active models |
+| `gateway_llamacpp_tokens_predicted_total{model_name="active"}` | counter | `model_name="active"` | `sum(all per-model)` | Total generation tokens across all active models |
+| `gateway_llamacpp_prompt_tokens_per_second{model_name="active"}` | gauge | `model_name="active"` | `sum(all per-model)` | Aggregate prompt throughput |
+| `gateway_llamacpp_predicted_tokens_per_second{model_name="active"}` | gauge | `model_name="active"` | `sum(all per-model)` | Aggregate generation throughput |
+| `gateway_llamacpp_kv_cache_usage_ratio{model_name="active"}` | gauge | `model_name="active"` | `avg(all per-model)` | Average KV cache ratio across active models |
+
+**Example Prometheus output:**
+
+```promql
+# 3 models total (2 active, 1 idle)
+gateway_llamacpp_prompt_tokens_total{model_name="qwen27b"} 12500
+gateway_llamacpp_prompt_tokens_total{model_name="llama70b"} 8300
+gateway_llamacpp_prompt_tokens_total{model_name="active"} 20800   ← sum
+
+gateway_llamacpp_kv_cache_usage_ratio{model_name="qwen27b"} 0.85
+gateway_llamacpp_kv_cache_usage_ratio{model_name="llama70b"} 0.62
+gateway_llamacpp_kv_cache_usage_ratio{model_name="active"} 0.735  ← avg
+```
+
+**Dashboard Query Examples:**
+
+```promql
+# Current aggregate throughput
+gateway_llamacpp_predicted_tokens_per_second{model_name="active"}
+
+# Per-model breakdown
+gateway_llamacpp_prompt_tokens_total{model_name!="active"}
+
+# All active models combined
+sum(gateway_llamacpp_prompt_tokens_total)
+```
 
 **Activation logic (hwexp adapter):**
 
@@ -228,19 +266,25 @@ Tier 2: For each model where `requests_processing > 0`, scrape `/metrics` at 10s
 def should_scrape_backend(model):
     """Only scrape detailed metrics if model is actively processing."""
     return model['requests_processing'] > 0
-```
 
-**When activated:**
-- Model receives a request → `requests_processing` increases (detected at next 15s router poll)
-- Next hwexp interval: scrape `/metrics` from that backend at 10s cadence
-- Model becomes idle → `requests_processing` drops to 0
-- hwexp stops scraping that backend (no CPU wasted on monitoring)
+async def emit_metrics(active_models):
+    """Emit per-model + aggregate metrics."""
+    for model in active_models:
+        emit(f"gateway_llamacpp_prompt_tokens_total{{model_name='{model.name}'}}",
+             model.prompt_tokens)
+
+    # Emit "active" aggregate
+    total_prompt = sum(m.prompt_tokens for m in active_models)
+    emit("gateway_llamacpp_prompt_tokens_total{model_name='active'}", total_prompt)
+```
 
 **Benefits:**
 - Zero overhead when models idle (only router query)
 - Full detailed metrics during active inference (when they matter)
-- Token throughput captured in real-time during request processing
-- KV cache ratio available for debugging inference performance
+- Per-model metrics for detailed analysis
+- Aggregate "active" metrics for dashboard gauges (single query for total throughput)
+- No complex derived metrics or PromQL expressions needed
+- Idiomatic Prometheus: queries like `sum()` work naturally
 
 ---
 
@@ -257,7 +301,7 @@ vLLM serves a single model per instance. Query `/metrics` endpoint at fixed 10s 
 
 | Metric Name | Type | Labels | Source | Description |
 |-------------|------|--------|--------|-------------|
-| `gateway_component_up` | gauge | `component=vllm` | `/metrics` | vLLM health (1=up, 0=down) |
+| `gateway_component_up{component="vllm"}` | gauge | `component=vllm` | `/metrics` | vLLM health (1=up, 0=down) |
 | `gateway_vllm_currently_loaded_model` | info | `model_name` | `/metrics` scrape | Current model loaded on this instance |
 | `gateway_vllm_num_requests_running` | gauge | - | `/metrics` → `vllm:num_requests_running` | Requests being processed |
 | `gateway_vllm_num_requests_waiting` | gauge | - | `/metrics` → `vllm:num_requests_waiting` | Requests in queue |
@@ -268,6 +312,8 @@ vLLM serves a single model per instance. Query `/metrics` endpoint at fixed 10s 
 **Poll interval:** Fixed 10s (always, whether active or idle). Single HTTP call to `/metrics`.
 
 **Rationale:** vLLM is a single-model service (unlike llama-swap which manages multiple). No benefit to adaptive polling — always need to know current request count and memory usage.
+
+**Note on aggregation:** If multiple vLLM instances are deployed (GPU cluster), hwexp will emit metrics for each instance as a separate scrape target. The "active" label approach applies per-instance (useful for multi-GPU setups).
 
 ---
 
