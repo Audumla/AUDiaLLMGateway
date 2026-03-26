@@ -811,14 +811,34 @@ All component-specific metrics follow the pattern:
 
 - **LiteLLM:** `gateway_litellm_proxy_total_requests`, `gateway_litellm_llm_api_latency`, etc.
 - **llama-swap router:** `gateway_llamaswap_models_loaded`, `gateway_llamaswap_active_model`
-- **llama.cpp backends:** `gateway_llamacpp_prompt_tokens_total{model_name="..."}`, etc.
+- **llama.cpp backends:** `gateway_llamacpp_prompt_tokens_total{model_name="qwen27b"}` (per-model)
+  - Plus aggregate: `gateway_llamacpp_prompt_tokens_total{model_name="active"}` (sum of active models)
 - **vLLM:** `gateway_vllm_num_requests_running`, `gateway_vllm_gpu_memory_usage_bytes`, etc.
+
+**Special label value: `model_name="active"`**
+
+For multi-model systems (llama-swap), aggregate metrics are emitted with `model_name="active"`:
+```promql
+# Per-model metrics (emitted only when model is active)
+gateway_llamacpp_prompt_tokens_total{model_name="qwen27b"} 12500
+gateway_llamacpp_prompt_tokens_total{model_name="llama70b"} 8300
+
+# Aggregate metric (sum of all active models)
+gateway_llamacpp_prompt_tokens_total{model_name="active"} 20800
+```
+
+Dashboard queries become simple:
+```promql
+gateway_llamacpp_prompt_tokens_total{model_name="active"}  # Total active throughput
+sum(gateway_llamacpp_prompt_tokens_total)                   # Also works (includes active label)
+```
 
 This namespace isolation makes it easy to:
 
 1. Filter dashboard by component: `{__name__=~"gateway_llamaswap.*"}`
-2. Create Grafana alerts per component
-3. Extend monitoring to new components without naming conflicts
+2. Query aggregate metrics: `{model_name="active"}`
+3. Create Grafana alerts per component or per model
+4. Extend monitoring to new components without naming conflicts
 
 ---
 
