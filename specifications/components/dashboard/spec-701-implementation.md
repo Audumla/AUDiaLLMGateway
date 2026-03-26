@@ -295,25 +295,70 @@ async def emit_metrics(active_models):
 **Internal Port:** `${VLLM_SERVICE_PORT:-8000}`
 **Metrics Endpoint:** `http://${VLLM_HOST}:${VLLM_SERVICE_PORT}/metrics`
 
-#### vLLM Metrics (Single Query)
+#### vLLM Metrics (Per-Instance + Aggregate)
 
-vLLM serves a single model per instance. Query `/metrics` endpoint at fixed 10s interval:
+vLLM serves a single model per instance. Query `/metrics` endpoint at fixed 10s interval.
+
+**Supports both single instance and distributed cluster deployments:**
+
+**Per-Instance Metrics:**
 
 | Metric Name | Type | Labels | Source | Description |
 |-------------|------|--------|--------|-------------|
 | `gateway_component_up{component="vllm"}` | gauge | `component=vllm` | `/metrics` | vLLM health (1=up, 0=down) |
-| `gateway_vllm_currently_loaded_model` | info | `model_name` | `/metrics` scrape | Current model loaded on this instance |
-| `gateway_vllm_num_requests_running` | gauge | - | `/metrics` → `vllm:num_requests_running` | Requests being processed |
-| `gateway_vllm_num_requests_waiting` | gauge | - | `/metrics` → `vllm:num_requests_waiting` | Requests in queue |
-| `gateway_vllm_gpu_cache_usage_perc` | gauge | - | `/metrics` → `vllm:gpu_cache_usage_perc` | GPU KV cache usage (0-100%) |
-| `gateway_vllm_gpu_memory_usage_bytes` | gauge | - | `/metrics` → `vllm:gpu_memory_usage_bytes` | GPU memory in use |
-| `gateway_vllm_num_preemptions_total` | counter | - | `/metrics` → `vllm:num_preemptions_total` | Total request preemptions |
+| `gateway_vllm_num_requests_running{model_name="..."}` | gauge | `model_name` | `/metrics` → `vllm:num_requests_running` | Requests being processed on this instance |
+| `gateway_vllm_num_requests_waiting{model_name="..."}` | gauge | `model_name` | `/metrics` → `vllm:num_requests_waiting` | Requests in queue on this instance |
+| `gateway_vllm_gpu_cache_usage_perc{model_name="..."}` | gauge | `model_name` | `/metrics` → `vllm:gpu_cache_usage_perc` | GPU KV cache usage (0-100%) |
+| `gateway_vllm_gpu_memory_usage_bytes{model_name="..."}` | gauge | `model_name` | `/metrics` → `vllm:gpu_memory_usage_bytes` | GPU memory in use on this instance |
+| `gateway_vllm_num_preemptions_total{model_name="..."}` | counter | `model_name` | `/metrics` → `vllm:num_preemptions_total` | Total request preemptions on this instance |
 
-**Poll interval:** Fixed 10s (always, whether active or idle). Single HTTP call to `/metrics`.
+**Aggregate Metrics (Sum across all vLLM instances):**
 
-**Rationale:** vLLM is a single-model service (unlike llama-swap which manages multiple). No benefit to adaptive polling — always need to know current request count and memory usage.
+| Metric Name | Type | Labels | Computation | Description |
+|-------------|------|--------|-------------|-------------|
+| `gateway_vllm_num_requests_running{model_name="active"}` | gauge | `model_name="active"` | `sum(all instances)` | Total requests across all vLLM instances |
+| `gateway_vllm_num_requests_waiting{model_name="active"}` | gauge | `model_name="active"` | `sum(all instances)` | Total queued requests across all instances |
+| `gateway_vllm_gpu_cache_usage_perc{model_name="active"}` | gauge | `model_name="active"` | `avg(all instances)` | Average KV cache usage across instances |
+| `gateway_vllm_gpu_memory_usage_bytes{model_name="active"}` | gauge | `model_name="active"` | `sum(all instances)` | Total GPU memory across all instances |
 
-**Note on aggregation:** If multiple vLLM instances are deployed (GPU cluster), hwexp will emit metrics for each instance as a separate scrape target. The "active" label approach applies per-instance (useful for multi-GPU setups).
+**Example Prometheus output (3 vLLM instances):**
+
+```promql
+# Per-instance metrics
+gateway_vllm_num_requests_running{model_name="qwen72b"} 5
+gateway_vllm_num_requests_running{model_name="llama70b"} 3
+gateway_vllm_num_requests_running{model_name="mistral7b"} 0
+
+# Aggregate across all instances
+gateway_vllm_num_requests_running{model_name="active"} 8
+
+# GPU memory: sum of all instances
+gateway_vllm_gpu_memory_usage_bytes{model_name="qwen72b"} 45000000000
+gateway_vllm_gpu_memory_usage_bytes{model_name="llama70b"} 42000000000
+gateway_vllm_gpu_memory_usage_bytes{model_name="mistral7b"} 0
+gateway_vllm_gpu_memory_usage_bytes{model_name="active"} 87000000000  ← sum
+```
+
+**Poll interval:** Fixed 10s (always, whether active or idle). Single HTTP call to `/metrics` per instance.
+
+**Rationale:** vLLM instances are always running and serving their model. No benefit to adaptive polling — always need to know current request count and memory usage.
+
+**Single instance vs. cluster:**
+- **Single vLLM instance:** Model label identifies the single model, "active" == that model's metrics
+- **Multiple instances (cluster):** Each instance identified by its model name, "active" aggregates across all
+
+**Dashboard queries:**
+
+```promql
+# Total requests across all vLLM instances
+gateway_vllm_num_requests_running{model_name="active"}
+
+# Per-instance breakdown
+gateway_vllm_num_requests_running{model_name!="active"}
+
+# Total GPU memory in use
+gateway_vllm_gpu_memory_usage_bytes{model_name="active"}
+```
 
 ---
 
