@@ -195,9 +195,9 @@ LiteLLM:     /metrics @ 10s = 6 req/min
 TOTAL:                          16 req/min (vs. 142 with per-backend polling)
 ```
 
-#### llama-swap Router Metrics (Single Query)
+#### llama-swap Router Metrics (Always Polled)
 
-All data extracted from `/v1/models` endpoint (single HTTP call every 15s):
+Tier 1: All data extracted from `/v1/models` endpoint (single HTTP call every 15s):
 
 | Metric Name | Type | Labels | Source | Description |
 |-------------|------|--------|--------|-------------|
@@ -208,24 +208,39 @@ All data extracted from `/v1/models` endpoint (single HTTP call every 15s):
 | `gateway_llamaswap_model_requests_deferred{model_name}` | gauge | `model_name` | `/v1/models` per-model | Requests in queue per model |
 | `gateway_llamaswap_model_last_used_timestamp{model_name}` | gauge | `model_name` | `/v1/models` per-model | Last activity timestamp per model |
 
-**Note:** No per-backend scraping. Queue depth and request counts come from router's model list, not from individual llama.cpp instances.
+#### llama.cpp Backend Metrics (Active Models Only)
 
-#### What We Don't Collect (and why)
+Tier 2: For each model where `requests_processing > 0`, scrape `/metrics` at 10s interval:
 
-**Removed from spec:** Per-model token throughput, KV cache ratio, detailed latency histograms
+| Metric Name | Type | Labels | Source | Description |
+|-------------|------|--------|--------|-------------|
+| `gateway_llamacpp_prompt_tokens_total{model_name}` | counter | `model_name` | `/metrics` on backend port | Total prompt tokens processed |
+| `gateway_llamacpp_tokens_predicted_total{model_name}` | counter | `model_name` | `/metrics` on backend port | Total generation tokens processed |
+| `gateway_llamacpp_prompt_tokens_per_second{model_name}` | gauge | `model_name` | `/metrics` on backend port | Prompt throughput (tokens/s) |
+| `gateway_llamacpp_predicted_tokens_per_second{model_name}` | gauge | `model_name` | `/metrics` on backend port | Generation throughput (tokens/s) |
+| `gateway_llamacpp_kv_cache_usage_ratio{model_name}` | gauge | `model_name` | `/metrics` on backend port | KV cache usage (0.0-1.0) |
+| `gateway_llamacpp_kv_cache_tokens{model_name}` | gauge | `model_name` | `/metrics` on backend port | Number of tokens in KV cache |
+| `gateway_llamacpp_request_latency_seconds{model_name}` | histogram | `model_name` | `/metrics` on backend port | Request latency distribution |
 
-**Rationale:**
-- These require scraping individual `/metrics` endpoints on 41000-41099
-- Only useful during active inference; not useful for idle model tracking
-- Can still be captured by users who want them via direct Prometheus scrape configs
-- Cost (CPU on inference) > benefit (detailed metrics for idle models)
+**Activation logic (hwexp adapter):**
 
-**Available if needed:** Users can add custom scrape targets in `config/local/prometheus.yaml`:
-```yaml
-scrape_configs:
-  - job_name: 'llamacpp-backends'
-    # User provides their own discovery + scrape targets
+```python
+def should_scrape_backend(model):
+    """Only scrape detailed metrics if model is actively processing."""
+    return model['requests_processing'] > 0
 ```
+
+**When activated:**
+- Model receives a request → `requests_processing` increases (detected at next 15s router poll)
+- Next hwexp interval: scrape `/metrics` from that backend at 10s cadence
+- Model becomes idle → `requests_processing` drops to 0
+- hwexp stops scraping that backend (no CPU wasted on monitoring)
+
+**Benefits:**
+- Zero overhead when models idle (only router query)
+- Full detailed metrics during active inference (when they matter)
+- Token throughput captured in real-time during request processing
+- KV cache ratio available for debugging inference performance
 
 ---
 
@@ -256,46 +271,79 @@ vLLM serves a single model per instance. Query `/metrics` endpoint at fixed 10s 
 
 ---
 
-## 1.4 Polling Summary & CPU Impact
+## 1.4 Hybrid Polling Strategy & Request Budget
 
-### Final Request Budget (Single-Query Approach)
+### Request Budget (Two-Tier: Always + Active)
+
+**Scenario A: All models idle (no active inference)**
 
 ```
 llama-swap router:    /v1/models @ 15s = 4 req/min
 vLLM:                 /metrics @ 10s   = 6 req/min
 LiteLLM:              /metrics @ 10s   = 6 req/min
+llama.cpp backends:   (none)             0 req/min
 ────────────────────────────────────────
-TOTAL:                                  = 16 req/min
+TOTAL:                                  = 16 req/min ✅
+```
 
-Comparison:
-- Naive per-backend polling: ~120-140 req/min ❌
-- Single-query approach:         16 req/min ✅
-- Reduction:                       ~88%
+**Scenario B: 2 models actively processing (out of 10 loaded)**
+
+```
+llama-swap router:        /v1/models @ 15s    = 4 req/min
+vLLM:                     /metrics @ 10s      = 6 req/min
+LiteLLM:                  /metrics @ 10s      = 6 req/min
+llama.cpp active (2x):    /metrics @ 10s each = 12 req/min
+────────────────────────────────────────
+TOTAL:                                       = 28 req/min ✅
+```
+
+**Scenario C: Full capacity (10 models processing, typical load test)**
+
+```
+llama-swap router:        /v1/models @ 15s    = 4 req/min
+vLLM:                     /metrics @ 10s      = 6 req/min
+LiteLLM:                  /metrics @ 10s      = 6 req/min
+llama.cpp active (10x):   /metrics @ 10s each = 60 req/min
+────────────────────────────────────────
+TOTAL:                                       = 76 req/min ✅
+```
+
+**Comparison with old approaches:**
+
+```
+Naive polling (all backends fixed 10s):     ~120 req/min ❌ (wasteful)
+Adaptive polling (60s for idle):             ~50 req/min (complex logic)
+Hybrid tier (active-only scrape):            16-76 req/min ✅ (dynamic, simple)
 ```
 
 ### CPU Impact Analysis
 
-**Old approach (querying individual llama.cpp backends):**
-- Per-backend `/metrics` scrape: ~50ms CPU (read KV cache, memory)
-- With 10 idle models @ 60s interval: 600 scrapes/hour = 60s CPU/hour per model
-- Total inference CPU wasted: ~10 minutes/hour on monitoring alone
+**Idle scenario (~16 req/min):**
+- Router query: ~10ms CPU
+- Service `/metrics` reads: ~30ms CPU
+- **Total: ~2.4s CPU/hour** (negligible)
 
-**New approach (single router query):**
-- `/v1/models` query: ~10ms CPU (JSON parse, iterate)
-- With 10 models @ 15s interval: 240 queries/hour = 2.4s CPU/hour total
-- Total inference CPU wasted: ~2.4s/hour (negligible)
+**Active scenario (2 models, ~28 req/min):**
+- Router + service queries: ~40ms CPU
+- 2 backend scrapes: ~100ms CPU (50ms each)
+- **Total: ~8.4s CPU/hour** (still <2% overhead)
 
-**Savings:** ~9 minutes/hour of inference CPU recovered
+**Peak scenario (10 models, ~76 req/min):**
+- All queries: ~550ms CPU per minute
+- **Total: ~33s CPU/hour** (acceptable during load test)
 
 ### Prometheus Storage Impact
 
-Metrics scraping is read-only, no storage overhead. Prometheus stores:
-- 6-7 metrics per component (down from 15+)
-- Active metrics: Last 15 days (configurable)
-- Storage: ~50KB per metric per day (compressed)
+Metrics are dynamic: only metrics from active models are emitted.
 
-**Total storage estimate:**
-- 20 metrics × 50KB × 15 days = ~15MB (negligible)
+- Idle state: ~20 metrics emitted
+- Active state (2 models): ~35 metrics emitted
+- Peak state (10 models): ~80 metrics emitted
+
+**Storage estimate (15 days retention):**
+- Idle (constant): 20 × 50KB × 15 = 15MB
+- Active spikes (temporary): minimal extra (compressed time-series)
+- **Total: ~20MB negligible**
 
 ---
 
