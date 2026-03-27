@@ -929,6 +929,105 @@ This is parallel to llama.cpp's `metrics: true` flag (already enabled by Gemini'
 
 ---
 
+## 11. Architectural Principle: Dashboard Independence
+
+**Critical Rule:** The dashboard is a separate observational + control component. Monitored components (LiteLLM, llama-swap, vLLM) are UNAWARE of the dashboard and require ZERO changes to integrate with it.
+
+### Single Source of Truth
+
+| Data | Owner | Consumer |
+|------|-------|----------|
+| Service host:port | `config/project/stack.base.yaml` | Dashboard reads via env vars |
+| Service startup cmd | `config/project/*.yaml` | Dashboard does NOT define |
+| Docker image | `docker-compose.yml` | Dashboard does NOT define |
+| Health endpoint path | `config/monitoring/<id>.yaml` | Dashboard only (monitoring-specific) |
+| Metrics extraction rules | `config/monitoring/<id>.yaml` | Dashboard only (monitoring-specific) |
+| Action button definitions | `config/monitoring/<id>.yaml` | Dashboard only (UI-specific) |
+| Service environment vars | `.env` | Set once, used by all |
+
+### What Dashboard Config DOES Contain
+
+**Only observational metadata:**
+```yaml
+# config/monitoring/litellm.yaml
+id: litellm
+health:
+  endpoint: /health/liveliness   # ← Where to probe for health
+  expect_status: 200
+metrics:
+  - id: proxy_total_requests
+    endpoint: /metrics            # ← Where to scrape metrics
+    metric_name: litellm_proxy_total_requests_metric  # ← Metric name
+    prometheus_name: gateway_litellm_proxy_total_requests  # ← Relabeled name
+actions:
+  - id: restart
+    label: Restart Gateway
+    type: docker_restart
+    container: audia-litellm      # ← Container name (from docker-compose)
+```
+
+### What Dashboard Config DOES NOT Contain
+
+❌ Service port (comes from `stack.base.yaml` via `${LITELLM_PORT:-4000}`)
+❌ Service host (comes from `stack.base.yaml` via `${LITELLM_HOST:-127.0.0.1}`)
+❌ Docker image name (not dashboard's concern)
+❌ Service startup arguments (not dashboard's concern)
+❌ Model configurations (not dashboard's concern)
+❌ Runtime environment setup (not dashboard's concern)
+
+### Configuration Resolution Chain
+
+```
+stack.base.yaml (authoritative: host, port, service name)
+    ↓
+Environment variables (set by launcher at startup)
+    ↓
+config/monitoring/*.yaml (references env vars: ${LITELLM_HOST}:${LITELLM_PORT})
+    ↓
+Dashboard reads manifests (manifest loader resolves ${VAR} to actual values)
+    ↓
+FastAPI + Vue know where to connect
+```
+
+### Component Independence Verification Checklist
+
+Before merging any dashboard code:
+
+- [ ] Dashboard makes NO changes to `config/project/*.yaml` (only reads)
+- [ ] Dashboard makes NO changes to `docker-compose.yml` (only reads)
+- [ ] Dashboard makes NO changes to `.env` (only reads)
+- [ ] Dashboard makes NO changes to component startup logic
+- [ ] All component host:port from `${VAR}` references (not hardcoded)
+- [ ] All component endpoints from manifests (not hardcoded)
+- [ ] Component team can deploy without knowing about dashboard
+- [ ] Dashboard can be disabled/removed without breaking components
+- [ ] Removing dashboard leaves all components fully functional
+
+### Adding a New Component (No Code Changes Required)
+
+User creates `config/local/monitoring/ollama.yaml` with:
+```yaml
+id: ollama
+display_name: Ollama
+health:
+  endpoint: /api/version
+metrics:
+  - id: models_loaded
+    endpoint: /api/tags
+    extract: ".models | length"
+actions:
+  - id: restart
+    type: docker_restart
+    container: ollama
+connection:
+  host: ${OLLAMA_HOST:-127.0.0.1}
+  port: ${OLLAMA_PORT:-11434}
+```
+
+Result: Ollama appears in dashboard automatically. Zero code changes.
+
+---
+
 ## 11. Constraints & Non-Goals
 
 | Constraint | Detail |

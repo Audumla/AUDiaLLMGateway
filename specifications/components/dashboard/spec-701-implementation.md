@@ -475,10 +475,135 @@ Metrics are dynamic: only metrics from active models are emitted.
 
 ---
 
+### Component Independence: Key Implementation Rules
+
+**RULE 1: Config Resolution Order**
+```python
+# manifest_loader.py MUST follow this order:
+1. Load stack.base.yaml (authoritative: host, port, service names)
+2. Load stack.override.yaml (local overrides)
+3. Export to environment: LITELLM_HOST, LITELLM_PORT, etc.
+4. Load config/monitoring/*.yaml
+5. Resolve ${VAR:-default} in manifests using exported env vars
+6. Pass to hwexp and FastAPI
+```
+
+**RULE 2: No Hardcoding Component Details**
+```python
+# ❌ WRONG: hardcoded port
+connection:
+  host: "127.0.0.1"
+  port: 4000  # ← Should come from config
+
+# ✅ CORRECT: from environment
+connection:
+  host: ${LITELLM_HOST:-127.0.0.1}
+  port: ${LITELLM_PORT:-4000}
+```
+
+**RULE 3: Config Duplication Prevention**
+```python
+# ❌ WRONG: duplicating stack.yaml definitions
+# dashboard/config/services.yaml
+services:
+  litellm:
+    host: 127.0.0.1
+    port: 4000
+    image: litellm:latest  # ← This is in docker-compose.yml!
+
+# ✅ CORRECT: reference source of truth only
+# config/monitoring/litellm.yaml
+connection:
+  host: ${LITELLM_HOST:-127.0.0.1}  # ← From stack.yaml export
+  port: ${LITELLM_PORT:-4000}        # ← From stack.yaml export
+```
+
+**RULE 4: Manifest Content Policy**
+
+| Include in manifest | Reason |
+| --- | --- |
+| Health endpoint path | Observational concern (where to probe) |
+| Metrics extraction rules | Observational concern (how to interpret /metrics) |
+| Action type definitions | Control concern (what can user do) |
+| Card display hints | UI concern (how to render) |
+| Container name | Docker action concern (which container to restart) |
+
+| Exclude from manifest | Reason |
+| --- | --- |
+| Service port | In stack.yaml, exported as env var |
+| Service host | In stack.yaml, exported as env var |
+| Docker image | In docker-compose.yml |
+| Startup command | In docker-compose.yml or config/*.yaml |
+| Model lists | Component-specific, dashboard doesn't care |
+| Runtime environment | Component-specific, not dashboard's concern |
+
+**RULE 5: Testing Component Independence**
+```python
+# Phase 1 test: components work without dashboard
+def test_components_work_standalone():
+    """Verify components can start/run without dashboard service."""
+    # Start docker-compose WITHOUT audia-dashboard service
+    subprocess.run(["docker-compose", "up", "-d",
+                   "audia-litellm", "audia-llama-cpp"])
+
+    # Verify components are healthy
+    assert health.check_litellm()
+    assert health.check_llamaswap()
+
+    # Verify dashboard is NOT required
+    assert dashboard_service.is_not_running()
+
+# Phase 1 test: dashboard startup doesn't modify component configs
+def test_dashboard_doesnt_modify_configs():
+    """Verify dashboard doesn't write to component config files."""
+    litellm_config_before = open("config/local/litellm.yaml").read()
+
+    # Start dashboard
+    dashboard.start()
+
+    # Verify nothing changed
+    litellm_config_after = open("config/local/litellm.yaml").read()
+    assert litellm_config_before == litellm_config_after
+```
+
+**RULE 6: Component Addition Without Code Changes**
+
+User adds component (e.g., Ollama) by creating ONE file:
+```yaml
+# config/local/monitoring/ollama.yaml
+id: ollama
+display_name: Ollama
+health:
+  endpoint: /api/version
+metrics:
+  - id: models_loaded
+    endpoint: /api/tags
+    extract: ".models | length"
+    prometheus_name: gateway_ollama_models_loaded
+actions:
+  - id: restart
+    type: docker_restart
+    container: ollama
+connection:
+  host: ${OLLAMA_HOST:-127.0.0.1}
+  port: ${OLLAMA_PORT:-11434}
+```
+
+Result:
+- ✅ Ollama appears in dashboard
+- ✅ Metrics scraped automatically
+- ✅ Restart button available
+- ✅ ZERO code changes to dashboard
+- ✅ ZERO changes to docker-compose.yml (assumes ollama service already exists)
+
+---
+
 ### Phase 1: Manifest Loader + FastAPI Scaffolding
 
 **Duration:** 3-4 days
 **Goal:** Load manifests, export env vars, serve via FastAPI
+
+**Dependencies:** Component Independence Rules (above) — enforce during code review
 
 #### Tasks
 
