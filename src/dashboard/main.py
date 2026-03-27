@@ -100,19 +100,27 @@ def create_app(root: Path = None) -> FastAPI:
             "version": "0.1.0",
         }
 
+    # Create logger service
+    from .services.logger import DashboardLogger
+    app.state.logger = DashboardLogger(max_entries=5000)
+
+    def get_logger_impl() -> DashboardLogger:
+        return app.state.logger
+
     # Import and register routers
-    from .routers import manifests, components
+    from .routers import manifests, components, logs
     app.include_router(manifests.router)
     app.include_router(components.router)
+    app.include_router(logs.router)
 
     # Override router dependencies with app state
     app.dependency_overrides[manifests.get_manifests] = get_manifests_impl
     app.dependency_overrides[components.get_manifests] = get_manifests_impl
+    app.dependency_overrides[logs.get_logger] = get_logger_impl
 
     # TODO: Register additional routers when implemented
-    # from .routers import config, logs, models, health
+    # from .routers import config, models, health
     # app.include_router(config.router)
-    # app.include_router(logs.router)
     # app.include_router(models.router)
     # app.include_router(health.router)
 
