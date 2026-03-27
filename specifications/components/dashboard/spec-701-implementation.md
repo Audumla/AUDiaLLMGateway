@@ -868,6 +868,286 @@ Grafana dashboard with full observability.
 
 ---
 
+## 2.1 Critical Blockers & Mitigation Strategies
+
+### Issue 1: External Dependency — AUDiotMonitor spec-801 (hwexp adapter)
+
+**Blocker:** Phase 2 (metrics collection) and Phase 3 (SPA development) cannot be fully validated without the hwexp manifest adapter in the separate AUDiotMonitor project.
+
+**Mitigation: Mock Prometheus Data Strategy**
+
+To unblock Phase 3 (Vue SPA frontend) while Phase 2 is being implemented in AUDiotMonitor:
+
+```python
+# src/dashboard/mock_prometheus.py (development only)
+MOCK_METRICS = {
+    "gateway_component_up": [
+        {"labels": {"component": "litellm"}, "value": 1},
+        {"labels": {"component": "llamaswap"}, "value": 1},
+        {"labels": {"component": "vllm"}, "value": 0},
+    ],
+    "gateway_llamacpp_prompt_tokens_total": [
+        {"labels": {"model_name": "qwen27b"}, "value": 12500},
+        {"labels": {"model_name": "llama70b"}, "value": 8300},
+        {"labels": {"model_name": "active"}, "value": 20800},
+    ],
+    "gateway_vllm_num_requests_running": [
+        {"labels": {"model_name": "qwen72b"}, "value": 5},
+        {"labels": {"model_name": "active"}, "value": 5},
+    ],
+    # ... more mock metrics
+}
+
+@app.get("/dashboard/prometheus/api/v1/query")
+async def mock_query(query: str):
+    """Return mock metric data for development."""
+    if MOCK_METRICS.get(metric_name):
+        return {"status": "success", "data": {"result": MOCK_METRICS[metric_name]}}
+```
+
+**Activation:**
+- Add environment variable: `DASHBOARD_MOCK_METRICS=true` (default: false)
+- When enabled, FastAPI returns mock data instead of proxying to Prometheus
+- Update `.env.example` and Phase 3 development docs to enable this
+
+**Outcome:** Vue SPA can be fully developed and tested without waiting for hwexp adapter.
+
+---
+
+### Issue 2: Docker Action Handler — Service Restart in Containerized Environment
+
+**Blocker:** `action_runner.py` needs to execute `docker compose restart <service>`, but `process_manager.py` only supports direct process management (subprocess).
+
+**Current State:** `process_manager.py` has:
+- `start_llama_swap()`, `stop_llama_swap()` — direct subprocess calls
+- `start_gateway()`, `stop_gateway()` — direct subprocess calls
+- NO docker-specific functions
+
+**Mitigation: Docker Socket Handler**
+
+New module: `src/dashboard/docker_handler.py`
+
+```python
+import docker
+from pathlib import Path
+
+class DockerActionHandler:
+    """Execute Docker actions when dashboard runs in container."""
+
+    def __init__(self):
+        # Mount: /var/run/docker.sock:/var/run/docker.sock:ro
+        self.client = docker.from_env()
+
+    async def restart_container(self, container_name: str) -> bool:
+        """Restart a Docker container by name."""
+        try:
+            container = self.client.containers.get(container_name)
+            container.restart()
+            return True
+        except docker.errors.NotFound:
+            raise ValueError(f"Container {container_name} not found")
+
+    async def reload_config_and_restart(self, container_names: list[str]) -> bool:
+        """Regenerate configs and restart affected containers."""
+        # Call process_manager.generate-configs
+        # Then restart each container
+        pass
+```
+
+**Docker-compose.yml update (new audia-dashboard service):**
+
+```yaml
+audia-dashboard:
+  build:
+    context: .
+    dockerfile: src/dashboard/Dockerfile
+  container_name: audia-dashboard
+  ports:
+    - "127.0.0.1:4100:4100"
+  volumes:
+    - /var/run/docker.sock:/var/run/docker.sock:ro  # ← Required
+    - ./config/monitoring:/app/config/monitoring:ro
+    - ./config/local:/app/config/local:ro
+  environment:
+    GATEWAY_ROOT: /app
+    DASHBOARD_API_KEY: ${DASHBOARD_API_KEY:-changeme}
+  depends_on:
+    - audia-litellm
+    - audia-nginx
+```
+
+**Action Mapping in action_runner.py:**
+
+```python
+ACTION_HANDLERS = {
+    "docker_restart": DockerActionHandler.restart_container,
+    "config_reload": ProcessManagerHandler.reload_config,
+    "http_post": HTTPHandler.post_to_endpoint,
+    "process_signal": ProcessHandler.send_signal,
+}
+```
+
+**Test Strategy:**
+- Unit test with mocked docker client
+- Integration test with real docker-compose (in docker-compose.test.yml)
+- Verify socket permissions on live server
+
+---
+
+### Issue 3: Security Hardening
+
+**Current Gaps:**
+1. `GET /manifests` and `GET /models/catalog` are open (no auth)
+2. `/dashboard/prometheus/` needs strict GET-only enforcement
+3. If dashboard is exposed on public-facing port, component structure leaks
+
+**Mitigation Strategy:**
+
+**A. API Key Protection (all endpoints):**
+
+```python
+# src/dashboard/security.py
+from fastapi import Header, HTTPException
+
+async def verify_api_key(x_api_key: str = Header(None)):
+    """Require API key for all endpoints."""
+    if DASHBOARD_AUTH_READONLY:
+        # Read-only mode: require key for POST, open GET
+        return
+
+    if not x_api_key or x_api_key != DASHBOARD_API_KEY:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+@app.get("/api/v1/manifests")
+async def get_manifests(_=Depends(verify_api_key)):
+    """Get all component manifests."""
+```
+
+**B. Nginx Prometheus Proxy (strict GET-only):**
+
+```nginx
+location /dashboard/prometheus/ {
+    # Prometheus read-only proxy
+    proxy_pass http://prometheus:9090/;
+    proxy_http_version 1.1;
+
+    # Strict GET-only (deny admin APIs, writes, deletions)
+    limit_except GET {
+        deny all;
+    }
+
+    # Disable dangerous endpoints
+    location ~ /api/v1/(admin|config|targets|alerts) {
+        return 403;
+    }
+}
+```
+
+**C. Deployment Considerations:**
+
+- `DASHBOARD_AUTH_READONLY=true` in production (hides action buttons)
+- `DASHBOARD_API_KEY` should be a strong random value
+- Dashboard should only be accessible via private network or VPN (not on public port 8080)
+- Nginx `limit_except` rule prevents Prometheus write access
+
+---
+
+### Issue 4: Frontend State Management (Prometheus Polling)
+
+**Problem:** ComponentCard needs to:
+1. Query Prometheus every 15s for specific metrics
+2. Update the correct card when metrics change
+3. Avoid repetitive boilerplate across all card instances
+
+**Solution: Pinia Store + Prometheus Client**
+
+New modules:
+- `src/dashboard/ui/src/stores/metricsStore.ts` — Pinia store
+- `src/dashboard/ui/src/services/prometheusClient.ts` — Typed HTTP client
+
+```typescript
+// stores/metricsStore.ts
+import { defineStore } from 'pinia'
+
+export const useMetricsStore = defineStore('metrics', {
+  state: () => ({
+    metrics: new Map<string, number>(),
+    lastUpdate: 0,
+    isLoading: false,
+  }),
+
+  actions: {
+    async pollMetrics() {
+      this.isLoading = true
+      const queries = [
+        'gateway_component_up',
+        'gateway_llamacpp_prompt_tokens_total{model_name="active"}',
+        'gateway_vllm_num_requests_running{model_name="active"}',
+        // ... all dashboard metrics
+      ]
+
+      const results = await prometheusClient.queryBatch(queries)
+      results.forEach(r => this.metrics.set(r.metric, r.value))
+      this.lastUpdate = Date.now()
+    },
+  }
+})
+
+// Start polling
+setInterval(() => metricsStore.pollMetrics(), 15000)
+```
+
+**ComponentCard Integration:**
+
+```vue
+<template>
+  <div class="card">
+    <h3>{{ manifest.display_name }}</h3>
+    <div class="status" :class="isUp ? 'up' : 'down'">
+      {{ isUp ? '🟢 Up' : '🔴 Down' }}
+    </div>
+    <div class="metrics">
+      <div v-for="field in manifest.card.extra_fields" :key="field.label">
+        {{ field.label }}: {{ metricValue(field.metric) }}
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed } from 'vue'
+import { useMetricsStore } from '@/stores/metricsStore'
+
+const metricsStore = useMetricsStore()
+const props = defineProps<{ manifest: ComponentManifest }>()
+
+const isUp = computed(() =>
+  metricsStore.metrics.get(`gateway_component_up{component="${props.manifest.id}"}`) === 1
+)
+
+const metricValue = (metricId: string) =>
+  metricsStore.metrics.get(metricId)?.toFixed(2) ?? 'N/A'
+</script>
+```
+
+**Benefits:**
+- Single source of truth for all metrics (Pinia store)
+- No repeated Prometheus queries per card
+- Automatic updates when metrics change
+- Easy to test (mock the store)
+
+---
+
+### Issue 5: vLLM Metrics Flag Verification
+
+**Current State:** vLLM profiles in `config/local/models.override.yaml` do NOT have `metrics: true`
+
+**Action Required:** Add metrics flag to all vLLM profiles
+
+See section 3 below for the required update.
+
+---
+
 ## 3. File Structure
 
 ### Complete Project Structure After Implementation
