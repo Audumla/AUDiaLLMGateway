@@ -296,19 +296,37 @@ class DashboardLogger:
         total = len(self.logs)
         by_level = {}
         by_component = {}
+        by_source = {}
+        error_count = 0
+        warning_count = 0
 
         for entry in self.logs:
+            # Count by level
             by_level[entry.level.value] = by_level.get(entry.level.value, 0) + 1
+
+            # Count by component
             if entry.component_id:
                 by_component[entry.component_id] = (
                     by_component.get(entry.component_id, 0) + 1
                 )
 
+            # Count by source
+            by_source[entry.source] = by_source.get(entry.source, 0) + 1
+
+            # Count errors and warnings
+            if entry.level == LogLevel.ERROR:
+                error_count += 1
+            elif entry.level == LogLevel.WARNING:
+                warning_count += 1
+
         return {
-            "total_entries": total,
+            "total_logs": total,
             "capacity": self.max_entries,
             "by_level": by_level,
             "by_component": by_component,
+            "by_source": by_source,
+            "error_count": error_count,
+            "warning_count": warning_count,
             "callbacks": len(self.callbacks),
         }
 
