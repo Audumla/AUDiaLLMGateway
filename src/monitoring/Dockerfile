@@ -1,7 +1,8 @@
-# Multi-stage build for Gateway Dashboard
+# Multi-stage build for Monitoring Data Provider API
+# Provides component status, logs, and control endpoints for LLM gateway
 
 # ===== Builder Stage =====
-FROM python:3.12-slim as builder
+FROM python:3.12-slim AS builder
 
 WORKDIR /build
 
@@ -18,7 +19,7 @@ COPY . /build
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir -r src/dashboard/requirements-dashboard.txt 2>&1 | grep -v "WARNING: Running pip"
+    pip install --no-cache-dir -r src/monitoring/requirements-monitoring.txt 2>&1 | grep -v "WARNING: Running pip"
 
 # ===== Runtime Stage =====
 FROM python:3.12-slim
@@ -41,8 +42,7 @@ COPY . /app
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PATH="/app:$PATH" \
-    DASHBOARD_LOG_LEVEL=INFO
+    PATH="/app:$PATH"
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
@@ -51,7 +51,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 # Expose port
 EXPOSE 8080
 
-# Default command: run dashboard
-CMD ["python", "-m", "uvicorn", "src.dashboard.main:app", \
+# Default command: run monitoring API
+CMD ["python", "-m", "uvicorn", "src.monitoring.main:app", \
      "--host", "0.0.0.0", "--port", "8080", \
      "--log-level", "info"]
