@@ -5,8 +5,8 @@ import yaml
 import pytest
 from pathlib import Path
 
-from src.dashboard.manifest_loader import ManifestLoader
-from src.dashboard.models.errors import ManifestLoadError
+from src.monitoring.manifest_loader import ManifestLoader
+from src.monitoring.models.errors import ManifestLoadError
 
 
 class TestManifestLoader:

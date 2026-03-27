@@ -5,8 +5,8 @@ from fastapi.testclient import TestClient
 from datetime import datetime, timezone
 import json
 
-from src.dashboard.main import create_app
-from src.dashboard.services.logger import DashboardLogger, LogLevel
+from src.monitoring.main import create_app
+from src.monitoring.services.logger import DashboardLogger, LogLevel
 
 
 @pytest.fixture
@@ -50,7 +50,7 @@ def logger_service():
 @pytest.fixture
 def app_with_routers(logger_service):
     """Create app with logs router."""
-    from src.dashboard.routers import logs
+    from src.monitoring.routers import logs
 
     app = create_app()
     app.include_router(logs.router)

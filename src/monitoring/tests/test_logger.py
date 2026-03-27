@@ -4,7 +4,7 @@ import pytest
 from datetime import datetime, timezone, timedelta
 from unittest.mock import Mock
 
-from src.dashboard.services.logger import (
+from src.monitoring.services.logger import (
     DashboardLogger,
     LogEntry,
     LogLevel,

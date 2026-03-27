@@ -1,10 +1,10 @@
 #!/bin/bash
-# Dashboard testing script
-# Validates dashboard code structure, tests, and containerization
+# Monitoring API testing script
+# Validates monitoring data provider code structure, tests, and containerization
 
 set -e
 
-DASHBOARD_ROOT="src/dashboard"
+DASHBOARD_ROOT="src/monitoring"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
@@ -15,7 +15,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 echo -e "${YELLOW}=====================================${NC}"
-echo -e "${YELLOW}Gateway Dashboard Test Suite${NC}"
+echo -e "${YELLOW}Monitoring Data Provider Test Suite${NC}"
 echo -e "${YELLOW}=====================================${NC}"
 echo
 
@@ -99,15 +99,15 @@ echo "Total tests: $test_count"
 
 echo
 echo -e "${GREEN}=====================================${NC}"
-echo -e "${GREEN}All dashboard tests passed!${NC}"
+echo -e "${GREEN}All monitoring API tests passed!${NC}"
 echo -e "${GREEN}=====================================${NC}"
 echo
 
 # 6. Next steps
 echo -e "${YELLOW}Next Steps:${NC}"
 echo "1. Build and run Docker image:"
-echo "   docker build -f src/dashboard/Dockerfile -t audia-dashboard:phase-1 ."
-echo "   docker run -p 8080:8080 audia-dashboard:phase-1"
+echo "   docker build -f src/monitoring/Dockerfile -t audia-monitoring:phase-1 ."
+echo "   docker run -p 8080:8080 audia-monitoring:phase-1"
 echo
 echo "2. Or use docker-compose:"
 echo "   docker-compose -f docker-compose.dashboard.yml up -d dashboard"

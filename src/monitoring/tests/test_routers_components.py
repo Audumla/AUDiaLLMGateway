@@ -6,18 +6,18 @@ from unittest.mock import Mock, patch
 from datetime import datetime, timezone
 import json
 
-from src.dashboard.main import create_app
-from src.dashboard.models import (
+from src.monitoring.main import create_app
+from src.monitoring.models import (
     ComponentManifest,
     ActionConfig,
 )
-from src.dashboard.models.manifest import (
+from src.monitoring.models.manifest import (
     HealthProbeConfig,
     ConnectionConfig,
     CardConfig,
 )
-from src.dashboard.action_runner import ExecutionResult
-from src.dashboard.services.action_executor import ActionExecutor
+from src.monitoring.action_runner import ExecutionResult
+from src.monitoring.services.action_executor import ActionExecutor
 
 
 @pytest.fixture
@@ -108,7 +108,7 @@ def mock_action_executor():
 @pytest.fixture
 def app_with_routers(sample_manifests, mock_action_executor):
     """Create app with components router."""
-    from src.dashboard.routers import components
+    from src.monitoring.routers import components
 
     app = create_app()
     app.include_router(components.router)
@@ -217,7 +217,7 @@ class TestComponentsRouter:
             completed_at=now,
         )
 
-        from src.dashboard.services.action_executor import ExecutionHistory, ExecutionState
+        from src.monitoring.services.action_executor import ExecutionHistory, ExecutionState
         mock_history = ExecutionHistory(
             execution_id="exec-123",
             action_id="restart",
@@ -277,7 +277,7 @@ class TestComponentsRouter:
             },
         )
 
-        from src.dashboard.services.action_executor import ExecutionHistory, ExecutionState
+        from src.monitoring.services.action_executor import ExecutionHistory, ExecutionState
         mock_history = ExecutionHistory(
             execution_id="exec-456",
             action_id="reload",
@@ -326,7 +326,7 @@ class TestComponentsRouter:
             completed_at=now,
         )
 
-        from src.dashboard.services.action_executor import ExecutionHistory, ExecutionState
+        from src.monitoring.services.action_executor import ExecutionHistory, ExecutionState
         mock_history = ExecutionHistory(
             execution_id="exec-789",
             action_id="restart",

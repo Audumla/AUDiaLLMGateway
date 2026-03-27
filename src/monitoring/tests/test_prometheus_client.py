@@ -5,7 +5,7 @@ from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime, timezone, timedelta
 import requests
 
-from src.dashboard.prometheus_client import (
+from src.monitoring.prometheus_client import (
     PrometheusClient,
     PrometheusException,
     PrometheusConnectionError,
