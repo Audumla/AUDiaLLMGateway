@@ -34,7 +34,7 @@ class HealthProbeConfig(BaseModel):
 class MetricConfig(BaseModel):
     """Prometheus metric configuration."""
     id: str = Field(..., description="Metric ID (unique within component)")
-    endpoint: str = Field(..., description="Endpoint to scrape")
+    endpoint: Optional[str] = Field(None, description="Endpoint to scrape (not needed for type=derived)")
     source_format: Literal["json", "prometheus"] = Field(
         default="prometheus",
         description="Response format"
