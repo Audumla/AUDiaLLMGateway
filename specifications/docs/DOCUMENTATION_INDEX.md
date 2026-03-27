@@ -7,8 +7,8 @@ Complete guide to all project documentation, organized by use case and reader ty
 ## Quick Start by Use Case
 
 ### I want to set up the system quickly
-1. **Start here:** [README.md](README.md) — Overview and Quick Start sections
-2. **Docker setup:** [docs/docker.md](docs/docker.md) — All deployment profiles
+1. **Start here:** [README.md](../../README.md) — Overview and Quick Start sections
+2. **Docker setup:** [docker.md](docker.md) — All deployment profiles
 3. **Windows auto-start:** [SETUP_AUTOSTART.md](SETUP_AUTOSTART.md) — One-command auto-start (5 min)
 
 ### I want to understand what's supported
@@ -17,13 +17,13 @@ Complete guide to all project documentation, organized by use case and reader ty
 3. **Performance details:** [PREBUILT_BINARIES_STRATEGY.md](PREBUILT_BINARIES_STRATEGY.md) — Boot times and caching
 
 ### I want to deploy to production
-1. **Docker deployment:** [docs/docker.md](docs/docker.md) — Production profiles and configurations
-2. **Architecture:** [docs/architecture.md](docs/architecture.md) — System design and topology
-3. **Reverse proxy:** [docs/reverse-proxy.md](docs/reverse-proxy.md) — nginx configuration
-4. **Config management:** [docs/docker-field-notes.md](docs/docker-field-notes.md) — Deployment notes
+1. **Docker deployment:** [docker.md](docker.md) — Production profiles and configurations
+2. **Architecture:** [architecture.md](architecture.md) — System design and topology
+3. **Reverse proxy:** [reverse-proxy.md](reverse-proxy.md) — nginx configuration
+4. **Config management:** [docker-field-notes.md](docker-field-notes.md) — Deployment notes
 
 ### I'm having issues
-1. **Troubleshooting:** [docs/troubleshooting.md](docs/troubleshooting.md) — Common problems and solutions
+1. **Troubleshooting:** [troubleshooting.md](troubleshooting.md) — Common problems and solutions
 2. **Diagnostics:** [SERVER_DIAGNOSTICS.md](SERVER_DIAGNOSTICS.md) — Server health and boot diagnostics
 3. **Build investigation:** [FAILING_BUILDS_INVESTIGATION.md](FAILING_BUILDS_INVESTIGATION.md) — Root causes and fixes
 
@@ -40,7 +40,7 @@ Complete guide to all project documentation, organized by use case and reader ty
 
 | Document | Purpose | Best For |
 | -------- | ------- | -------- |
-| [README.md](README.md) | Project overview and quick start paths | First-time users, decision makers |
+| [README.md](../../README.md) | Project overview and quick start paths | First-time users, decision makers |
 | [SUPPORTED_FEATURES.md](SUPPORTED_FEATURES.md) | Complete feature inventory (2000+ lines) | Understanding capabilities, version info |
 | [CHANGELOG.md](CHANGELOG.md) | All changes and improvements | Version history, what's new |
 
@@ -56,9 +56,9 @@ Complete guide to all project documentation, organized by use case and reader ty
 
 | Document | Purpose | Best For |
 | -------- | ------- | -------- |
-| [docs/docker.md](docs/docker.md) | Docker deployment profiles and setup | Docker users, production deployments |
-| [docs/docker-field-notes.md](docs/docker-field-notes.md) | Validated versions, first-install issues | Troubleshooting Docker deployments |
-| [docs/runbook.md](docs/runbook.md) | Native install, operations, management | Non-Docker installations, native deployments |
+| [docker.md](docker.md) | Docker deployment profiles and setup | Docker users, production deployments |
+| [docker-field-notes.md](docker-field-notes.md) | Validated versions, first-install issues | Troubleshooting Docker deployments |
+| [runbook.md](runbook.md) | Native install, operations, management | Non-Docker installations, native deployments |
 | [SETUP_AUTOSTART.md](SETUP_AUTOSTART.md) | Windows Task Scheduler auto-start (150+ lines) | Windows users wanting auto-boot behavior |
 | [DOCKER_AUTOSTART.md](DOCKER_AUTOSTART.md) | Docker auto-start configuration (400+ lines) | Docker-based auto-start setups |
 
@@ -66,9 +66,9 @@ Complete guide to all project documentation, organized by use case and reader ty
 
 | Document | Purpose | Best For |
 | -------- | ------- | -------- |
-| [docs/architecture.md](docs/architecture.md) | System design, runtime topology, config layers | Understanding system structure |
-| [docs/reverse-proxy.md](docs/reverse-proxy.md) | nginx configuration and routing | Reverse proxy setup and customization |
-| [README.md](README.md) — "Config layering" section | Project/local/generated config model | Config management and overrides |
+| [architecture.md](architecture.md) | System design, runtime topology, config layers | Understanding system structure |
+| [reverse-proxy.md](reverse-proxy.md) | nginx configuration and routing | Reverse proxy setup and customization |
+| [README.md](../../README.md) — "Config layering" section | Project/local/generated config model | Config management and overrides |
 
 ### Testing & Validation
 
@@ -83,7 +83,7 @@ Complete guide to all project documentation, organized by use case and reader ty
 | Document | Purpose | Best For |
 | -------- | ------- | -------- |
 | [SERVER_DIAGNOSTICS.md](SERVER_DIAGNOSTICS.md) | Server health report and diagnostics (300+ lines) | Checking system status, troubleshooting |
-| [docs/troubleshooting.md](docs/troubleshooting.md) | Common issues and solutions | Problem solving |
+| [troubleshooting.md](troubleshooting.md) | Common issues and solutions | Problem solving |
 | [FAILING_BUILDS_INVESTIGATION.md](FAILING_BUILDS_INVESTIGATION.md) | Build failures and solutions | Understanding build issues |
 
 ### Agent & Provider Instructions
@@ -147,13 +147,13 @@ Technical specifications in `specifications/` directory:
 ## How to Use This Index
 
 **If you're:** → **Start with:**
-- Setting up the system → [README.md](README.md)
+- Setting up the system → [README.md](../../README.md)
 - Checking supported features → [SUPPORTED_FEATURES.md](SUPPORTED_FEATURES.md)
-- Deploying to Docker → [docs/docker.md](docs/docker.md)
+- Deploying to Docker → [docker.md](docker.md)
 - Setting up auto-start → [SETUP_AUTOSTART.md](SETUP_AUTOSTART.md)
 - Testing the system → [MANUAL_TESTING_INSTRUCTIONS.md](MANUAL_TESTING_INSTRUCTIONS.md)
-- Troubleshooting issues → [docs/troubleshooting.md](docs/troubleshooting.md)
-- Understanding architecture → [docs/architecture.md](docs/architecture.md)
+- Troubleshooting issues → [troubleshooting.md](troubleshooting.md)
+- Understanding architecture → [architecture.md](architecture.md)
 - Looking for backend details → [PREBUILT_BINARIES_STRATEGY.md](PREBUILT_BINARIES_STRATEGY.md)
 - Checking versions → [BACKEND_VERSIONS.md](BACKEND_VERSIONS.md)
 
@@ -165,8 +165,8 @@ Technical specifications in `specifications/` directory:
 | --------- | ------- | --------- |
 | llama.cpp | latest (default: b8508) | [SUPPORTED_FEATURES.md](SUPPORTED_FEATURES.md#version-support) |
 | Minimum for Qwen 3.5 | b8153 | [BACKEND_VERSIONS.md](BACKEND_VERSIONS.md) |
-| Docker Compose | Compatible | [docs/docker.md](docs/docker.md) |
-| Python | 3.10+ | [README.md](README.md) |
+| Docker Compose | Compatible | [docker.md](docker.md) |
+| Python | 3.10+ | [README.md](../../README.md) |
 
 ---
 
@@ -190,4 +190,6 @@ All documentation updated as of 2026-03-25:
 - ✅ TEST_AUTOSTART.md — 4-phase framework documented
 - ✅ README.md — References updated
 - ✅ CHANGELOG.md — All changes recorded
+
+
 

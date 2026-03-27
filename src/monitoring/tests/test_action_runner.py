@@ -73,7 +73,7 @@ class TestActionRunner:
 
     def test_initialization_without_docker(self):
         """Test runner initialization without Docker handler."""
-        with patch("src.dashboard.action_runner.create_docker_handler", return_value=None):
+        with patch("src.monitoring.action_runner.create_docker_handler", return_value=None):
             runner = ActionRunner(docker_handler=None)
             assert runner.docker is None
 

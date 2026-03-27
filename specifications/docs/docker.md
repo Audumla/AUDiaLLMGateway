@@ -771,7 +771,7 @@ docker compose up -d
 ## Troubleshooting
 
 Field notes from validated installs, known-good versions, and failure modes live in
-[docs/docker-field-notes.md](docker-field-notes.md).
+[docker-field-notes.md](docker-field-notes.md).
 
 ### Gateway container exits immediately
 
@@ -913,3 +913,4 @@ Supported backend keys inside `gpu_profiles.<name>`:
 - `vllm-cuda` (if you use a CUDA vLLM image)
 
 Direct `vllm:` values on defaults/deployments/exposures still override preset values.
+

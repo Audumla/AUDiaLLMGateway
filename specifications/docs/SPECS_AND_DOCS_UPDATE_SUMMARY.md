@@ -283,9 +283,9 @@ All documentation files are properly cross-referenced:
 3. PREBUILT_BINARIES_STRATEGY.md (how it works)
 
 ### Deploying
-1. docs/docker.md (Docker setup)
-2. docs/architecture.md (understanding design)
-3. docs/reverse-proxy.md (if needed)
+1. docker.md (Docker setup)
+2. architecture.md (understanding design)
+3. reverse-proxy.md (if needed)
 
 ### Testing
 1. MANUAL_TESTING_INSTRUCTIONS.md (step-by-step)
@@ -293,7 +293,7 @@ All documentation files are properly cross-referenced:
 3. SETUP_AUTOSTART.md (auto-start validation)
 
 ### Troubleshooting
-1. docs/troubleshooting.md (common issues)
+1. troubleshooting.md (common issues)
 2. SERVER_DIAGNOSTICS.md (check health)
 3. FAILING_BUILDS_INVESTIGATION.md (if builds fail)
 
@@ -345,4 +345,5 @@ All documentation files are properly cross-referenced:
 - Docker composition properly configured
 
 **Status:** Documentation and specifications are complete, accurate, and up-to-date with implementation.
+
 

@@ -18,7 +18,7 @@ contents:
     dst: "/opt/AUDiaLLMGateway/config/project"
   - src: "config/env.example"
     dst: "/opt/AUDiaLLMGateway/config/env.example"
-  - src: "docs/"
+  - src: "specifications/docs/"
     dst: "/opt/AUDiaLLMGateway/docs"
   - src: "install/"
     dst: "/opt/AUDiaLLMGateway/install"
@@ -54,3 +54,4 @@ overrides:
       - curl
     scripts:
       postinstall: scripts/postinstall.sh
+
