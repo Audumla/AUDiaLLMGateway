@@ -35,8 +35,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt pytest
 
-      - name: Run pytest
+      - name: Run pytest (main tests)
         run: PYTHONPATH=. pytest tests/ -v --ignore=tests/docker
+
+      - name: Run pytest (monitoring API tests)
+        run: PYTHONPATH=. pytest src/monitoring/tests/ -v --tb=short
 
   # --------------------------------------------------------------------------
   # Docker smoke tests — per-distro install validation
@@ -132,7 +135,7 @@ jobs:
             audia-integration
 
   # --------------------------------------------------------------------------
-  # Docker image build validation — ensures both images build successfully
+  # Docker image build validation — ensures all images build successfully
   # --------------------------------------------------------------------------
   docker-build:
     name: Docker image build (${{ matrix.image }})
@@ -141,6 +144,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - image: monitoring
+            dockerfile: src/monitoring/Dockerfile
+            build_arg: ""
           - image: gateway
             dockerfile: docker/Dockerfile.gateway
             build_arg: GATEWAY_BASE_IMAGE=audia-gateway-base:test
