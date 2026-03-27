@@ -22,8 +22,8 @@ Provides an OpenAI-compatible API endpoint backed by local models:
 
 | Path | Best for |
 | ---- | -------- |
-| [Docker](docs/docker.md) | Linux home lab or server — recommended |
-| [Native install](docs/runbook.md) | Windows, macOS, or Linux without Docker |
+| [Docker](specifications/docs/docker.md) | Linux home lab or server — recommended |
+| [Native install](specifications/docs/runbook.md) | Windows, macOS, or Linux without Docker |
 
 ### Docker (Linux — recommended)
 
@@ -64,11 +64,11 @@ For NVIDIA hosts, the root compose profile is the direct path:
 docker compose --profile vllm up -d
 ```
 
-For AMD hosts, use the unified AMD compose profile from [docs/docker.md](docs/docker.md),
+For AMD hosts, use the unified AMD compose profile from [docker.md](specifications/docs/docker.md),
 set `LLAMA_BACKEND=auto` or explicitly to `vulkan`/`rocm`, and route individual `llama.cpp` models with explicit
 `executable_macro` values such as `llama-server-vulkan`, `llama-server-rocm`, `llama-server-rocm-gfx1100`, or `llama-server-rocm-gfx1030`.
 
-See [docs/docker.md](docs/docker.md) for all deployment profiles (Universal, NVIDIA, AMD Vulkan/ROCm, External Proxy).
+See [docker.md](specifications/docs/docker.md) for all deployment profiles (Universal, NVIDIA, AMD Vulkan/ROCm, External Proxy).
 
 For local source-based Docker development, use:
 
@@ -76,7 +76,7 @@ For local source-based Docker development, use:
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 ```
 
-**Smart Binary Caching:** Backend binaries use prebuilt releases from ggml-org with smart caching — binaries are downloaded once per version change and reused on subsequent restarts. See [PREBUILT_BINARIES_STRATEGY.md](PREBUILT_BINARIES_STRATEGY.md) for details.
+**Smart Binary Caching:** Backend binaries use prebuilt releases from ggml-org with smart caching — binaries are downloaded once per version change and reused on subsequent restarts. See [PREBUILT_BINARIES_STRATEGY.md](specifications/docs/PREBUILT_BINARIES_STRATEGY.md) for details.
 
 ### Native install
 
@@ -92,7 +92,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 ./bootstrap/AUDiaLLMGateway-install-release.sh
 ```
 
-See [docs/runbook.md](docs/runbook.md) for the full native install and operations guide.
+See [runbook.md](specifications/docs/runbook.md) for the full native install and operations guide.
 
 ### Windows Auto-Start Setup
 
@@ -105,48 +105,48 @@ setup-autostart.bat
 # Restart computer
 ```
 
-Services auto-start on next logon (PostgreSQL, llama-cpp, gateway, nginx). See [SETUP_AUTOSTART.md](SETUP_AUTOSTART.md) for details and troubleshooting.
+Services auto-start on next logon (PostgreSQL, llama-cpp, gateway, nginx). See [SETUP_AUTOSTART.md](specifications/docs/SETUP_AUTOSTART.md) for details and troubleshooting.
 
 ---
 
 ## Documentation
 
-**[📖 Full Documentation Index →](DOCUMENTATION_INDEX.md)** — Comprehensive guide to all docs organized by use case and reader type.
+**[📖 Full Documentation Index →](specifications/docs/DOCUMENTATION_INDEX.md)** — Comprehensive guide to all docs organized by use case and reader type.
 
 ### Core Docs
 
 | Document | Contents |
 | -------- | -------- |
-| [docs/docker.md](docs/docker.md) | Docker deployment — all profiles, setup, management |
-| [docs/docker-field-notes.md](docs/docker-field-notes.md) | Docker install field notes — validated versions, first-install issues, recovery notes |
-| [docs/runbook.md](docs/runbook.md) | Native install, update, start/stop, config validation |
-| [docs/architecture.md](docs/architecture.md) | System design — runtime, config, and installer topology |
-| [docs/reverse-proxy.md](docs/reverse-proxy.md) | nginx routes, config generation, upstream layout |
-| [docs/troubleshooting.md](docs/troubleshooting.md) | Common issues and fixes |
+| [docker.md](specifications/docs/docker.md) | Docker deployment — all profiles, setup, management |
+| [docker-field-notes.md](specifications/docs/docker-field-notes.md) | Docker install field notes — validated versions, first-install issues, recovery notes |
+| [runbook.md](specifications/docs/runbook.md) | Native install, update, start/stop, config validation |
+| [architecture.md](specifications/docs/architecture.md) | System design — runtime, config, and installer topology |
+| [reverse-proxy.md](specifications/docs/reverse-proxy.md) | nginx routes, config generation, upstream layout |
+| [troubleshooting.md](specifications/docs/troubleshooting.md) | Common issues and fixes |
 
 ### Backend & Performance
 
 | Document | Contents |
 | -------- | -------- |
-| [SUPPORTED_FEATURES.md](SUPPORTED_FEATURES.md) | All supported backends (6 variants), versions, features, and status |
-| [PREBUILT_BINARIES_STRATEGY.md](PREBUILT_BINARIES_STRATEGY.md) | Prebuilt binary distribution with smart caching (45-90s boot time) |
-| [BACKEND_VERSIONS.md](BACKEND_VERSIONS.md) | Complete backend version reference and compatibility |
-| [FAILING_BUILDS_INVESTIGATION.md](FAILING_BUILDS_INVESTIGATION.md) | Root cause analysis and solutions for previously failing builds |
+| [SUPPORTED_FEATURES.md](specifications/docs/SUPPORTED_FEATURES.md) | All supported backends (6 variants), versions, features, and status |
+| [PREBUILT_BINARIES_STRATEGY.md](specifications/docs/PREBUILT_BINARIES_STRATEGY.md) | Prebuilt binary distribution with smart caching (45-90s boot time) |
+| [BACKEND_VERSIONS.md](specifications/docs/BACKEND_VERSIONS.md) | Complete backend version reference and compatibility |
+| [FAILING_BUILDS_INVESTIGATION.md](specifications/docs/FAILING_BUILDS_INVESTIGATION.md) | Root cause analysis and solutions for previously failing builds |
 
 ### Setup & Testing
 
 | Document | Contents |
 | -------- | -------- |
-| [SETUP_AUTOSTART.md](SETUP_AUTOSTART.md) | Windows Task Scheduler auto-start setup guide |
-| [MANUAL_TESTING_INSTRUCTIONS.md](MANUAL_TESTING_INSTRUCTIONS.md) | 4-phase manual testing procedures |
-| [TEST_AUTOSTART.md](TEST_AUTOSTART.md) | Comprehensive testing framework with success criteria |
-| [DOCKER_AUTOSTART.md](DOCKER_AUTOSTART.md) | Docker configuration for auto-start behavior |
+| [SETUP_AUTOSTART.md](specifications/docs/SETUP_AUTOSTART.md) | Windows Task Scheduler auto-start setup guide |
+| [MANUAL_TESTING_INSTRUCTIONS.md](specifications/docs/MANUAL_TESTING_INSTRUCTIONS.md) | 4-phase manual testing procedures |
+| [TEST_AUTOSTART.md](specifications/docs/TEST_AUTOSTART.md) | Comprehensive testing framework with success criteria |
+| [DOCKER_AUTOSTART.md](specifications/docs/DOCKER_AUTOSTART.md) | Docker configuration for auto-start behavior |
 
 ### Diagnostics
 
 | Document | Contents |
 | -------- | -------- |
-| [SERVER_DIAGNOSTICS.md](SERVER_DIAGNOSTICS.md) | Server health report and boot diagnostics |
+| [SERVER_DIAGNOSTICS.md](specifications/docs/SERVER_DIAGNOSTICS.md) | Server health report and boot diagnostics |
 
 ---
 
@@ -361,7 +361,7 @@ Change aliases in `config/project/stack.base.yaml` or override in
 
 ## Reverse proxy
 
-Optional nginx is configured via code generation. See [docs/reverse-proxy.md](docs/reverse-proxy.md).
+Optional nginx is configured via code generation. See [reverse-proxy.md](specifications/docs/reverse-proxy.md).
 Route layout: `/v1/` → LiteLLM, `/llamaswap/` → llama-swap, `/vllm/` → vLLM when enabled, `/health` → status.
 
 ---
@@ -389,3 +389,5 @@ docker compose pull && docker compose up -d
 
 The update replaces project-managed files from the release archive and preserves
 `config/local/`, `state/`, `models/`, and `.env`.
+
+

@@ -43,8 +43,8 @@ class MockResponse:
 @pytest.fixture
 def mock_requests():
     """Mock requests library."""
-    with patch("src.dashboard.prometheus_client.REQUESTS_AVAILABLE", True):
-        with patch("src.dashboard.prometheus_client.requests") as mock:
+    with patch("src.monitoring.prometheus_client.REQUESTS_AVAILABLE", True):
+        with patch("src.monitoring.prometheus_client.requests") as mock:
             mock_session = MagicMock()
             mock.Session.return_value = mock_session
             # Preserve the real RequestException class so we can raise it in tests
@@ -122,7 +122,7 @@ class TestPrometheusClient:
 
     def test_requests_not_available(self):
         """Test error when requests library not available."""
-        with patch("src.dashboard.prometheus_client.REQUESTS_AVAILABLE", False):
+        with patch("src.monitoring.prometheus_client.REQUESTS_AVAILABLE", False):
             with pytest.raises(PrometheusException):
                 PrometheusClient()
 
@@ -515,15 +515,15 @@ class TestPrometheusClient:
 
     def test_create_prometheus_client_unavailable(self):
         """Test factory returns None when unavailable."""
-        with patch("src.dashboard.prometheus_client.REQUESTS_AVAILABLE", False):
+        with patch("src.monitoring.prometheus_client.REQUESTS_AVAILABLE", False):
             client = create_prometheus_client()
 
             assert client is None
 
     def test_create_prometheus_client_connection_error(self):
         """Test factory returns None on connection error."""
-        with patch("src.dashboard.prometheus_client.REQUESTS_AVAILABLE", True):
-            with patch("src.dashboard.prometheus_client.requests") as mock:
+        with patch("src.monitoring.prometheus_client.REQUESTS_AVAILABLE", True):
+            with patch("src.monitoring.prometheus_client.requests") as mock:
                 mock.RequestException = requests.RequestException
                 mock.Session.return_value.get.side_effect = requests.RequestException(
                     "Connection failed"

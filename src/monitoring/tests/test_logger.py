@@ -279,13 +279,15 @@ class TestDashboardLogger:
 
         stats = logger_service.get_statistics()
 
-        assert stats["total_entries"] == 3
+        assert stats["total_logs"] == 3
         assert stats["capacity"] == 1000
         assert stats["by_level"]["INFO"] == 1
         assert stats["by_level"]["WARNING"] == 1
         assert stats["by_level"]["ERROR"] == 1
         assert stats["by_component"]["comp1"] == 2
         assert stats["by_component"]["comp2"] == 1
+        assert stats["error_count"] == 1
+        assert stats["warning_count"] == 1
 
     def test_log_entry_to_dict(self):
         """Test LogEntry.to_dict()."""

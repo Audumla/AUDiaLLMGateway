@@ -73,8 +73,8 @@ class MockDockerClient:
 @pytest.fixture
 def mock_docker():
     """Mock Docker module."""
-    with patch("src.dashboard.docker_handler.DOCKER_AVAILABLE", True):
-        with patch("src.dashboard.docker_handler.docker") as mock_docker_module:
+    with patch("src.monitoring.docker_handler.DOCKER_AVAILABLE", True):
+        with patch("src.monitoring.docker_handler.docker") as mock_docker_module:
             # Make docker.DockerClient point to our mock
             mock_docker_module.DockerClient = MockDockerClient
             # Mock docker.models.containers for type hints
@@ -113,7 +113,7 @@ class TestDockerHandler:
 
     def test_unavailable_docker_raises_exception(self):
         """Test error when Docker SDK not available."""
-        with patch("src.dashboard.docker_handler.DOCKER_AVAILABLE", False):
+        with patch("src.monitoring.docker_handler.DOCKER_AVAILABLE", False):
             with pytest.raises(DockerException):
                 DockerHandler()
 
@@ -236,6 +236,6 @@ class TestDockerHandler:
 
     def test_create_docker_handler_unavailable(self):
         """Test factory returns None when Docker unavailable."""
-        with patch("src.dashboard.docker_handler.DOCKER_AVAILABLE", False):
+        with patch("src.monitoring.docker_handler.DOCKER_AVAILABLE", False):
             handler = create_docker_handler()
             assert handler is None
