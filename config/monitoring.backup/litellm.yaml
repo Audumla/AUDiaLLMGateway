@@ -1,0 +1,304 @@
+# LiteLLM Gateway Component Manifest
+# This manifest defines monitoring and control for the LiteLLM proxy layer
+id: litellm
+display_name: LiteLLM Gateway
+icon: gateway
+enabled: false
+
+# ── Health probe ────────────────────────────────────────────────────────────────
+health:
+  endpoint: /health/liveliness
+  method: GET
+  expect_status: 200
+  timeout_s: 3
+  headers:
+    Authorization: "Bearer ${LITELLM_MASTER_KEY}"
+
+# ── Metrics (polled and emitted as RawMeasurements for Prometheus) ─────────────
+metrics:
+  # Core health metric
+  - id: component_up
+    endpoint: /health/liveliness
+    extract: "1"
+    prometheus_name: gateway_component_up
+    unit: status
+    poll_interval_s: 10
+
+  # Request tracking - scraped from LiteLLM's native Prometheus endpoint
+  - id: proxy_total_requests
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: litellm_proxy_total_requests_metric
+    prometheus_name: gateway_litellm_proxy_total_requests
+    unit: count
+    poll_interval_s: 15
+    labels:
+      - model
+      - key
+      - team
+      - user
+      - endpoint
+
+  - id: proxy_failed_requests
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: litellm_proxy_failed_requests_metric
+    prometheus_name: gateway_litellm_proxy_failed_requests
+    unit: count
+    poll_interval_s: 15
+    labels:
+      - model
+      - key
+      - team
+
+  # Latency metrics
+  - id: request_total_latency
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: litellm_request_total_latency_metric
+    prometheus_name: gateway_litellm_request_total_latency
+    unit: seconds
+    poll_interval_s: 15
+    labels:
+      - model
+      - key
+      - team
+
+  - id: llm_api_latency
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: litellm_llm_api_latency_metric
+    prometheus_name: gateway_litellm_llm_api_latency
+    unit: seconds
+    poll_interval_s: 15
+    labels:
+      - model
+      - deployment
+
+  - id: time_to_first_token
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: litellm_llm_api_time_to_first_token_metric
+    prometheus_name: gateway_litellm_time_to_first_token
+    unit: seconds
+    poll_interval_s: 15
+    labels:
+      - model
+      - deployment
+
+  # Token tracking
+  - id: total_tokens
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: litellm_total_tokens_metric
+    prometheus_name: gateway_litellm_total_tokens
+    unit: count
+    poll_interval_s: 15
+    labels:
+      - model
+      - key
+      - team
+      - user
+
+  - id: input_tokens
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: litellm_input_tokens_metric
+    prometheus_name: gateway_litellm_input_tokens
+    unit: count
+    poll_interval_s: 15
+    labels:
+      - model
+      - key
+      - team
+      - user
+
+  - id: output_tokens
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: litellm_output_tokens_metric
+    prometheus_name: gateway_litellm_output_tokens
+    unit: count
+    poll_interval_s: 15
+    labels:
+      - model
+      - key
+      - team
+      - user
+
+  # Spend tracking
+  - id: spend_metric
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: litellm_spend_metric
+    prometheus_name: gateway_litellm_spend
+    unit: usd
+    poll_interval_s: 30
+    labels:
+      - model
+      - key
+      - team
+      - user
+
+  # Deployment health
+  - id: deployment_state
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: litellm_deployment_state
+    prometheus_name: gateway_litellm_deployment_state
+    unit: status
+    poll_interval_s: 30
+    labels:
+      - deployment
+      - model
+
+  - id: deployment_success_responses
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: litellm_deployment_success_responses
+    prometheus_name: gateway_litellm_deployment_success
+    unit: count
+    poll_interval_s: 15
+    labels:
+      - deployment
+      - model
+
+  - id: deployment_failure_responses
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: litellm_deployment_failure_responses
+    prometheus_name: gateway_litellm_deployment_failure
+    unit: count
+    poll_interval_s: 15
+    labels:
+      - deployment
+      - model
+
+  # Rate limits
+  - id: remaining_requests
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: litellm_remaining_requests_metric
+    prometheus_name: gateway_litellm_remaining_requests
+    unit: count
+    poll_interval_s: 10
+    labels:
+      - deployment
+      - provider
+
+  - id: remaining_tokens
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: litellm_remaining_tokens_metric
+    prometheus_name: gateway_litellm_remaining_tokens
+    unit: count
+    poll_interval_s: 10
+    labels:
+      - deployment
+      - provider
+
+  # System health
+  - id: in_flight_requests
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: litellm_in_flight_requests
+    prometheus_name: gateway_litellm_in_flight_requests
+    unit: count
+    poll_interval_s: 5
+
+  - id: redis_latency
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: litellm_redis_latency
+    prometheus_name: gateway_litellm_redis_latency
+    unit: seconds
+    poll_interval_s: 15
+    labels:
+      - operation
+
+  # Fallback tracking
+  - id: deployment_cooled_down
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: litellm_deployment_cooled_down
+    prometheus_name: gateway_litellm_deployment_cooled_down
+    unit: count
+    poll_interval_s: 15
+    labels:
+      - deployment
+
+  - id: successful_fallbacks
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: litellm_deployment_successful_fallbacks
+    prometheus_name: gateway_litellm_successful_fallbacks
+    unit: count
+    poll_interval_s: 15
+    labels:
+      - primary_model
+      - fallback_model
+
+  - id: failed_fallbacks
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: litellm_deployment_failed_fallbacks
+    prometheus_name: gateway_litellm_failed_fallbacks
+    unit: count
+    poll_interval_s: 15
+    labels:
+      - primary_model
+      - fallback_model
+
+# ── Actions (rendered as buttons in the control panel) ─────────────────────────
+actions:
+  - id: restart
+    label: Restart Gateway
+    type: docker_restart
+    container: audia-litellm
+    confirm: true
+    confirm_message: "Restart the LiteLLM gateway? Active requests will be interrupted."
+
+  - id: reload_config
+    label: Reload Config
+    type: config_reload
+    confirm: true
+    confirm_message: "Regenerate configs and restart the gateway?"
+
+  - id: flush_redis
+    label: Flush Redis Cache
+    type: shell
+    command: litellm_flush_redis
+    confirm: false
+
+# ── Card display ─────────────────────────────────────────────────────────────────
+card:
+  port: ${LITELLM_PORT:-4000}
+  extra_fields:
+    - label: Total Requests (5m)
+      metric: proxy_total_requests
+      aggregation: rate_5m
+    - label: Avg Latency
+      metric: request_total_latency
+      aggregation: avg_5m
+    - label: Active Deployments
+      metric: deployment_state
+      filter: state=0
+    - label: In-Flight Requests
+      metric: in_flight_requests
+  links:
+    - label: API Docs
+      path: /
+    - label: Health
+      path: /health/liveliness
+    - label: Metrics
+      path: /metrics
+    - label: LiteLLM UI
+      path: /ui/
+
+# ── Connection (how hwexp and FastAPI reach this component) ────────────────────
+connection:
+  host: ${LITELLM_HOST:-llm-gateway}
+  port: ${LITELLM_PORT:-4000}
+  auth:
+    type: bearer
+    token_env: LITELLM_MASTER_KEY

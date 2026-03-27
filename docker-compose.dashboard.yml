@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  dashboard:
+    build:
+      context: .
+      dockerfile: src/dashboard/Dockerfile
+    container_name: audia-dashboard
+    ports:
+      - "8080:8080"
+    environment:
+      PYTHONUNBUFFERED: "1"
+      DASHBOARD_LOG_LEVEL: "DEBUG"
+      # Mount Docker socket for container operations
+      DOCKER_HOST: "unix:///var/run/docker.sock"
+    volumes:
+      # Mount Docker socket (read-only) for container restart operations
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Mount config directories for manifest discovery
+      - ./config/monitoring:/app/config/monitoring:ro
+      - ./config/local/monitoring:/app/config/local/monitoring:ro
+      - ./config/project:/app/config/project:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - audia-net
+    depends_on:
+      - prometheus  # Optional: for metrics
+
+  # Optional: Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: audia-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    networks:
+      - audia-net
+    profiles:
+      - monitoring
+
+networks:
+  audia-net:
+    driver: bridge

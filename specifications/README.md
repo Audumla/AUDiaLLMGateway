@@ -31,6 +31,14 @@ Legend: **Implemented** | *Draft / in progress* | Planned
 
 ---
 
+## Dashboard & Monitoring
+
+| Spec | Status | Description |
+| ---- | ------ | ----------- |
+| `components/dashboard/spec-701-gateway-dashboard.md` | *Draft* | Gateway dashboard & control panel — component status, model management, operational controls, AUDiotMonitor integration |
+
+---
+
 ## Platform Variants
 
 | Spec | Status | Description |

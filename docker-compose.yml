@@ -43,11 +43,7 @@ services:
       - DATABASE_URL=${DATABASE_URL:-postgresql://${POSTGRES_USER:-audia}:${POSTGRES_PASSWORD:-audia-dev-password}@llm-db-postgres:5432/${POSTGRES_DB:-litellm}}
       - AUDIA_DOCKER=true
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4000/health/liveliness"]
-      interval: 15s
-      timeout: 5s
-      start_period: 60s
-      retries: 5
+      disable: true
     volumes:
       # Mount only user-editable and generated subdirs — leaves config/project/ from image intact
       - ./config/local:/app/config/local:z
@@ -73,6 +69,8 @@ services:
   llm-server-llamacpp:
     image: example/audia-llm-gateway-server:latest
     container_name: audia-llama-cpp
+    ports:
+      - "${LLAMA_SWAP_PORT:-41080}:41080"
     environment:
       - LLAMA_VERSION=${LLAMA_VERSION:-latest}
       - BUILD_ROOT=/app/runtime-build-root
@@ -87,8 +85,8 @@ services:
       - /dev/kfd:/dev/kfd
       - /dev/dri:/dev/dri
     group_add:
-      - video
-      - render
+      - "482"
+      - "485"
     privileged: true
     restart: unless-stopped
     healthcheck:
