@@ -8,7 +8,7 @@ from unittest.mock import patch, mock_open
 
 import yaml
 
-from src.dashboard.services.gateway_config import (
+from src.monitoring.services.gateway_config import (
     GatewayConfigService,
     StackConfig,
     ModelsConfig,

@@ -14,10 +14,10 @@ from typing import Annotated, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from datetime import datetime, timezone
 
-from src.dashboard.manifest_loader import ManifestLoader
-from src.dashboard.models import ComponentManifest
-from src.dashboard.action_runner import ActionRunner
-from src.dashboard.services.action_executor import ActionExecutor
+from src.monitoring.manifest_loader import ManifestLoader
+from src.monitoring.models import ComponentManifest
+from src.monitoring.action_runner import ActionRunner
+from src.monitoring.services.action_executor import ActionExecutor
 
 logger = logging.getLogger(__name__)
 

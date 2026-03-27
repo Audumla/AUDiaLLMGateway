@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from src.dashboard.models import ComponentManifest
+from src.monitoring.models import ComponentManifest
 
 logger = logging.getLogger(__name__)
 

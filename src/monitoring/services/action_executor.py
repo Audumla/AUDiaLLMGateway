@@ -19,8 +19,8 @@ from enum import Enum
 from typing import Any, Optional, Callable
 from pathlib import Path
 
-from src.dashboard.action_runner import ActionRunner, ExecutionResult
-from src.dashboard.models import ActionConfig
+from src.monitoring.action_runner import ActionRunner, ExecutionResult
+from src.monitoring.models import ActionConfig
 
 logger = logging.getLogger(__name__)
 

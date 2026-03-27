@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 
-from src.dashboard.docker_handler import (
+from src.monitoring.docker_handler import (
     DockerHandler,
     DockerException,
     ContainerNotFoundError,
