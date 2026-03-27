@@ -53,7 +53,7 @@ Deployment profiles in `docker/examples/`:
 | AMD unified | `docker/examples/docker-compose.amd.yml` | Same config supports `LLAMA_BACKEND=vulkan` or `LLAMA_BACKEND=rocm`; optional `vLLM` stays ROCm |
 | External proxy | `docker/examples/docker-compose.external-proxy.yml` | Behind Traefik/nginx |
 
-See [docs/docker.md](../docs/docker.md) for setup instructions, environment
+See [docs/docker.md](docs/docker.md) for setup instructions, environment
 variables, port reference, and troubleshooting.
 
 ### Path B: Native install (Windows, macOS, Linux)
@@ -66,7 +66,7 @@ Platform-specific bootstrap scripts live in `bootstrap/`. After install, all
 operations go through `scripts/AUDiaLLMGateway.sh` (Linux/macOS) or
 `scripts/AUDiaLLMGateway.ps1` (Windows).
 
-See [docs/runbook.md](../docs/runbook.md) for the full native operations guide.
+See [docs/runbook.md](docs/runbook.md) for the full native operations guide.
 
 ---
 
@@ -143,3 +143,4 @@ deploy:
 The hot-reload workflow described in early drafts of this spec (inotify detection →
 auto-regenerate → selective restart) is not yet implemented. The current workflow
 is: edit config → run `generate` → restart affected services.
+
