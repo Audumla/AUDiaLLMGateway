@@ -1,0 +1,264 @@
+# llama-swap + llama.cpp Component Manifest
+# This manifest defines monitoring and control for the llama-swap router
+# and the llama.cpp inference backends it manages
+id: llamaswap
+display_name: llama-swap + llama.cpp
+icon: cpu
+enabled: false
+
+# ── Health probe ────────────────────────────────────────────────────────────────
+health:
+  endpoint: /health
+  method: GET
+  expect_status: 200
+  timeout_s: 3
+  # llama-swap returns JSON: {"status": "healthy", "models": [...]}
+  status_field: ".status"
+
+# ── Metrics (polled and emitted as RawMeasurements for Prometheus) ─────────────
+metrics:
+  # Core health metric
+  - id: component_up
+    endpoint: /health
+    extract: "1"
+    prometheus_name: gateway_component_up
+    unit: status
+    poll_interval_s: 10
+    labels:
+      component: llamaswap
+
+  # Router-level metrics: discovered models via /v1/models
+  - id: models_loaded
+    endpoint: /v1/models
+    source_format: json
+    extract: ".data | length"
+    prometheus_name: gateway_llamaswap_models_loaded
+    unit: count
+    poll_interval_s: 15
+
+  - id: models_available
+    endpoint: /v1/models
+    source_format: json
+    extract: ".data | length"
+    prometheus_name: gateway_llamaswap_models_available
+    unit: count
+    poll_interval_s: 15
+
+  - id: active_model_info
+    endpoint: /v1/models
+    source_format: json
+    extract: '.data[0].id // "none"'
+    prometheus_name: gateway_llamaswap_active_model
+    unit: label
+    poll_interval_s: 15
+
+  # Model discovery: extract model IDs and ports for llama.cpp scraping
+  # This is used by hwexp adapter to dynamically discover llama.cpp instances
+  - id: model_discovery
+    endpoint: /v1/models
+    source_format: json
+    extract: ".data[].id"
+    prometheus_name: gateway_llamaswap_model_info
+    unit: label
+    poll_interval_s: 30
+    # Special: this metric triggers dynamic scraping of discovered llama.cpp instances
+
+  # llama.cpp per-model metrics (scraped from dynamic ports discovered above)
+  # These are templates - actual scraping happens per discovered model instance
+
+  # Token processing metrics
+  - id: prompt_tokens_total
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: llamacpp:prompt_tokens_total
+    prometheus_name: gateway_llamacpp_prompt_tokens_total
+    unit: count
+    poll_interval_s: 15
+    labels:
+      - model_name
+    # Note: endpoint is dynamically resolved per model via llama-swap API
+
+  - id: tokens_predicted_total
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: llamacpp:tokens_predicted_total
+    prometheus_name: gateway_llamacpp_tokens_predicted_total
+    unit: count
+    poll_interval_s: 15
+    labels:
+      - model_name
+
+  - id: prompt_tokens_per_second
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: llamacpp:prompt_tokens_seconds
+    prometheus_name: gateway_llamacpp_prompt_tokens_per_second
+    unit: tokens_per_second
+    poll_interval_s: 15
+    labels:
+      - model_name
+
+  - id: predicted_tokens_per_second
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: llamacpp:predicted_tokens_seconds
+    prometheus_name: gateway_llamacpp_predicted_tokens_per_second
+    unit: tokens_per_second
+    poll_interval_s: 15
+    labels:
+      - model_name
+
+  # KV Cache & Memory metrics
+  - id: kv_cache_usage_ratio
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: llamacpp:kv_cache_usage_ratio
+    prometheus_name: gateway_llamacpp_kv_cache_usage_ratio
+    unit: ratio
+    poll_interval_s: 10
+    labels:
+      - model_name
+
+  - id: kv_cache_tokens
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: llamacpp:kv_cache_tokens
+    prometheus_name: gateway_llamacpp_kv_cache_tokens
+    unit: count
+    poll_interval_s: 10
+    labels:
+      - model_name
+
+  # Request queue metrics
+  - id: requests_processing
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: llamacpp:requests_processing
+    prometheus_name: gateway_llamacpp_requests_processing
+    unit: count
+    poll_interval_s: 5
+    labels:
+      - model_name
+
+  - id: requests_deferred
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: llamacpp:requests_deferred
+    prometheus_name: gateway_llamacpp_requests_deferred
+    unit: count
+    poll_interval_s: 5
+    labels:
+      - model_name
+
+  # Derived/aggregated metrics (computed by hwexp adapter)
+  - id: total_requests_5m
+    type: derived
+    formula: |
+      sum(rate(gateway_llamacpp_prompt_tokens_total[5m]))
+    prometheus_name: gateway_llamaswap_requests_rate_5m
+    unit: tokens_per_second
+    poll_interval_s: 15
+
+  - id: aggregate_kv_cache_usage
+    type: derived
+    formula: |
+      avg(gateway_llamacpp_kv_cache_usage_ratio)
+    prometheus_name: gateway_llamaswap_avg_kv_cache_usage
+    unit: ratio
+    poll_interval_s: 15
+
+# ── Actions (rendered as buttons in the control panel) ─────────────────────────
+actions:
+  - id: restart
+    label: Restart llama-swap
+    type: docker_restart
+    container: audia-llama
+    confirm: true
+    confirm_message: "Restart llama-swap? All loaded models will be unloaded."
+
+  - id: reload_config
+    label: Reload Config
+    type: config_reload
+    confirm: true
+    confirm_message: "Regenerate llama-swap config and restart?"
+
+  - id: unload_all_models
+    label: Unload All Models
+    type: http_post
+    endpoint: /unload
+    body: {}
+    confirm: true
+    confirm_message: "Unload all models from llama.cpp? Next request will trigger reload."
+
+  - id: restart_backend
+    label: Restart Backend Only
+    type: shell
+    command: restart_llama_cpp_backends
+    confirm: false
+
+# ── Card display ─────────────────────────────────────────────────────────────────
+card:
+  port: ${LLAMA_SWAP_PORT:-41080}
+  extra_fields:
+    - label: Loaded Models
+      metric: models_loaded
+    - label: Active Model
+      metric: active_model_info
+    - label: KV Cache Usage
+      metric: kv_cache_usage_ratio
+      format: percent
+    - label: Requests Processing
+      metric: requests_processing
+    - label: Token Gen Speed
+      metric: predicted_tokens_per_second
+      format: "{value:.1f} tok/s"
+  links:
+    - label: API
+      path: /llamaswap/v1/models
+    - label: Health
+      path: /llamaswap/health
+    - label: llama-swap UI
+      path: /llamaswap/ui/
+
+# ── Connection (how hwexp and FastAPI reach this component) ────────────────────
+connection:
+  host: ${LLAMA_SWAP_HOST:-llm-server-llamacpp}
+  port: ${LLAMA_SWAP_PORT:-41080}
+  auth:
+    type: none
+
+# ── llama.cpp Backend Configuration ────────────────────────────────────────────
+# This section tells hwexp how to discover and scrape llama.cpp instances
+llama_cpp_backends:
+  # llama-swap starts llama.cpp on dynamic ports. We need to:
+  # 1. Query llama-swap to get model -> port mapping
+  # 2. Scrape /metrics from each llama.cpp instance
+  # 3. Add model_name label to all metrics
+
+  # Port range for llama.cpp instances (configured in llama-swap base config)
+  # Base port comes from stack config; instances start at startPort and increment
+  port_range:
+    start: ${LLAMA_SWAP_START_PORT:-41000}
+    end: ${LLAMA_SWAP_END_PORT:-41099}
+
+  # Endpoint to query for model discovery
+  discovery_endpoint: /v1/models
+
+  # Metrics endpoint on each llama.cpp instance
+  metrics_endpoint: /metrics
+
+  # Health endpoint on each llama.cpp instance
+  health_endpoint: /health
+
+  # Enable --metrics flag on llama.cpp startup
+  # This MUST be added to llama-swap model configuration
+  requires_metrics_flag: true
+
+  # Example llama-swap model config addition:
+  # models:
+  #   qwen3.5-27b:
+  #     cmd: |
+  #       llama-server-rocm \
+  #         --model /app/models/gguf/qwen3.5-27b-q4_k_m.gguf \
+  #         --port 41001 \
+  #         --metrics  # ← Required for Prometheus scraping
