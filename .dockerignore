@@ -1,15 +1,48 @@
+# Git
 .git
+.gitignore
 .github
-.vscode
+
+# Development
 .venv
-.pytest_cache
+.vscode
+.idea
+*.pyc
 __pycache__
-models/*
-runtime/*
-state/*
-config/generated/*
-test-work/*
-*.deb
-*.rpm
-*.bak
-.agent_runner
+*.egg-info
+.pytest_cache
+.coverage
+htmlcov/
+
+# Build artifacts
+dist/
+build/
+*.o
+*.so
+
+# System
+.DS_Store
+Thumbs.db
+.env.local
+
+# Testing
+test-work/
+.pytest_cache/
+htmlcov/
+
+# Documentation
+docs/
+*.md
+
+# Docker
+Dockerfile*
+docker-compose*
+
+# Agent runner
+.agent_runner/
+agent_artifacts/
+
+# Temporary
+*.tmp
+*.swp
+*~
