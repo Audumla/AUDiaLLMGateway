@@ -1,48 +1,49 @@
 # Multi-stage build for Monitoring Data Provider API
 # Provides component status, logs, and control endpoints for LLM gateway
+# Optimized for fast builds with minimal image size
 
 # ===== Builder Stage =====
 FROM python:3.12-slim AS builder
 
 WORKDIR /build
 
-# Install build dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install only essential build dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
     build-essential \
-    gcc \
-    g++ \
-    git \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy source
-COPY . /build
+# Copy only requirements first (for better caching)
+COPY src/monitoring/requirements.txt .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir -r src/monitoring/requirements-monitoring.txt 2>&1 | grep -v "WARNING: Running pip"
+# Install Python dependencies with pip optimizations
+RUN pip install --no-cache-dir --upgrade pip setuptools && \
+    pip install --no-cache-dir -r requirements.txt
 
 # ===== Runtime Stage =====
 FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install only runtime OS dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* && \
+    apt-get clean
 
-# Copy installed packages from builder
+# Copy installed packages from builder (more efficient than rebuilding)
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Copy application
-COPY . /app
+# Copy application source (last step for best caching)
+COPY src/monitoring /app/src/monitoring
+COPY config /app/config
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PATH="/app:$PATH"
+    PYTHONDONTWRITEBYTECODE=1
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \

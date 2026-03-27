@@ -1,18 +1,8 @@
-# Dashboard backend dependencies
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-pydantic==2.5.0
-pydantic-settings==2.1.0
-pyyaml==6.0.1
-docker==7.0.0
-aiofiles==23.2.1
-requests==2.31.0
+# Development and testing dependencies (includes all runtime + test)
+-r requirements.txt
 
 # Testing
 pytest==7.4.3
 pytest-asyncio==0.21.1
 httpx==0.25.0
 pytest-cov==4.1.0
-
-# Utilities
-python-dotenv==1.0.0
