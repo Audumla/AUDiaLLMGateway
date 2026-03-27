@@ -24,8 +24,6 @@ metrics:
     prometheus_name: gateway_component_up
     unit: status
     poll_interval_s: 10
-    labels:
-      component: llamaswap
 
   # Router-level metrics: discovered models via /v1/models
   - id: models_loaded
