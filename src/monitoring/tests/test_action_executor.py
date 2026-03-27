@@ -4,15 +4,15 @@ import pytest
 from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime, timezone
 
-from src.dashboard.services.action_executor import (
+from src.monitoring.services.action_executor import (
     ActionExecutor,
     ExecutionHistory,
     ExecutionState,
     ExecutionError,
     create_action_executor,
 )
-from src.dashboard.models import ActionConfig
-from src.dashboard.action_runner import ExecutionResult
+from src.monitoring.models import ActionConfig
+from src.monitoring.action_runner import ExecutionResult
 
 
 @pytest.fixture

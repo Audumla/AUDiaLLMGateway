@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
-from src.dashboard.services.logger import DashboardLogger
+from src.monitoring.services.logger import DashboardLogger
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ async def get_logs(
     """
     try:
         # Convert LogLevel string if provided
-        from src.dashboard.services.logger import LogLevel
+        from src.monitoring.services.logger import LogLevel
         log_level = None
         if level:
             try:
@@ -101,7 +101,7 @@ async def stream_logs(
         # Create an async queue to receive log events
         import asyncio
         from queue import Queue
-        from src.dashboard.services.logger import LogLevel
+        from src.monitoring.services.logger import LogLevel
 
         log_queue: Queue = Queue()
         log_level = None

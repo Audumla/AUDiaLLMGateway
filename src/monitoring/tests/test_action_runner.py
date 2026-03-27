@@ -4,14 +4,14 @@ import pytest
 from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime, timezone
 
-from src.dashboard.action_runner import (
+from src.monitoring.action_runner import (
     ActionRunner,
     ActionType,
     ExecutionResult,
     create_action_runner,
 )
-from src.dashboard.models import ActionConfig
-from src.dashboard.docker_handler import DockerException
+from src.monitoring.models import ActionConfig
+from src.monitoring.docker_handler import DockerException
 
 
 @pytest.fixture

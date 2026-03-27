@@ -5,7 +5,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from fastapi.testclient import TestClient
-from src.dashboard.main import create_app
+from src.monitoring.main import create_app
 
 
 @pytest.fixture

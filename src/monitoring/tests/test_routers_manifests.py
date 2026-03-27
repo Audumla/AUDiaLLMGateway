@@ -5,12 +5,12 @@ from fastapi.testclient import TestClient
 from datetime import datetime, timezone
 import json
 
-from src.dashboard.main import create_app
-from src.dashboard.models import (
+from src.monitoring.main import create_app
+from src.monitoring.models import (
     ComponentManifest,
     ActionConfig,
 )
-from src.dashboard.models.manifest import (
+from src.monitoring.models.manifest import (
     HealthProbeConfig,
     ConnectionConfig,
     CardConfig,
@@ -148,7 +148,7 @@ def sample_manifests():
 @pytest.fixture
 def app_with_routers(sample_manifests):
     """Create app with manifests router."""
-    from src.dashboard.routers import manifests
+    from src.monitoring.routers import manifests
 
     app = create_app()
     app.include_router(manifests.router)

@@ -35,7 +35,7 @@ def test_manifests_endpoint_with_components(temp_project, sample_manifest):
         yaml.dump(sample_manifest, f)
 
     # Create new app to load manifests
-    from src.dashboard.main import create_app
+    from src.monitoring.main import create_app
     from fastapi.testclient import TestClient
 
     new_app = create_app(root=temp_project)
@@ -56,7 +56,7 @@ def test_component_manifest_endpoint(temp_project, sample_manifest):
     with open(manifest_file, "w") as f:
         yaml.dump(sample_manifest, f)
 
-    from src.dashboard.main import create_app
+    from src.monitoring.main import create_app
     from fastapi.testclient import TestClient
 
     new_app = create_app(root=temp_project)
