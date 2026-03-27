@@ -100,32 +100,17 @@ def create_app(root: Path = None) -> FastAPI:
             "version": "0.1.0",
         }
 
-    # Manifests endpoint (for debugging)
-    @app.get("/api/v1/manifests")
-    async def get_all_manifests(
-        manifests: Annotated[dict[str, ComponentManifest], Depends(get_manifests)]
-    ):
-        """Get all enabled component manifests."""
-        return {
-            "components": list(manifests.values()),
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        }
+    # Import and register routers
+    from .routers import manifests, components
+    app.include_router(manifests.router)
+    app.include_router(components.router)
 
-    # Component-specific manifest
-    @app.get("/api/v1/manifests/{component_id}")
-    async def get_component_manifest(
-        component_id: str,
-        manifests: Annotated[dict[str, ComponentManifest], Depends(get_manifests)]
-    ):
-        """Get manifest for a specific component."""
-        if component_id not in manifests:
-            raise HTTPException(status_code=404, detail="Component not found")
-        return manifests[component_id]
+    # Override router dependencies with app state
+    app.dependency_overrides[manifests.get_manifests] = get_manifests_impl
+    app.dependency_overrides[components.get_manifests] = get_manifests_impl
 
-    # TODO: Import and register routers
-    # from .routers import manifests, components, config, logs, models, health
-    # app.include_router(manifests.router)
-    # app.include_router(components.router)
+    # TODO: Register additional routers when implemented
+    # from .routers import config, logs, models, health
     # app.include_router(config.router)
     # app.include_router(logs.router)
     # app.include_router(models.router)
