@@ -43,7 +43,19 @@ async def get_logs(
     try:
         # Convert LogLevel string if provided
         from src.dashboard.services.logger import LogLevel
-        log_level = LogLevel(level) if level else None
+        log_level = None
+        if level:
+            try:
+                log_level = LogLevel(level)
+            except ValueError:
+                # Invalid level - return empty results
+                return {
+                    "logs": [],
+                    "total": 0,
+                    "limit": limit,
+                    "offset": offset,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
 
         # Get ALL logs with filters (don't limit here)
         all_logs = log_service.get_logs(
@@ -92,7 +104,14 @@ async def stream_logs(
         from src.dashboard.services.logger import LogLevel
 
         log_queue: Queue = Queue()
-        log_level = LogLevel(level) if level else None
+        log_level = None
+        if level:
+            try:
+                log_level = LogLevel(level)
+            except ValueError:
+                # Invalid level - send error event
+                yield f"data: {{'error': 'Invalid log level: {level}'}}\n\n"
+                return
 
         def on_log(log_entry):
             """Callback when a new log is created."""
