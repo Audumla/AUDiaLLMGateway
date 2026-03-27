@@ -45,23 +45,23 @@ async def get_logs(
         from src.dashboard.services.logger import LogLevel
         log_level = LogLevel(level) if level else None
 
-        # Get logs with filters
-        logs = log_service.get_logs(
+        # Get ALL logs with filters (don't limit here)
+        all_logs = log_service.get_logs(
             level=log_level,
             component_id=component,
             source=source,
-            limit=limit + offset,  # Get enough to skip offset
+            limit=10000,  # Get all matching logs
         )
 
         # Apply offset pagination
-        paginated_logs = logs[offset : offset + limit]
+        paginated_logs = all_logs[offset : offset + limit]
 
         # Convert to dicts
         log_dicts = [log.to_dict() for log in paginated_logs]
 
         return {
             "logs": log_dicts,
-            "total": len(logs),
+            "total": len(all_logs),
             "limit": limit,
             "offset": offset,
             "timestamp": datetime.now(timezone.utc).isoformat(),
