@@ -150,7 +150,7 @@ class ManifestLoader:
 
         try:
             for yaml_file in sorted(directory.glob("*.yaml")):
-                with open(yaml_file) as f:
+                with open(yaml_file, encoding="utf-8") as f:
                     content = yaml.safe_load(f)
                     if content and isinstance(content, dict):
                         # Use 'id' field as key if available, else use filename

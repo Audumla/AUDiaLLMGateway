@@ -24,8 +24,6 @@ metrics:
     prometheus_name: gateway_component_up
     unit: status
     poll_interval_s: 10
-    labels:
-      component: vllm
 
   # Request processing metrics
   - id: num_requests_running
@@ -229,12 +227,6 @@ actions:
     type: http_post
     endpoint: /reset_kv_cache
     body: {}
-    confirm: false
-
-  - id: list_lora_adapters
-    label: List LoRA Adapters
-    type: http_get
-    endpoint: /v1/lora_adapters
     confirm: false
 
 # ── Card display ─────────────────────────────────────────────────────────────────
