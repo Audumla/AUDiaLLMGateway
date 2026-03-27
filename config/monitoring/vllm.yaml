@@ -1,0 +1,286 @@
+# vLLM Component Manifest
+# This manifest defines monitoring and control for the vLLM high-performance backend
+# Note: vLLM is optional - enabled via Docker compose profile
+id: vllm
+display_name: vLLM Backend
+icon: gpu
+enabled: false
+
+# ── Health probe ────────────────────────────────────────────────────────────────
+health:
+  endpoint: /health
+  method: GET
+  expect_status: 200
+  timeout_s: 5
+  # vLLM returns JSON: {"status": "healthy", "model": "..."}
+  status_field: ".status"
+
+# ── Metrics (polled and emitted as RawMeasurements for Prometheus) ─────────────
+metrics:
+  # Core health metric
+  - id: component_up
+    endpoint: /health
+    extract: "1"
+    prometheus_name: gateway_component_up
+    unit: status
+    poll_interval_s: 10
+
+  # Request processing metrics
+  - id: num_requests_running
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: vllm:num_requests_running
+    prometheus_name: gateway_vllm_num_requests_running
+    unit: count
+    poll_interval_s: 5
+    labels:
+      - model_name
+
+  - id: num_requests_waiting
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: vllm:num_requests_waiting
+    prometheus_name: gateway_vllm_num_requests_waiting
+    unit: count
+    poll_interval_s: 5
+    labels:
+      - model_name
+
+  # Latency metrics
+  - id: time_to_first_token
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: vllm:time_to_first_token_seconds
+    prometheus_name: gateway_vllm_time_to_first_token
+    unit: seconds
+    poll_interval_s: 15
+    labels:
+      - model_name
+
+  - id: time_per_output_token
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: vllm:time_per_output_token_seconds
+    prometheus_name: gateway_vllm_time_per_output_token
+    unit: seconds
+    poll_interval_s: 15
+    labels:
+      - model_name
+
+  - id: e2e_request_latency
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: vllm:e2e_request_latency_seconds
+    prometheus_name: gateway_vllm_e2e_request_latency
+    unit: seconds
+    poll_interval_s: 15
+    labels:
+      - model_name
+
+  # Token metrics
+  - id: request_prompt_tokens
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: vllm:request_prompt_tokens
+    prometheus_name: gateway_vllm_request_prompt_tokens
+    unit: count
+    poll_interval_s: 15
+    labels:
+      - model_name
+
+  - id: request_generation_tokens
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: vllm:request_generation_tokens
+    prometheus_name: gateway_vllm_request_generation_tokens
+    unit: count
+    poll_interval_s: 15
+    labels:
+      - model_name
+
+  # KV Cache & Memory metrics
+  - id: gpu_cache_usage_perc
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: vllm:gpu_cache_usage_perc
+    prometheus_name: gateway_vllm_gpu_cache_usage_perc
+    unit: percent
+    poll_interval_s: 10
+    labels:
+      - model_name
+
+  - id: cpu_cache_usage_perc
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: vllm:cpu_cache_usage_perc
+    prometheus_name: gateway_vllm_cpu_cache_usage_perc
+    unit: percent
+    poll_interval_s: 10
+    labels:
+      - model_name
+
+  - id: gpu_memory_usage_bytes
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: vllm:gpu_memory_usage_bytes
+    prometheus_name: gateway_vllm_gpu_memory_usage_bytes
+    unit: bytes
+    poll_interval_s: 10
+    labels:
+      - model_name
+
+  # Scheduler & Batching metrics
+  - id: num_preemptions_total
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: vllm:num_preemptions_total
+    prometheus_name: gateway_vllm_num_preemptions_total
+    unit: count
+    poll_interval_s: 15
+    labels:
+      - model_name
+
+  - id: avg_num_batched_tokens
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: vllm:avg_num_batched_tokens
+    prometheus_name: gateway_vllm_avg_num_batched_tokens
+    unit: count
+    poll_interval_s: 15
+    labels:
+      - model_name
+
+  - id: avg_num_running_tokens
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: vllm:avg_num_running_tokens
+    prometheus_name: gateway_vllm_avg_num_running_tokens
+    unit: count
+    poll_interval_s: 15
+    labels:
+      - model_name
+
+  # LLM Engine internal metrics
+  - id: iteration_steps_total
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: vllm:iteration_steps_total
+    prometheus_name: gateway_vllm_iteration_steps_total
+    unit: count
+    poll_interval_s: 15
+    labels:
+      - model_name
+
+  - id: num_tokens_total
+    endpoint: /metrics
+    source_format: prometheus
+    metric_name: vllm:num_tokens_total
+    prometheus_name: gateway_vllm_num_tokens_total
+    unit: count
+    poll_interval_s: 15
+    labels:
+      - model_name
+
+  # Model information (from /v1/models)
+  - id: served_model_info
+    endpoint: /v1/models
+    source_format: json
+    extract: '.data[0].id // "none"'
+    prometheus_name: gateway_vllm_served_model
+    unit: label
+    poll_interval_s: 30
+
+  # Derived metrics (computed by hwexp adapter)
+  - id: requests_rate_5m
+    type: derived
+    formula: |
+      rate(gateway_vllm_num_tokens_total[5m])
+    prometheus_name: gateway_vllm_tokens_rate_5m
+    unit: tokens_per_second
+    poll_interval_s: 15
+
+  - id: gpu_memory_usage_gb
+    type: derived
+    formula: |
+      gateway_vllm_gpu_memory_usage_bytes / 1073741824
+    prometheus_name: gateway_vllm_gpu_memory_usage_gb
+    unit: gigabytes
+    poll_interval_s: 10
+
+# ── Actions (rendered as buttons in the control panel) ─────────────────────────
+actions:
+  - id: restart
+    label: Restart vLLM
+    type: docker_restart
+    container: audia-vllm
+    confirm: true
+    confirm_message: "Restart vLLM backend? Active inference requests will be interrupted."
+
+  - id: reload_config
+    label: Reload Config
+    type: config_reload
+    confirm: true
+    confirm_message: "Regenerate vLLM config and restart the container?"
+
+  - id: clear_kv_cache
+    label: Clear KV Cache
+    type: http_post
+    endpoint: /reset_kv_cache
+    body: {}
+    confirm: false
+
+# ── Card display ─────────────────────────────────────────────────────────────────
+card:
+  port: ${VLLM_PORT:-41090}
+  extra_fields:
+    - label: Served Model
+      metric: served_model_info
+    - label: Requests Running
+      metric: num_requests_running
+    - label: Requests Waiting
+      metric: num_requests_waiting
+    - label: GPU Cache Usage
+      metric: gpu_cache_usage_perc
+      format: percent
+    - label: GPU Memory
+      metric: gpu_memory_usage_gb
+      format: "{value:.2f} GB"
+    - label: Time to First Token
+      metric: time_to_first_token
+      format: "{value:.3f}s"
+    - label: Token Gen Speed
+      metric: time_per_output_token
+      format: "{value:.1f} tok/s"
+  links:
+    - label: API
+      path: /vllm/v1/models
+    - label: Health
+      path: /vllm/health
+    - label: Metrics
+      path: /vllm/metrics
+
+# ── Connection (how hwexp and FastAPI reach this component) ────────────────────
+connection:
+  # In Docker: uses service hostname; bare metal: uses host from stack config
+  host: ${VLLM_HOST:-llm-server-vllm}
+  port: ${VLLM_SERVICE_PORT:-8000}
+  auth:
+    type: none
+
+# ── Docker-specific overrides ──────────────────────────────────────────────────
+# When running in Docker, the connection host changes to the service name
+docker_connection:
+  host: "llm-server-vllm"
+  port: 8000
+
+# ── vLLM Startup Configuration ─────────────────────────────────────────────────
+# These settings are used by the vLLM entrypoint script
+vllm_startup:
+  # Model is defined in models.override.yaml deployments
+  # gpu_memory_utilization: 0.90  # from model deployment profile
+  # max_model_len: 4096           # from model deployment profile
+  # tensor_parallel_size: 1       # from model deployment profile
+
+  # Metrics configuration
+  enable_metrics: true  # vLLM enables /metrics by default
+  metrics_port: 8000    # Same as service port
