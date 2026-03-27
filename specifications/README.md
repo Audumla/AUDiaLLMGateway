@@ -54,7 +54,8 @@ Legend: **Implemented** | *Draft / in progress* | Planned
 For a new contributor:
 
 1. [README.md](../README.md) — project overview and quick start
-2. [docs/architecture.md](../docs/architecture.md) — system design
+2. [docs/architecture.md](docs/architecture.md) — system design
 3. [spec-001](spec-001-local-llm-gateway-mid-level.md) — component topology and deployment models
 4. [spec-002](spec-002-model-catalog-and-config-lifecycle.md) — model catalog and config lifecycle (draft)
-5. [docs/runbook.md](../docs/runbook.md) — operations reference
+5. [docs/runbook.md](docs/runbook.md) — operations reference
+
