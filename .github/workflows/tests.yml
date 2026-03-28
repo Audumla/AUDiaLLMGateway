@@ -189,6 +189,7 @@ jobs:
           context: .
           file: ${{ matrix.dockerfile }}
           build-args: ${{ matrix.build_arg }}
+          load: true
           push: false
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
