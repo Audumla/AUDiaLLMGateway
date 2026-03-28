@@ -3,7 +3,7 @@
 id: litellm
 display_name: LiteLLM Gateway
 icon: gateway
-enabled: false
+enabled: true
 
 # ── Health probe ────────────────────────────────────────────────────────────────
 health:

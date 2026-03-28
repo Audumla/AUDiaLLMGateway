@@ -4,7 +4,7 @@
 id: llamaswap
 display_name: llama-swap + llama.cpp
 icon: cpu
-enabled: false
+enabled: true
 
 # ── Health probe ────────────────────────────────────────────────────────────────
 health:
