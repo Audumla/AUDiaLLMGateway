@@ -30,9 +30,9 @@ test-work/
 .pytest_cache/
 htmlcov/
 
-# Documentation
+# Documentation (keep README.md and CHANGELOG.md - needed by nfpm packaging)
 docs/
-*.md
+BUILD_AND_DEPLOYMENT.md
 
 # Docker
 Dockerfile*
