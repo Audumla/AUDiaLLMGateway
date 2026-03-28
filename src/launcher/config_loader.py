@@ -1727,6 +1727,7 @@ def build_litellm_config(stack: StackConfig) -> dict[str, Any]:
         },
         "general_settings": {
             "disable_spend_logs": True,
+            "allow_requests_on_db_unavailable": True,
         },
         "router_settings": {
             "enable_pre_call_checks": False,
