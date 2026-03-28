@@ -954,6 +954,84 @@ sleep 30 && python3 /tmp/bench_qwen27.py
 
 ---
 
+## Combined Benchmark Priority Matrix (vLLM + llama.cpp)
+
+Across **both vLLM and llama.cpp**, the following tests have the highest probability of uncovering performance improvements:
+
+### Tier 1 — Most Likely to Yield Improvement
+
+| Test | Backend | Variable | Rationale | Expected Improvement |
+| --- | --- | --- | --- | --- |
+| **vLLM Test B** | vLLM | AMD rocm/vllm-dev:rocm721_torch210_triton36_preview_* | Different Triton/rocBLAS combo; AMD's curated preview stacks | Up to +5 tok/s if kernels are better |
+| **llama.cpp Test 3** | llama.cpp | rocBLAS-only (no hipBLASLt) | rocBLAS is battle-tested on AMD; hipBLASLt may have RDNA3 gaps | Up to +2 tok/s if rocBLAS wins |
+| **vLLM Test A** | vLLM | Official vLLM nightly | Lowest friction upstream test; recent fixes may exist | Up to +2 tok/s if kernel issues fixed |
+| **llama.cpp Test 7** | llama.cpp | Latest main branch | Unreleased optimizations; main may have RDNA3 fixes | Up to +2 tok/s |
+
+### Tier 2 — Secondary Variables Worth Testing
+
+| Test | Backend | Variable | Rationale | Expected Improvement |
+| --- | --- | --- | --- | --- |
+| **vLLM Test C** | vLLM | Self-built with explicit gfx1100 | Isolates arch targeting impact; may improve kernel selection | Up to +1 tok/s |
+| **llama.cpp Test 2** | llama.cpp | Explicit gfx1030;gfx1100 targeting | Confirms whether explicit arch helps llama.cpp too | Up to +1 tok/s |
+| **llama.cpp Test 4** | llama.cpp | hipBLASLt-only (no rocBLAS) | Isolate hipBLASLt performance if rocBLAS fallback removed | Baseline comparison |
+
+### Tier 3 — Sanity Check / Scaling Tests
+
+| Test | Backend | Variable | Rationale | Expected Improvement |
+| --- | --- | --- | --- | --- |
+| **llama.cpp Test 9** | llama.cpp | Single GPU (GPU[1] only) | Measure 2-GPU scaling efficiency; establish memory bandwidth baseline | ~13–15 tok/s; measure scaling penalty |
+| **llama.cpp Test 10** | llama.cpp | All 3 GPUs (unequal split) | Confirm 6900 XT bottleneck; compare with Vulkan 3-GPU result (21.98 tok/s) | ~18–20 tok/s; measure heterogeneous penalty |
+| **vLLM Test D** | vLLM | AMD rocm/vllm-dev:nightly | AMD dev stream nightly; similar to official but may have timing differences | ~10.8 tok/s baseline |
+
+### Tier 4 — Historical / Regression Tests
+
+| Test | Backend | Variable | Rationale | Expected Improvement |
+| --- | --- | --- | --- | --- |
+| **llama.cpp Test 6** | llama.cpp | ROCm 6.3-era build | Historical comparison; check if newer ROCm 7.2 is actually better | Expect 19–21 tok/s (no regression) |
+| **llama.cpp Test 8** | llama.cpp | HSA_OVERRIDE_GFX_VERSION | Mirrors vLLM tuning; low expectation but quick to test | ~21 tok/s (no change) |
+
+### Recommended Execution Order
+
+1. **Day 1 — Tier 1:** Run vLLM AMD preview (B), llama.cpp rocBLAS-only (3), vLLM nightly (A), llama.cpp main (7)
+2. **Day 2 — Tier 2:** Run vLLM self-built gfx1100 (C), llama.cpp explicit arch (2), llama.cpp hipBLASLt-only (4)
+3. **Day 3 — Tier 3:** Run llama.cpp single GPU (9), all 3 GPUs (10), vLLM dev nightly (D)
+4. **Optional:** Tier 4 tests if time permits or if Tier 1–3 show no improvement
+
+### Expected Outcomes — Three Scenarios
+
+#### Scenario A: Tier 1 finds improvement (>22 tok/s)
+
+- Continue Tier 1 winners through remaining tests
+- Roll out winning combination
+- Document as new baseline
+
+#### Scenario B: Tier 1 finds no improvement (~21 tok/s)
+
+- Run Tier 2 to isolate secondary variables
+- If still no improvement, conclude kernel quality is the limiting factor
+- Recommend Vulkan as permanent fallback (26.41 tok/s)
+
+#### Scenario C: Mixed results
+
+- Identify which backend/vLLM version wins
+- Use for concurrent workloads (vLLM for batching, llama.cpp for interactive)
+- Continue tuning the winner
+
+---
+
+## Next Steps
+
+All test scripts and detailed commands are documented in sections above. Server gpu-host.example is ready with:
+- Both XTX GPUs isolated for testing
+- Qwen3.5-27B Q6_K GGUF (llama-swap)
+- Qwen3.5-27B AWQ (vLLM)
+- Benchmark scripts (`/tmp/bench_vllm2.py`, `/tmp/bench_qwen27.py`)
+- GPU monitoring utilities (rocm-smi, docker logs)
+
+Execute tests in priority order, record results in the [Summary Table](#summary-table-best-known-results) above, and track findings progressively in this document.
+
+---
+
 ## Model Path Reference
 
 Expected performance by quantization type on RX 7900 XTX (gfx1100), based on current upstream docs and this session's measurements:
