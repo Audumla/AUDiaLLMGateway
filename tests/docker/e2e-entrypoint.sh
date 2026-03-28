@@ -57,17 +57,18 @@ MODELS_RESPONSE = json.dumps({
     "data": [{"id": "local/qwen27_fast", "object": "model"}]
 })
 
-COMPLETION_RESPONSE = json.dumps({
-    "id": "mock-123",
-    "object": "chat.completion",
-    "model": "local/qwen27_fast",
-    "choices": [{
-        "index": 0,
-        "message": {"role": "assistant", "content": "Hello from mock llama-swap!"},
-        "finish_reason": "stop"
-    }],
-    "usage": {"prompt_tokens": 5, "completion_tokens": 7, "total_tokens": 12}
-})
+def make_completion(model):
+    return json.dumps({
+        "id": "mock-123",
+        "object": "chat.completion",
+        "model": model,
+        "choices": [{
+            "index": 0,
+            "message": {"role": "assistant", "content": "Hello from mock llama-swap!"},
+            "finish_reason": "stop"
+        }],
+        "usage": {"prompt_tokens": 5, "completion_tokens": 7, "total_tokens": 12}
+    })
 
 class MockHandler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
@@ -90,8 +91,13 @@ class MockHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         if "/chat/completions" in self.path:
             length = int(self.headers.get("Content-Length", 0))
-            self.rfile.read(length)  # consume body
-            self._send_json(COMPLETION_RESPONSE)
+            body_bytes = self.rfile.read(length)
+            try:
+                body = json.loads(body_bytes)
+                model = body.get("model", "mock-model")
+            except Exception:
+                model = "mock-model"
+            self._send_json(make_completion(model))
         else:
             self._send_json('{"error":"not found"}', 404)
 
@@ -150,14 +156,16 @@ for i in $(seq 1 30); do
     fi
     sleep 2
 done
-[ "$ok_litellm" -eq 1 ] || { fail "litellm did not start in time"; tail -20 /tmp/litellm.log; exit 1; }
+[ "$ok_litellm" -eq 1 ] || { fail "litellm did not start in time"; tail -30 /tmp/litellm.log; exit 1; }
+# Give litellm a moment to finish internal initialization after liveliness is up
+sleep 3
 
 # ---------------------------------------------------------------------------
 # 4. E2E: chat completion round-trip
 # ---------------------------------------------------------------------------
 section "E2E chat completion"
 
-RESPONSE=$(curl -sf -X POST "http://127.0.0.1:${LITELLM_PORT}/v1/chat/completions" \
+RESPONSE=$(curl -s -X POST "http://127.0.0.1:${LITELLM_PORT}/v1/chat/completions" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer sk-e2e-test" \
     -d '{
@@ -166,20 +174,23 @@ RESPONSE=$(curl -sf -X POST "http://127.0.0.1:${LITELLM_PORT}/v1/chat/completion
         "max_tokens": 10
     }' 2>/dev/null) || true
 
-[ -n "$RESPONSE" ] \
-    && ok "got response from litellm" \
-    || fail "no response from litellm /v1/chat/completions"
-
 if [ -n "$RESPONSE" ]; then
     CONTENT=$(echo "$RESPONSE" | "$VENV_PYTHON" -c \
         "import json,sys; d=json.load(sys.stdin); print(d['choices'][0]['message']['content'])" 2>/dev/null || true)
-    [ -n "$CONTENT" ] \
-        && ok "response content: $CONTENT" \
-        || fail "could not parse response content"
+    if [ -n "$CONTENT" ]; then
+        ok "chat completion: $CONTENT"
+    else
+        # response present but not a valid completion — show it
+        ERRMSG=$(echo "$RESPONSE" | "$VENV_PYTHON" -c \
+            "import json,sys; d=json.load(sys.stdin); print(d.get('error',{}).get('message','?')[:120])" 2>/dev/null || echo "$RESPONSE" | head -c 200)
+        fail "chat completion returned error: $ERRMSG"
+    fi
+else
+    fail "no response from litellm /v1/chat/completions"
 fi
 
 # Verify /v1/models through litellm
-MODEL_NAMES=$(curl -sf "http://127.0.0.1:${LITELLM_PORT}/v1/models" \
+MODEL_NAMES=$(curl -s "http://127.0.0.1:${LITELLM_PORT}/v1/models" \
     -H "Authorization: Bearer sk-e2e-test" | \
     "$VENV_PYTHON" -c \
     "import json,sys; d=json.load(sys.stdin); print(','.join(m['id'] for m in d.get('data',[])))" 2>/dev/null || true)
@@ -196,6 +207,10 @@ echo "  Failed: $FAIL"
 echo
 
 if [ "$FAIL" -gt 0 ]; then
+    echo
+    echo "=== LiteLLM log (last 40 lines) ==="
+    tail -40 /tmp/litellm.log 2>/dev/null || true
+    echo
     echo "E2E TEST FAILED"
     exit 1
 fi

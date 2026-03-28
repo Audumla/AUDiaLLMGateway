@@ -184,12 +184,16 @@ jobs:
           cache-to: type=gha,mode=max,scope=backend-base
 
       - name: Build ${{ matrix.image }} image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ${{ matrix.dockerfile }}
-          build-args: ${{ matrix.build_arg }}
-          load: true
-          push: false
-          cache-from: type=gha,scope=${{ matrix.image }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+        # Use plain docker build (not buildx) so it can access base images
+        # loaded into the local Docker daemon in the steps above.
+        run: |
+          BUILD_ARG="${{ matrix.build_arg }}"
+          EXTRA_ARGS=""
+          if [ -n "$BUILD_ARG" ]; then
+            EXTRA_ARGS="--build-arg $BUILD_ARG"
+          fi
+          docker build \
+            $EXTRA_ARGS \
+            -f "${{ matrix.dockerfile }}" \
+            -t "audia-${{ matrix.image }}:test" \
+            .
