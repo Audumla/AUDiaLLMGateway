@@ -1,5 +1,67 @@
 # Changelog
 
+## [0.14.0](https://github.com/Audumla/AUDiaLLMGateway/compare/v0.13.1...v0.14.0) (2026-03-28)
+
+
+### Features
+
+* **action-executor:** implement execution coordinator with history tracking ([aaaab91](https://github.com/Audumla/AUDiaLLMGateway/commit/aaaab91829eb59c803c463585d772e6c0d0ae3b2))
+* **action-runner:** implement action dispatch system with multi-handler support ([9005583](https://github.com/Audumla/AUDiaLLMGateway/commit/9005583023757cc6d92e16b932faf6ff3b4f4b60))
+* add Docker containerization and test infrastructure ([157855a](https://github.com/Audumla/AUDiaLLMGateway/commit/157855ad436aeb2392cc4d65dae82d8d4c59be36))
+* **components-router:** implement components management router with action execution ([e438a06](https://github.com/Audumla/AUDiaLLMGateway/commit/e438a06ec39f51f1af5b8f6ddf08d9055aab8773))
+* **docker-handler:** implement Docker socket integration for container operations ([0ddae51](https://github.com/Audumla/AUDiaLLMGateway/commit/0ddae51a48b8836864246bb046cc4e8627611bff))
+* enable monitoring manifests and fix port resolution ([b3f97e1](https://github.com/Audumla/AUDiaLLMGateway/commit/b3f97e180b587981906920fdfdf68d1a81574d57))
+* **gateway-config:** implement configuration service for stack and models ([e086db1](https://github.com/Audumla/AUDiaLLMGateway/commit/e086db1e0620da944ce9f2776447f810d0abfbd4))
+* implement Phase 1 dashboard backend infrastructure ([5a9326f](https://github.com/Audumla/AUDiaLLMGateway/commit/5a9326f9fdf16ce43c5c57d22faf63cbecbc01b6))
+* **logger:** implement centralized logging service for SSE streaming ([60114af](https://github.com/Audumla/AUDiaLLMGateway/commit/60114af93026a35002014505c1c7345f53077705))
+* **logs-router:** implement log streaming endpoints with filtering ([9f24fec](https://github.com/Audumla/AUDiaLLMGateway/commit/9f24fec3cf46f63e33a280d741e5cdab6bebe00b))
+* **manifests-router:** implement component manifest discovery endpoints ([fb2716b](https://github.com/Audumla/AUDiaLLMGateway/commit/fb2716bea6eb6ff307522af58e19ade4f1779bd9))
+* **prometheus-client:** implement Prometheus metrics client with query support ([8d58700](https://github.com/Audumla/AUDiaLLMGateway/commit/8d58700582e6d45c582619fbc089b1c8495ae986))
+
+
+### Bug Fixes
+
+* /litellm/ proxies to LiteLLM root (Swagger), not dashboard ([ca441c2](https://github.com/Audumla/AUDiaLLMGateway/commit/ca441c2ca594deb0fe75618887b6819eea8a7af4))
+* add allow_requests_on_db_unavailable to litellm config ([f0b7226](https://github.com/Audumla/AUDiaLLMGateway/commit/f0b722637babdb8900924f18178cf66c1740c68b))
+* correct logger statistics and test hanging issues ([20cb271](https://github.com/Audumla/AUDiaLLMGateway/commit/20cb271e2596eb417ba61504f1b648f7bd3b5bd4))
+* correct pagination total count in logs endpoint ([f3a7d82](https://github.com/Audumla/AUDiaLLMGateway/commit/f3a7d823aa40951d51dd871c060d19f91ce52c49))
+* handle invalid log level gracefully ([89c07d2](https://github.com/Audumla/AUDiaLLMGateway/commit/89c07d2baa8212aed37d561431a303e9ebd0fb62))
+* proxy llamaswap API routes through nginx so UI works behind /llamaswap/ prefix ([7087f81](https://github.com/Audumla/AUDiaLLMGateway/commit/7087f81fe43ac36b0a54fe4c8ce9dc04e48ae2a6))
+* redirect /litellm and /litellm/ to dashboard (/litellm/ui/) ([63acdb4](https://github.com/Audumla/AUDiaLLMGateway/commit/63acdb4297070d1ba4333cc7bcb780ceb0b8417a))
+* redirect /litellm/ to dashboard and add swagger/openapi nginx routes ([e1d3ae1](https://github.com/Audumla/AUDiaLLMGateway/commit/e1d3ae1b9598fabb45fe1e3e53b2bd6b38884a99))
+* resolve CI build failures - nfpm packaging and Docker base image access ([413e3a6](https://github.com/Audumla/AUDiaLLMGateway/commit/413e3a68f5e21866187aaf927ad1ca09f40c2c14))
+* resolve Docker matrix build and E2E test failures ([94ded30](https://github.com/Audumla/AUDiaLLMGateway/commit/94ded30c2b6a5700f4207fdbc4ccf2047f5e14db))
+* resolve manifest schema validation errors ([7bda2e1](https://github.com/Audumla/AUDiaLLMGateway/commit/7bda2e1d2268dfb5b2ded17d71e7344cea42c17a))
+* revert litellm redirect — /litellm/ proxies to litellm root (Swagger catalog) ([b4a39fa](https://github.com/Audumla/AUDiaLLMGateway/commit/b4a39fa6501642c297a171396cb74f8a790f226c))
+* update Dockerfile for src/monitoring refactoring ([aa5047c](https://github.com/Audumla/AUDiaLLMGateway/commit/aa5047c0cc92152b45d6f980b2c8bb6161478456))
+* use minimal test config in E2E test to avoid litellm 1.70+ routing regression ([91d193b](https://github.com/Audumla/AUDiaLLMGateway/commit/91d193b533c6ad92f9e302711451ea284fdf0df7))
+
+
+### Performance Improvements
+
+* optimize Docker build for monitoring API ([dcac744](https://github.com/Audumla/AUDiaLLMGateway/commit/dcac744d4a46ec4582c9b078eacd05a4cd3e94ac))
+
+
+### Documentation
+
+* add aggregate model_name=\"active\" metrics for dashboard ([74dce24](https://github.com/Audumla/AUDiaLLMGateway/commit/74dce24ada638daaf57471e333c6c3ed366838b3))
+* add changelog entry for nginx proxy routing fix ([cdd0974](https://github.com/Audumla/AUDiaLLMGateway/commit/cdd09742bc1bba3952f23ecc65b275c9e454366c))
+* add critical blockers & mitigation strategies (75% → 85% readiness) ([a441550](https://github.com/Audumla/AUDiaLLMGateway/commit/a441550b4d0c47409d37843ba182c467a293115d))
+* add Docker build and deployment script for Docker Hub ([90258c6](https://github.com/Audumla/AUDiaLLMGateway/commit/90258c696b4bffd6578831e6d97339cc6555b3b0))
+* add tier 2 active-model detailed metrics to hybrid monitoring ([6988f14](https://github.com/Audumla/AUDiaLLMGateway/commit/6988f1412e3686e790774488bd516db753c5eaa9))
+* API reference with data structures and examples for Vue frontend ([a13260d](https://github.com/Audumla/AUDiaLLMGateway/commit/a13260d766abe3fffbb4e6030f9708acaa9be91c))
+* apply aggregate model_name=\"active\" metrics to vLLM ([99e9fb3](https://github.com/Audumla/AUDiaLLMGateway/commit/99e9fb346070a4a276ff3ea61ab945373d04ab30))
+* comprehensive build and deployment report for v0.14.0 ([24c9fdb](https://github.com/Audumla/AUDiaLLMGateway/commit/24c9fdb6244cd1c5644e4b2757331104d0886dea))
+* enforce dashboard component independence & separation of concerns ([a459ec1](https://github.com/Audumla/AUDiaLLMGateway/commit/a459ec1c3a063c96bb09d4f84d81a6a5e12d32a8))
+* optimize dashboard monitoring to single-query approach ([40d4cc4](https://github.com/Audumla/AUDiaLLMGateway/commit/40d4cc40a20e76dca6ded43fa4fe80600ec9d514))
+* Phase 2 completion summary - Docker integration and action dispatch ([0bb8000](https://github.com/Audumla/AUDiaLLMGateway/commit/0bb800080cf887e93e2023aaa631478f77494614))
+* Phase 3 Part 1 progress - infrastructure services complete ([c3a041e](https://github.com/Audumla/AUDiaLLMGateway/commit/c3a041ecbf0898955473fcfbd332acc0e775f750))
+* Phase 3 Part 2 completion summary ([81f7f49](https://github.com/Audumla/AUDiaLLMGateway/commit/81f7f49009cd916b23cf30bf088c7951f67ad4c1))
+* release summary for v0.14.0 ([2af56ca](https://github.com/Audumla/AUDiaLLMGateway/commit/2af56ca2e409d97953615ffb6125d908fcd0e1ac))
+* update dashboard specs with readiness assessment and implementation guidance ([7cd47e9](https://github.com/Audumla/AUDiaLLMGateway/commit/7cd47e960d07e9afe1f1e1443d219827e8cad054))
+
+## Changelog
+
 ## Unreleased
 
 ### Scaffolded a native Windows local LLM gateway workspace in AUDiaLLMGateway. (New Feature)
