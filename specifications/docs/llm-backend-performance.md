@@ -1019,16 +1019,274 @@ Across **both vLLM and llama.cpp**, the following tests have the highest probabi
 
 ---
 
+## llama.cpp Vulkan Optimization — Driver, Mesa, and Runtime Tuning (2026-03-29)
+
+Current Vulkan result: **26.41 tok/s** (best performer overall). However, this baseline was established on the default llama.cpp container build without systematic Vulkan driver or Mesa tuning.
+
+Recent llama.cpp Vulkan testing on RDNA4 identified several meaningful optimization paths for AMD Radeon cards:
+
+### Vulkan Test Variables
+
+| Variable | Current State | Test | Expected Impact | Notes |
+| --- | --- | --- | --- | --- |
+| **Build version** | Prebuilt in container | Upstream latest release | None expected (already modern) | Confirms baseline is current |
+| **Vulkan driver** | RADV (likely) | RADV vs AMDVLK A/B | RADV wins overall | AMD officially recommends RADV over discontinued AMDVLK |
+| **Mesa/RADV version** | System default | Newer Mesa 26.x build | +5–10% on prefill | Cooperative-matrix improvements in Mesa 26.0+ |
+| **Flash Attention** | ON (in current config) | OFF baseline, then ON | OFF may be faster | FA can crash on RDNA3 or fall back to slow CPU path |
+| **PCIe ASPM** | Default | Performance mode | +10.8% decode (RDNA4 result) | Bandwidth-sensitive; plausible on RDNA3 |
+| **Prefill batch size** | Current | `-ub 2048` | +5–10% prefill | RADV responds well to larger microbatches |
+| **AMDVLK tuning** | N/A | Driver selection + env vars | MoE-specific gains | Only if MoE workload; otherwise skip |
+
+### Vulkan Test Plan (7 Tests)
+
+All tests use `Qwen3.5-27B-Q6_K.gguf`, Vulkan1+Vulkan2 (both XTXs), standard benchmark prompt (300 tokens). Baseline: 26.41 tok/s.
+
+---
+
+#### Test V1: Confirm Current Build & Driver (Baseline)
+
+```bash
+# Inside audia-llama-cpp container
+docker exec audia-llama-cpp \
+  env VK_DRIVER_FILES=/usr/share/vulkan/icd.d/radeon_icd.x86_64.json \
+      LD_LIBRARY_PATH=/app/runtime-root/vulkan/lib \
+  /app/runtime-root/vulkan/bin/llama-server-vulkan \
+  --port 41080 --host 0.0.0.0 \
+  --model /app/models/gguf/qwen3.5-27B/Qwen3.5-27B-Q6_K.gguf \
+  --ctx-size 131072 \
+  --device Vulkan2,Vulkan1 \
+  --split-mode layer --tensor-split 1,1 \
+  --gpu-layers 99 --parallel 1 \
+  --flash-attn on --temp 0 --top-p 0.9 --top-k 20 \
+  --threads 8 --threads-batch 24 \
+  --batch-size 512 --ubatch-size 512 \
+  --cache-type-k q8_0 --cache-type-v q8_0 &
+
+sleep 30 && python3 /tmp/bench_qwen27.py
+```
+
+**Expected:** 26.41 tok/s (baseline confirmation with explicit RADV pinning).
+
+---
+
+#### Test V2: Flash Attention OFF (Preferred Baseline)
+
+```bash
+docker exec audia-llama-cpp \
+  env VK_DRIVER_FILES=/usr/share/vulkan/icd.d/radeon_icd.x86_64.json \
+      LD_LIBRARY_PATH=/app/runtime-root/vulkan/lib \
+  /app/runtime-root/vulkan/bin/llama-server-vulkan \
+  --port 41080 --host 0.0.0.0 \
+  --model /app/models/gguf/qwen3.5-27B/Qwen3.5-27B-Q6_K.gguf \
+  --ctx-size 131072 \
+  --device Vulkan2,Vulkan1 \
+  --split-mode layer --tensor-split 1,1 \
+  --gpu-layers 99 --parallel 1 \
+  --flash-attn off \
+  --temp 0 --top-p 0.9 --top-k 20 \
+  --threads 8 --threads-batch 24 \
+  --batch-size 512 --ubatch-size 512 \
+  --cache-type-k q8_0 --cache-type-v q8_0 &
+
+sleep 30 && python3 /tmp/bench_qwen27.py
+```
+
+**Expected:** 26.0–26.5 tok/s (possibly same or slightly faster if FA has overhead on RDNA3).
+
+---
+
+#### Test V3: Prefill Batch Size Tuning (-ub 2048)
+
+```bash
+docker exec audia-llama-cpp \
+  env VK_DRIVER_FILES=/usr/share/vulkan/icd.d/radeon_icd.x86_64.json \
+      LD_LIBRARY_PATH=/app/runtime-root/vulkan/lib \
+  /app/runtime-root/vulkan/bin/llama-server-vulkan \
+  --port 41080 --host 0.0.0.0 \
+  --model /app/models/gguf/qwen3.5-27B/Qwen3.5-27B-Q6_K.gguf \
+  --ctx-size 131072 \
+  --device Vulkan2,Vulkan1 \
+  --split-mode layer --tensor-split 1,1 \
+  --gpu-layers 99 --parallel 1 \
+  --flash-attn off \
+  --temp 0 --top-p 0.9 --top-k 20 \
+  --threads 8 --threads-batch 24 \
+  --batch-size 512 --ubatch-size 2048 \
+  --cache-type-k q8_0 --cache-type-v q8_0 &
+
+sleep 30 && python3 /tmp/bench_qwen27.py
+```
+
+**Expected:** 27.0–27.5 tok/s if prefill gains apply to RDNA3 (RDNA4 data showed +5–10% on prefill-heavy workloads).
+
+---
+
+#### Test V4: PCIe ASPM Performance Mode
+
+```bash
+# Host-level tuning (requires sudo)
+echo performance | sudo tee /sys/module/pcie_aspm/parameters/policy
+
+# Run same as Test V3 (with -ub 2048 + FA off)
+docker exec audia-llama-cpp \
+  env VK_DRIVER_FILES=/usr/share/vulkan/icd.d/radeon_icd.x86_64.json \
+      LD_LIBRARY_PATH=/app/runtime-root/vulkan/lib \
+  /app/runtime-root/vulkan/bin/llama-server-vulkan \
+  --port 41080 --host 0.0.0.0 \
+  --model /app/models/gguf/qwen3.5-27B/Qwen3.5-27B-Q6_K.gguf \
+  --ctx-size 131072 \
+  --device Vulkan2,Vulkan1 \
+  --split-mode layer --tensor-split 1,1 \
+  --gpu-layers 99 --parallel 1 \
+  --flash-attn off \
+  --temp 0 --top-p 0.9 --top-k 20 \
+  --threads 8 --threads-batch 24 \
+  --batch-size 512 --ubatch-size 2048 \
+  --cache-type-k q8_0 --cache-type-v q8_0 &
+
+sleep 30 && python3 /tmp/bench_qwen27.py
+
+# Reset to default
+echo default | sudo tee /sys/module/pcie_aspm/parameters/policy
+```
+
+**Expected:** 27.0–27.5 tok/s (ASPM performance mode may improve decode bandwidth on decode-heavy generation).
+
+---
+
+#### Test V5: Self-Built Upstream Vulkan Release
+
+```bash
+# Clone latest llama.cpp release tag
+git clone https://github.com/ggml-org/llama.cpp.git llama-vulkan-latest
+cd llama-vulkan-latest
+git checkout $(git describe --tags --abbrev=0)  # Latest release tag
+
+# Build clean Vulkan
+cmake -B build -DGGML_VULKAN=ON -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release -j $(nproc)
+
+# Run
+./build/bin/llama-server \
+  --port 41080 --host 0.0.0.0 \
+  --model /app/models/gguf/qwen3.5-27B/Qwen3.5-27B-Q6_K.gguf \
+  --ctx-size 131072 \
+  --device Vulkan2,Vulkan1 \
+  --split-mode layer --tensor-split 1,1 \
+  --gpu-layers 99 --parallel 1 \
+  --flash-attn off --temp 0 --top-p 0.9 --top-k 20 \
+  --threads 8 --threads-batch 24 \
+  --batch-size 512 --ubatch-size 2048 \
+  --cache-type-k q8_0 --cache-type-v q8_0 &
+
+sleep 30 && python3 /tmp/bench_qwen27.py
+```
+
+**Expected:** 26.5–27.5 tok/s (likely same or better than container build; confirms build version is not a limiting factor).
+
+---
+
+#### Test V6: AMDVLK Driver Comparison (A/B Test)
+
+```bash
+# AMDVLK baseline (if available on system)
+docker exec audia-llama-cpp \
+  env VK_DRIVER_FILES=/etc/vulkan/icd.d/amd_icd64.json \
+      LD_LIBRARY_PATH=/app/runtime-root/vulkan/lib \
+  /app/runtime-root/vulkan/bin/llama-server-vulkan \
+  --port 41080 --host 0.0.0.0 \
+  --model /app/models/gguf/qwen3.5-27B/Qwen3.5-27B-Q6_K.gguf \
+  --ctx-size 131072 \
+  --device Vulkan2,Vulkan1 \
+  --split-mode layer --tensor-split 1,1 \
+  --gpu-layers 99 --parallel 1 \
+  --flash-attn off --temp 0 --top-p 0.9 --top-k 20 \
+  --threads 8 --threads-batch 24 \
+  --batch-size 512 --ubatch-size 2048 \
+  --cache-type-k q8_0 --cache-type-v q8_0 &
+
+sleep 30 && python3 /tmp/bench_qwen27.py
+```
+
+**Expected:** 24–26 tok/s (RADV has been shown to outperform AMDVLK on RDNA; AMDVLK is discontinued).
+
+---
+
+#### Test V7: Upstream Build + Newer Mesa/RADV (If Available)
+
+If your Mesa is older than 26.0, build or upgrade to Mesa 26.x+ (or use a newer container image):
+
+```bash
+# After ensuring Mesa 26.x+ is installed/active, run Test V5 again
+
+./build/bin/llama-server \
+  --port 41080 --host 0.0.0.0 \
+  --model /app/models/gguf/qwen3.5-27B/Qwen3.5-27B-Q6_K.gguf \
+  --ctx-size 131072 \
+  --device Vulkan2,Vulkan1 \
+  --split-mode layer --tensor-split 1,1 \
+  --gpu-layers 99 --parallel 1 \
+  --flash-attn off --temp 0 --top-p 0.9 --top-k 20 \
+  --threads 8 --threads-batch 24 \
+  --batch-size 512 --ubatch-size 2048 \
+  --cache-type-k q8_0 --cache-type-v q8_0 &
+
+sleep 30 && python3 /tmp/bench_qwen27.py
+```
+
+**Expected:** 27.0–28.5 tok/s if Mesa 26.x cooperative-matrix improvements apply to RDNA3 (RDNA4 data showed +5–10% prefill improvement).
+
+---
+
+### Vulkan Test Summary Table
+
+| Test | Variable | Expected tok/s | Pass Threshold |
+| --- | --- | --- | --- |
+| V1 | Baseline RADV explicit | 26.41 | ±0.5 |
+| V2 | Flash Attention OFF | 26.0–26.5 | >25.5 |
+| V3 | Prefill -ub 2048 | 27.0–27.5 | >26.5 = win |
+| V4 | PCIe ASPM performance | 27.0–27.5 | >26.5 = win |
+| V5 | Self-built upstream | 26.5–27.5 | >26.0 |
+| V6 | AMDVLK comparison | 24–26 | RADV should win |
+| V7 | Mesa 26.x+ upgrade | 27.0–28.5 | >26.5 = win |
+
+### Vulkan Success Criteria
+
+- **>27.0 tok/s** = meaningful optimization found. Document and roll out.
+- **27.0–27.5 tok/s** = modest improvements from prefill tuning or ASPM; consider rolling out in combination.
+- **26.0–26.5 tok/s** = minor variations within noise margin; baseline already near-optimal.
+- **<26.0 tok/s** = regression detected; investigate cause.
+
+### Why Vulkan is Worth Optimizing Further
+
+Despite being the current winner (26.41 tok/s vs vLLM 10.8 tok/s), Vulkan has only been tested with the container's default build configuration. Recent llama.cpp Vulkan tuning on RDNA4 found that:
+
+1. Prefill batch size tuning (-ub 2048) improved prefill by 5–10%
+2. PCIe ASPM performance mode improved decode by ~10.8%
+3. Correct driver selection (RADV over AMDVLK) matters
+4. Newer Mesa/RADV brings cooperative-matrix improvements
+5. Flash Attention can crash or regress on RDNA; OFF is safer
+
+Combining these, a plausible target is **27.5–28.5 tok/s** (5–8% improvement over current 26.41 tok/s baseline).
+
+---
+
 ## Next Steps
 
-All test scripts and detailed commands are documented in sections above. Server gpu-host.example is ready with:
-- Both XTX GPUs isolated for testing
-- Qwen3.5-27B Q6_K GGUF (llama-swap)
-- Qwen3.5-27B AWQ (vLLM)
-- Benchmark scripts (`/tmp/bench_vllm2.py`, `/tmp/bench_qwen27.py`)
-- GPU monitoring utilities (rocm-smi, docker logs)
+All test suites are now documented:
 
-Execute tests in priority order, record results in the [Summary Table](#summary-table-best-known-results) above, and track findings progressively in this document.
+1. **vLLM ROCm Build Streams** (4 tests) — targeting Triton AWQ kernel improvements
+2. **llama.cpp ROCm Optimization** (10 tests) — targeting BLAS backend and hardware scaling
+3. **llama.cpp Vulkan Tuning** (7 tests) — targeting driver, Mesa, and runtime optimizations
+
+**Recommended execution order across all three:**
+
+- **Day 1 — Vulkan baseline (V1–V3):** Confirm baseline, test FA, test prefill tuning
+- **Day 2 — Vulkan optimization (V4–V7):** ASPM, upstream build, driver comparison, Mesa upgrade
+- **Day 3 — vLLM ROCm (Tests A–B):** Official nightly, AMD preview (Tier 1 vLLM tests)
+- **Day 4 — llama.cpp ROCm (Tests 1–3):** Baseline, explicit arch, rocBLAS (Tier 1 llama.cpp tests)
+
+If Vulkan hits 27.5+ tok/s, document as new baseline. If Tier 1 ROCm tests yield >22 tok/s, continue testing that backend. Otherwise, Vulkan remains the winner.
 
 ---
 
