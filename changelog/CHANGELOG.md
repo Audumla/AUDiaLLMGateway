@@ -2,13 +2,6 @@
 
 ## Unreleased
 
-### Fixed nginx proxy routing for llamaswap UI API endpoints. (Bug Fix)
-
-- Added explicit nginx location blocks for `/activity`, `/logs`, `/models`, `/api/`, `/upstream/`, `/dev/` so that the llamaswap UI JavaScript's absolute-path API calls are forwarded to llamaswap_upstream instead of 404-ing when the UI is accessed via the `/llamaswap/` proxy prefix.
-- Added `tests/test_nginx_proxy_routing.py` with 14 regression tests covering all proxy route mappings to prevent recurrence.
-- Updated stale test assertions following the previous session's env-var cleanup: `build-rocm-gfx` profile rename, `ROCR_VISIBLE_DEVICES` removal, `vllm_primary` → `vllm_single_gpu` deployment key, and config-file-driven model selection.
-- Disabled `vllm_qwen72b_distributed` deployment by default (requires explicit opt-in for 2×GPU setups).
-
 ### Scaffolded a native Windows local LLM gateway workspace in AUDiaLLMGateway. (New Feature)
 - Created a Git-backed repo scaffold with config, docs, PowerShell wrappers, and Python orchestration for llama-server plus LiteLLM.
 - Added health checks, routing tests, and config generation for local model profiles and future MCP registration.
@@ -17,7 +10,7 @@
 ### Renamed the local LLM gateway workspace from AUDiaLLMEnvironment to AUDiaLLMGateway. (Documentation Update)
 - Renamed the repo directory to AUDiaLLMGateway.
 - Updated README and changelog references to the new project name.
-- Re-ran tests and config generation from the renamed path. 
+- Re-ran tests and config generation from the renamed path.
 
 ### Added the first mid-level project spec for AUDiaLLMGateway. (Documentation Update)
 - Created a specifications folder with a mid-level phase 1 gateway spec.
@@ -552,5 +545,19 @@
 ### Update nginx and vLLM specs for health prefix route, Docker DNS resolver, and vLLM compose profiles (Documentation Update)
 - spec-401-nginx-reverse-proxy: /health is now documented as prefix location; Docker DNS resolver note added
 - spec-251-vllm-runtime: clarified vLLM is not started by default and requires COMPOSE_PROFILES=watcher,vllm and AUDIA_ENABLE_VLLM=true
+
+### Moved project docs under specifications/docs to keep repo root tidy. (Documentation Update)
+- Relocated root docs and existing docs/ into specifications/docs.
+- Updated README, doc index, spec references, and packaging path to new docs location.
+- Removed stray root outputs and empty docs directory.
+
+### Full end-to-end test of deployed LLM gateway on buri (10.10.100.10) covering all 7 phases. (Test Update)
+- Phase 1: All 5 endpoints healthy, 13 llama-swap models, generated configs valid
+- Phase 2: tiny_qwen25 344 tok/s, qwen4b_vision1 anomalously slow at 3.9 tok/s
+- Phase 3: Vulkan 31.1 tok/s beats ROCm 25 tok/s (24% faster) for 27B; 122B at 37.7 tok/s on 3-GPU Vulkan
+- Phase 4: vLLM FAIL - custom image is CUDA not ROCm; standard ROCm image fails No HIP GPUs; docker-compose missing config volume mount
+- Phase 5: hwexp and node-exporter scraping OK, no LLM inference metrics in Prometheus
+- Phase 6: All nginx proxy routes PASS
+- Phase 7: 7 issues documented including vLLM bugs and missing Prometheus LLM metrics
 
 ---
