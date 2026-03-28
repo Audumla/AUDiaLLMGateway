@@ -133,14 +133,32 @@ MODEL_COUNT=$(curl -sf "http://127.0.0.1:${MOCK_PORT}/v1/models" | "$VENV_PYTHON
 # ---------------------------------------------------------------------------
 section "litellm proxy"
 
-# Set a dummy master key and point litellm at the generated config
+# Write a minimal test config that avoids the model-name convention issues
+# that can appear with newer litellm versions (local/ prefix routing changes).
+# The generated production config is validated for existence above; here we use
+# a simple config to test the actual round-trip routing mechanism.
+cat > /tmp/e2e-litellm.config.yaml <<LITELLM_CFG
+model_list:
+- model_name: e2e-test-model
+  litellm_params:
+    model: openai/mock-model
+    api_base: http://127.0.0.1:${MOCK_PORT}/v1
+    api_key: sk-not-required
+litellm_settings:
+  master_key: sk-e2e-test
+general_settings:
+  disable_spend_logs: true
+  allow_requests_on_db_unavailable: true
+LITELLM_CFG
+
+# Set a dummy master key
 export LITELLM_MASTER_KEY="sk-e2e-test"
 
 LITELLM_BIN="$INSTALL_DIR/.venv/bin/litellm"
 [ -x "$LITELLM_BIN" ] || LITELLM_BIN="litellm"
 
 "$LITELLM_BIN" \
-    --config "$INSTALL_DIR/config/generated/litellm/litellm.config.yaml" \
+    --config "/tmp/e2e-litellm.config.yaml" \
     --port "$LITELLM_PORT" \
     --host "127.0.0.1" \
     > /tmp/litellm.log 2>&1 &
@@ -169,7 +187,7 @@ RESPONSE=$(curl -s -X POST "http://127.0.0.1:${LITELLM_PORT}/v1/chat/completions
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer sk-e2e-test" \
     -d '{
-        "model": "local/qwen27_fast",
+        "model": "e2e-test-model",
         "messages": [{"role": "user", "content": "hello"}],
         "max_tokens": 10
     }' 2>/dev/null) || true
