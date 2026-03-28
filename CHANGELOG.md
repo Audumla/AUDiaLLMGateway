@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.15.0](https://github.com/Audumla/AUDiaLLMGateway/compare/v0.14.0...v0.15.0) (2026-03-28)
+
+
+### Features
+
+* enable monitoring manifests and fix port resolution ([b3f97e1](https://github.com/Audumla/AUDiaLLMGateway/commit/b3f97e180b587981906920fdfdf68d1a81574d57))
+
+
+### Bug Fixes
+
+* add allow_requests_on_db_unavailable to litellm config ([f0b7226](https://github.com/Audumla/AUDiaLLMGateway/commit/f0b722637babdb8900924f18178cf66c1740c68b))
+* resolve CI build failures - nfpm packaging and Docker base image access ([413e3a6](https://github.com/Audumla/AUDiaLLMGateway/commit/413e3a68f5e21866187aaf927ad1ca09f40c2c14))
+* resolve Docker matrix build and E2E test failures ([94ded30](https://github.com/Audumla/AUDiaLLMGateway/commit/94ded30c2b6a5700f4207fdbc4ccf2047f5e14db))
+* use minimal test config in E2E test to avoid litellm 1.70+ routing regression ([91d193b](https://github.com/Audumla/AUDiaLLMGateway/commit/91d193b533c6ad92f9e302711451ea284fdf0df7))
+
+
+### Performance Improvements
+
+* optimize Docker build for monitoring API ([dcac744](https://github.com/Audumla/AUDiaLLMGateway/commit/dcac744d4a46ec4582c9b078eacd05a4cd3e94ac))
+
+
+### Documentation
+
+* add Docker build and deployment script for Docker Hub ([90258c6](https://github.com/Audumla/AUDiaLLMGateway/commit/90258c696b4bffd6578831e6d97339cc6555b3b0))
+* comprehensive build and deployment report for v0.14.0 ([24c9fdb](https://github.com/Audumla/AUDiaLLMGateway/commit/24c9fdb6244cd1c5644e4b2757331104d0886dea))
+* release summary for v0.14.0 ([2af56ca](https://github.com/Audumla/AUDiaLLMGateway/commit/2af56ca2e409d97953615ffb6125d908fcd0e1ac))
+
 ## [0.14.0](https://github.com/Audumla/AUDiaLLMGateway/compare/v0.13.1...v0.14.0) (2026-03-28)
 
 
