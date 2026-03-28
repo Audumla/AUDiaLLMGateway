@@ -1860,5 +1860,43 @@
       "spec-401-nginx-reverse-proxy: /health is now documented as prefix location; Docker DNS resolver note added",
       "spec-251-vllm-runtime: clarified vLLM is not started by default and requires COMPOSE_PROFILES=watcher,vllm and AUDIA_ENABLE_VLLM=true"
     ]
+  },
+  {
+    "id": "CHG-94b9b3dd",
+    "agent": "codex",
+    "change_group": "docs-reorg",
+    "plugin_version": "unreleased",
+    "date": "2026-03-27",
+    "recorded_at": "2026-03-27T05:44:34.716285Z",
+    "summary_tags": [
+      "Documentation Update"
+    ],
+    "summary": "Moved project docs under specifications/docs to keep repo root tidy.",
+    "details": [
+      "Relocated root docs and existing docs/ into specifications/docs.",
+      "Updated README, doc index, spec references, and packaging path to new docs location.",
+      "Removed stray root outputs and empty docs directory."
+    ]
+  },
+  {
+    "id": "CHG-2af56ca2",
+    "agent": "claude",
+    "change_group": "llm-gateway-e2e-test-20260328",
+    "plugin_version": "unreleased",
+    "date": "2026-03-28",
+    "recorded_at": "2026-03-28T00:47:42.871148Z",
+    "summary_tags": [
+      "Test Update"
+    ],
+    "summary": "Full end-to-end test of deployed LLM gateway on gpu-host (gpu-host.example) covering all 7 phases.",
+    "details": [
+      "Phase 1: All 5 endpoints healthy, 13 llama-swap models, generated configs valid",
+      "Phase 2: tiny_qwen25 344 tok/s, qwen4b_vision1 anomalously slow at 3.9 tok/s",
+      "Phase 3: Vulkan 31.1 tok/s beats ROCm 25 tok/s (24% faster) for 27B; 122B at 37.7 tok/s on 3-GPU Vulkan",
+      "Phase 4: vLLM FAIL - custom image is CUDA not ROCm; standard ROCm image fails No HIP GPUs; docker-compose missing config volume mount",
+      "Phase 5: hwexp and node-exporter scraping OK, no LLM inference metrics in Prometheus",
+      "Phase 6: All nginx proxy routes PASS",
+      "Phase 7: 7 issues documented including vLLM bugs and missing Prometheus LLM metrics"
+    ]
   }
 ]
