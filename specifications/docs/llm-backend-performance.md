@@ -641,6 +641,319 @@ These tests target the **runtime kernel selection layer** beneath vLLM's applica
 
 ---
 
+## llama.cpp ROCm Optimization — Exhaustive Test Plan (2026-03-29)
+
+While Vulkan dominates for single-sequence throughput (26.41 tok/s), llama.cpp ROCm remains a fallback. Previous testing (2026-03-28) showed:
+
+- `ggml-latest`, `ggml-b8429`, `ggml-git-main`, `lemonade-b1217`: all ~21 tok/s
+- All four tested variants achieved identical throughput on the same hardware
+- No investigation into runtime tuning, build flags, or GEMM kernel selection
+
+This session's vLLM research identified **build stack variations as a meaningful variable**. The same applies to llama.cpp: different ROCm base versions, different rocBLAS/hipBLASLt kernel selections, and RDNA3-specific optimizations can affect throughput.
+
+### llama.cpp ROCm Build Variables
+
+llama.cpp can be built via:
+
+1. **Prebuilt releases** (`ggml-org` GitHub releases) — Fast, tested binaries
+2. **Custom CMake builds** — Full control over `AMDGPU_TARGETS`, `DGGML_HIPBLAS`, rocBLAS variants
+3. **Docker multistage** — Isolate build environment from runtime
+4. **AMD rocm/rocm-pytorch base images** — Different ROCm versions and kernel libraries
+
+### Exhaustive Test Matrix
+
+Test the following untested combinations on `Qwen3.5-27B-Q6_K.gguf`, ROCm0+ROCm1 (both XTX), flash-attn on, Q8_0 KV cache:
+
+| # | Test Name | Build Source | ROCm Version | hipBLAS | AMDGPU_TARGETS | Expected | Rationale |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | **Baseline Prebuilt Latest** | `ggml-org` releases b8565+ | System default | auto | auto | ~21 | Confirm current baseline |
+| 2 | **Manual CMake b8565 + ROCm 7.2** | Self-build from source | 7.2 explicit | ON | `gfx1030;gfx1100` | 21–22? | Explicit arch targeting for RDNA3 |
+| 3 | **Manual CMake b8565 + ROCm 7.2 + rocBLAS** | Self-build from source | 7.2 explicit | rocBLAS only | `gfx1030;gfx1100` | 21–23? | rocBLAS may outperform hipBLASLt on RDNA3 |
+| 4 | **Manual CMake b8565 + hipBLASLt only** | Self-build from source | 7.2 explicit | hipBLASLt only (no rocBLAS) | `gfx1030;gfx1100` | 21–22? | hipBLASLt-only path (isolate backend) |
+| 5 | **Manual CMake b8565 + gfx1100-only** | Self-build from source | 7.2 explicit | ON | `gfx1100` | 21–22? | Drop gfx1030; focus kernels on 7900 XTX only |
+| 6 | **Manual CMake ROCm 6.3 era** | Self-build from ROCm 6.3 era source | 6.3 | ON | `gfx1100` | 19–21? | Older kernels; check for regressions vs 7.2 |
+| 7 | **Latest upstream (main)** | git clone + CMake from latest main | System default | ON | `gfx1030;gfx1100` | 21–23? | Test latest unreleased optimizations |
+| 8 | **Tensor cores / FP8 fallback test** | b8565 with `-DGGML_CUDA_FA_ALL_QUANTS=ON` (if applicable) | 7.2 | ON | `gfx1030;gfx1100` | 21–22? | Check if compute capability flags help RDNA3 |
+| 9 | **Single GPU (GPU[1] XTX only)** | b8565 prebuilt | 7.2 | auto | auto | 13–15? | Measure 1 GPU performance; compare 2-GPU scaling |
+| 10 | **All 3 GPUs (unequal split)** | b8565 prebuilt + balanced tensor split | 7.2 | auto | auto | 18–20? | Confirm 6900 XT bottleneck; measure penalty |
+
+### Test Execution Commands
+
+All tests use the same prompt, model, and benchmark methodology. Tests 1–8 run inside the llama-cpp container via `docker exec` (port 41080). Tests 9–10 run standalone.
+
+---
+
+#### Test 1: Baseline Prebuilt Latest (b8565+)
+
+```bash
+# Pull latest prebuilt from ggml-org
+LATEST_RELEASE=$(curl -s https://api.github.com/repos/ggml-org/llama.cpp/releases/latest | python3 -c "import json,sys; print(json.load(sys.stdin)['tag_name'])")
+echo "Testing: $LATEST_RELEASE"
+
+# Inside audia-llama-cpp container, start backend
+docker exec audia-llama-cpp \
+  env LD_LIBRARY_PATH=/app/runtime-root/rocm/lib:/opt/rocm/lib \
+      ROCBLAS_TENSILE_LIBPATH=/opt/rocm/lib/rocblas/library \
+  /app/runtime-root/rocm/bin/llama-server-rocm \
+  --port 41080 --host 0.0.0.0 \
+  --model /app/models/gguf/qwen3.5-27B/Qwen3.5-27B-Q6_K.gguf \
+  --ctx-size 131072 \
+  --device ROCm0,ROCm1 \
+  --split-mode layer --tensor-split 1,1 \
+  --gpu-layers 99 --parallel 1 \
+  --flash-attn on --temp 0 --top-p 0.9 --top-k 20 \
+  --threads 8 --threads-batch 24 \
+  --batch-size 512 --ubatch-size 512 \
+  --cache-type-k q8_0 --cache-type-v q8_0 &
+
+sleep 30 && python3 /tmp/bench_qwen27.py
+```
+
+**Expected:** ~21 tok/s (baseline confirmation).
+
+---
+
+#### Test 2: Manual CMake with Explicit gfx1030;gfx1100 Targeting
+
+This requires building inside the container or on the server. Abbreviated steps:
+
+```bash
+# Inside container or on server with ROCm 7.2
+git clone https://github.com/ggml-org/llama.cpp.git llama-rocm-gfx-test
+cd llama-rocm-gfx-test
+git checkout b8565  # Use known good commit
+
+# Build with explicit RDNA3 targets
+mkdir build && cd build
+cmake .. \
+  -DLLAMA_BUILD_SERVER=ON \
+  -DGGML_HIPBLAS=ON \
+  -DAMDGPU_TARGETS="gfx1030;gfx1100" \
+  -DCMAKE_HIP_ARCHITECTURES="gfx1030;gfx1100" \
+  -DCMAKE_BUILD_TYPE=Release
+
+cmake --build . --config Release --parallel $(nproc)
+
+# Copy binary to llama-cpp container or run standalone
+cp build/bin/llama-server /tmp/llama-server-gfx-explicit
+
+# Test
+/tmp/llama-server-gfx-explicit \
+  --port 41080 --host 0.0.0.0 \
+  --model /app/models/gguf/qwen3.5-27B/Qwen3.5-27B-Q6_K.gguf \
+  --ctx-size 131072 \
+  --device ROCm0,ROCm1 \
+  --split-mode layer --tensor-split 1,1 \
+  --gpu-layers 99 --parallel 1 \
+  --flash-attn on --temp 0 --top-p 0.9 --top-k 20 \
+  --threads 8 --threads-batch 24 \
+  --batch-size 512 --ubatch-size 512 \
+  --cache-type-k q8_0 --cache-type-v q8_0 &
+
+sleep 30 && python3 /tmp/bench_qwen27.py
+```
+
+**Expected:** 21–22 tok/s. Explicit arch targeting may help kernel selection; if it does, continue with other arch-specific tests.
+
+---
+
+#### Test 3: rocBLAS vs hipBLASLt — rocBLAS Only
+
+```bash
+# Same build as Test 2, but compile with rocBLAS preference
+# (rocBLAS is HIP's native BLAS; hipBLASLt is the newer wrapper)
+
+cmake .. \
+  -DLLAMA_BUILD_SERVER=ON \
+  -DGGML_HIPBLAS=ON \
+  -DGGML_USE_ROCBLAS=ON \
+  -DAMDGPU_TARGETS="gfx1030;gfx1100" \
+  -DCMAKE_HIP_ARCHITECTURES="gfx1030;gfx1100" \
+  -DCMAKE_BUILD_TYPE=Release
+
+cmake --build . --config Release --parallel $(nproc)
+
+# Run as Test 2
+```
+
+**Expected:** 21–23 tok/s. rocBLAS is battle-tested on AMD; hipBLASLt may have RDNA3 gaps.
+
+---
+
+#### Test 4: hipBLASLt Only (no rocBLAS fallback)
+
+```bash
+cmake .. \
+  -DLLAMA_BUILD_SERVER=ON \
+  -DGGML_HIPBLAS=ON \
+  -DGGML_USE_ROCBLAS=OFF \
+  -DAMDGPU_TARGETS="gfx1030;gfx1100" \
+  -DCMAKE_HIP_ARCHITECTURES="gfx1030;gfx1100" \
+  -DCMAKE_BUILD_TYPE=Release
+
+cmake --build . --config Release --parallel $(nproc)
+```
+
+**Expected:** 21–22 tok/s or slower. Isolates hipBLASLt performance if no rocBLAS fallback.
+
+---
+
+#### Test 5: gfx1100-Only Build (drop gfx1030)
+
+```bash
+cmake .. \
+  -DLLAMA_BUILD_SERVER=ON \
+  -DGGML_HIPBLAS=ON \
+  -DAMDGPU_TARGETS="gfx1100" \
+  -DCMAKE_HIP_ARCHITECTURES="gfx1100" \
+  -DCMAKE_BUILD_TYPE=Release
+
+cmake --build . --config Release --parallel $(nproc)
+```
+
+**Expected:** 21–22 tok/s (same, since only XTX GPUs are used). Tests whether dropping gfx1030 allows more focused kernel optimization.
+
+---
+
+#### Test 6: ROCm 6.3-Era Build
+
+If a ROCm 6.3 container is available:
+
+```bash
+# In ROCm 6.3 container
+git clone https://github.com/ggml-org/llama.cpp.git
+cd llama.cpp
+git checkout b8200  # Approximate ROCm 6.3 era commit
+
+cmake .. \
+  -DLLAMA_BUILD_SERVER=ON \
+  -DGGML_HIPBLAS=ON \
+  -DAMDGPU_TARGETS="gfx1100" \
+  -DCMAKE_BUILD_TYPE=Release
+
+cmake --build . --config Release --parallel $(nproc)
+```
+
+**Expected:** 19–21 tok/s. Older kernels may regress; establishes whether vLLM's ROCm 7.2 standard is optimal.
+
+---
+
+#### Test 7: Latest Upstream (main branch)
+
+```bash
+git clone https://github.com/ggml-org/llama.cpp.git llama-main
+cd llama-main
+# Stay on main (no checkout)
+
+cmake .. \
+  -DLLAMA_BUILD_SERVER=ON \
+  -DGGML_HIPBLAS=ON \
+  -DAMDGPU_TARGETS="gfx1030;gfx1100" \
+  -DCMAKE_BUILD_TYPE=Release
+
+cmake --build . --config Release --parallel $(nproc)
+```
+
+**Expected:** 21–23 tok/s. Main branch may include unreleased RDNA3 improvements.
+
+---
+
+#### Test 8: Compute Capability Fallback Flags
+
+```bash
+# Test if compute capability flags help (similar to vLLM's HSA_OVERRIDE)
+
+cmake .. \
+  -DLLAMA_BUILD_SERVER=ON \
+  -DGGML_HIPBLAS=ON \
+  -DAMDGPU_TARGETS="gfx1030;gfx1100" \
+  -DCMAKE_HIP_ARCHITECTURES="gfx1030;gfx1100" \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DHIP_PATH=/opt/rocm
+
+cmake --build . --config Release --parallel $(nproc)
+
+# At runtime, try:
+HSA_OVERRIDE_GFX_VERSION=11.0.0 /tmp/llama-server-...
+```
+
+**Expected:** 21–22 tok/s (no change expected; tests whether HSA_OVERRIDE helps llama.cpp like it does vLLM).
+
+---
+
+#### Test 9: Single GPU (GPU[1] / XTX only)
+
+```bash
+docker exec audia-llama-cpp \
+  env LD_LIBRARY_PATH=/app/runtime-root/rocm/lib:/opt/rocm/lib \
+      ROCBLAS_TENSILE_LIBPATH=/opt/rocm/lib/rocblas/library \
+      ROCR_VISIBLE_DEVICES=1 \
+  /app/runtime-root/rocm/bin/llama-server-rocm \
+  --port 41080 --host 0.0.0.0 \
+  --model /app/models/gguf/qwen3.5-27B/Qwen3.5-27B-Q6_K.gguf \
+  --ctx-size 131072 \
+  --device ROCm0 \
+  --gpu-layers 99 --parallel 1 \
+  --flash-attn on --temp 0 --top-p 0.9 --top-k 20 \
+  --threads 8 --threads-batch 24 \
+  --batch-size 512 --ubatch-size 512 \
+  --cache-type-k q8_0 --cache-type-v q8_0 &
+
+sleep 30 && python3 /tmp/bench_qwen27.py
+```
+
+**Expected:** 13–15 tok/s. Single GPU = half the memory bandwidth; measure 2-GPU scaling efficiency.
+
+---
+
+#### Test 10: All 3 GPUs with Balanced Split
+
+```bash
+docker exec audia-llama-cpp \
+  env LD_LIBRARY_PATH=/app/runtime-root/rocm/lib:/opt/rocm/lib \
+      ROCBLAS_TENSILE_LIBPATH=/opt/rocm/lib/rocblas/library \
+  /app/runtime-root/rocm/bin/llama-server-rocm \
+  --port 41080 --host 0.0.0.0 \
+  --model /app/models/gguf/qwen3.5-27B/Qwen3.5-27B-Q6_K.gguf \
+  --ctx-size 131072 \
+  --device ROCm0,ROCm1,ROCm2 \
+  --split-mode layer --tensor-split 16,24,24 \
+  --gpu-layers 99 --parallel 1 \
+  --flash-attn on --temp 0 --top-p 0.9 --top-k 20 \
+  --threads 8 --threads-batch 24 \
+  --batch-size 512 --ubatch-size 512 \
+  --cache-type-k q8_0 --cache-type-v q8_0 &
+
+sleep 30 && python3 /tmp/bench_qwen27.py
+```
+
+**Expected:** 18–20 tok/s (similar to 3-GPU Vulkan test, which yielded 21.98 tok/s but with MUCH larger memory footprint). ROCm should show similar bottlenecking behavior.
+
+---
+
+### Summary Table — llama.cpp ROCm Test Grid
+
+| Test | Variable | Expected tok/s | Pass/Fail Threshold |
+| --- | --- | --- | --- |
+| 1 | Baseline prebuilt | 21.0 | ±0.5 |
+| 2 | Explicit gfx1030;gfx1100 | 21.5–22.5 | >21.0 = win |
+| 3 | rocBLAS only | 21.5–23.0 | >21.5 = win |
+| 4 | hipBLASLt only | 21.0–21.5 | >21.0 = win |
+| 5 | gfx1100-only | 21.0 | ±0.5 |
+| 6 | ROCm 6.3-era | 19.0–21.0 | >20.0 = no regression |
+| 7 | Latest main | 21.5–23.0 | >21.0 = win |
+| 8 | HSA_OVERRIDE flag | 21.0 | No change expected |
+| 9 | Single GPU | 13.0–15.0 | Measure scaling |
+| 10 | All 3 GPUs | 18.0–20.0 | Measure bottleneck |
+
+### Success Criteria
+
+- **Any result > 22 tok/s** = meaningful kernel improvement found. Continue testing that variable.
+- **rocBLAS-only or main-branch > 22 tok/s** = strong candidate for rollout.
+- **All tests ~21 tok/s** = confirm Vulkan's 26.41 tok/s as the persistent winner; ROCm kernel quality is the gap, not fixable via build flags.
+
+---
+
 ## Model Path Reference
 
 Expected performance by quantization type on RX 7900 XTX (gfx1100), based on current upstream docs and this session's measurements:
