@@ -1,0 +1,96 @@
+{
+  "session_date": "2026-03-30",
+  "compare_model": {
+    "hf": "Qwen/Qwen3.5-27B",
+    "gguf": "Qwen3.5-27B-Q6_K.gguf"
+  },
+  "topology": {
+    "gpus": [
+      "GPU1 (RX 7900 XTX)",
+      "GPU2 (RX 7900 XTX)"
+    ],
+    "exclude_gpu": "GPU0 (RX 6900 XT)"
+  },
+  "results": [
+    {
+      "backend": "llamacpp_rocm",
+      "engine": "qwen27-rocm-ggml-b8429",
+      "elapsed_s": 4.781,
+      "prompt_tokens": 39,
+      "completion_tokens": 100,
+      "eval_tok_s": 20.92,
+      "status": "confirmed_warm"
+    },
+    {
+      "backend": "llamacpp_rocm",
+      "engine": "qwen27-rocm-ggml-git-main",
+      "elapsed_s": 10.155,
+      "prompt_tokens": 39,
+      "completion_tokens": 100,
+      "eval_tok_s": 9.85,
+      "status": "confirmed"
+    },
+    {
+      "backend": "llamacpp_rocm",
+      "engine": "qwen27-rocm-lemonade-b1217",
+      "elapsed_s": 10.031,
+      "prompt_tokens": 39,
+      "completion_tokens": 100,
+      "eval_tok_s": 9.97,
+      "status": "confirmed"
+    },
+    {
+      "backend": "llamacpp_rocm",
+      "engine": "qwen3.5-27b-(96k-Q6)",
+      "elapsed_s": 14.349,
+      "prompt_tokens": 39,
+      "completion_tokens": 100,
+      "eval_tok_s": 6.97,
+      "status": "confirmed"
+    },
+    {
+      "backend": "llamacpp_rocm",
+      "engine": "qwen3.5-27b-(96k-Q6)-rocm-latest",
+      "elapsed_s": 10.166,
+      "prompt_tokens": 39,
+      "completion_tokens": 100,
+      "eval_tok_s": 9.84,
+      "status": "confirmed"
+    },
+    {
+      "backend": "ollama_rocm",
+      "engine": "qwen27b",
+      "elapsed_s": 99.578,
+      "prompt_tokens": 29,
+      "completion_tokens": 1804,
+      "eval_tok_s": 18.12,
+      "status": "confirmed"
+    }
+  ],
+  "failures": [
+    {
+      "backend": "llamacpp_rocm",
+      "engine": "qwen27-rocm-ggml-b8429",
+      "status": "failed_after_restart",
+      "reason": "fresh restart returned HTTP 502 and llama-swap ExitError exit status 1"
+    },
+    {
+      "backend": "llamacpp_rocm",
+      "engine": "qwen27-rocm-ggml-git-main",
+      "status": "failed_after_restart",
+      "reason": "fresh restart returned HTTP 502 and llama-swap ExitError exit status 1"
+    },
+    {
+      "backend": "vllm_awq",
+      "engine": "Qwen3.5-27B-AWQ-vLLM",
+      "status": "failed",
+      "reason": "engine core assertion in causal_conv1d_update during warm-up"
+    },
+    {
+      "backend": "zinc",
+      "engine": "qwen3.5-27B-Q6_K.gguf",
+      "status": "failed",
+      "reason": "arithmetic exception in libvulkan_radeon.so on both GPU1 and GPU2"
+    }
+  ]
+}

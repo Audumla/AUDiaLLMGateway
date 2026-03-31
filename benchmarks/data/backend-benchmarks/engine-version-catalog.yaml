@@ -1,0 +1,190 @@
+version: 1
+title: AUDia backend engine version compatibility catalog
+purpose: >-
+  Keep backend systems and engine versions separate so we can record exactly
+  which engine builds work with which backend systems on this host.
+last_updated: 2026-03-31
+
+engines:
+  llama_cpp:
+    versions:
+      current_release:
+        status: working
+        backend_systems:
+          - llamacpp_vulkan_current
+          - llamacpp_rocm_current
+        notes:
+          - Current ggml-org release lane used by the gateway runtime.
+      ggml_b8429:
+        status: historical_working
+        backend_systems:
+          - llamacpp_rocm_ggml_b8429
+        notes:
+          - Historical ROCm comparison build.
+      ggml_git_main:
+        status: historical_working
+        backend_systems:
+          - llamacpp_rocm_ggml_git_main
+        notes:
+          - Historical ROCm comparison build from source tracking.
+      lemonade_b1217:
+        status: historical_working
+        backend_systems:
+          - llamacpp_rocm_lemonade_b1217
+        notes:
+          - Historical Lemonade ROCm comparison build.
+      lemonade_b1224:
+        status: working
+        backend_systems:
+          - llamacpp_rocm_lemonade_b1224
+        notes:
+          - Prebuilt `gfx110X` lane from lemonade-sdk release b1224.
+          - qwen3.5-27B benchmark result: 21.85 tok/s on dual RX 7900 XTX.
+          - Host needed `libatomic1` before this prebuilt could start.
+      rocm_gfx1100_preview:
+        status: working
+        backend_systems:
+          - llamacpp_rocm_preview
+        notes:
+          - Best confirmed ROCm fallback on the dual-XTX test box.
+      rocm_7_2_1_prebuilt_lane:
+        status: working
+        backend_systems:
+          - llamacpp_rocm72_prebuilt
+        notes:
+          - Validated against qwen3.5-27B on the dual XTX lane.
+          - Benchmark result: 9.98 tok/s (`qwen3.5-27b-(96k-Q6)-rocm-latest`).
+      rocm_7_2_1_local_source_build:
+        status: working
+        backend_systems:
+          - llamacpp_rocm721_local_build
+        notes:
+          - Built from ggml-org/llama.cpp b8583 inside `rocm/dev-ubuntu-24.04:7.2.1`.
+          - Required explicit install of `hipblas-dev`, `rocblas-dev`, and
+            `hipblaslt-dev` in the runtime container lane.
+          - Benchmark result: 21.49 tok/s on qwen3.5-27B dual-XTX test.
+      lychee_strix_halo_b8580_gfx1151:
+        status: architecture_scoped
+        backend_systems:
+          - llamacpp_rocm_lychee_strix_halo
+        notes:
+          - Release lane: Lychee-Technology/llama-cpp-for-strix-halo.
+          - Latest observed prebuilt: llama-cpp-b8580-rocm-7.2.1-gfx1151.tar.xz.
+          - Marked as architecture-scoped because the current benchmark host is
+            dual RX 7900 XTX (gfx1100) and not Strix Halo (gfx1151).
+          - For non-gfx1151 hosts, use source-build fallback and record as a
+            distinct engine lane.
+          - On the current gfx1100 host this prebuilt did not run; after
+            dependency fixes it exited with Illegal instruction.
+          - Attempted source-build fallback from the Lychee repo was blocked
+            because the repository does not contain a direct CMake source tree.
+
+  vllm:
+    versions:
+      rocm_current:
+        status: working_on_small_models
+        backend_systems:
+          - vllm_rocm_current
+        notes:
+          - Official ROCm 6.3+ and ROCm 7.0 support are documented upstream.
+          - Qwen3-0.6B is known-good on this host.
+          - Qwen3.5-4B compare run regressed and needs further triage.
+      rocm_7_2_1_wheel_nightly:
+        status: working_on_small_models
+        backend_systems:
+          - vllm_rocm721_wheel_nightly
+        notes:
+          - Uses the documented ROCm nightly wheel lane from the current vLLM
+            GPU install docs.
+          - Built as `local/vllm-rocm721-wheel:nightly`.
+          - Qwen3-0.6B served successfully at 75.05 eval tok/s.
+          - Qwen3.5-4B still fails during engine startup with HIP OOM in the
+            multimodal attention path.
+      rocm_v0_18_0:
+        status: blocked_on_model_init
+        backend_systems:
+          - vllm_rocm_current
+        notes:
+          - Tested with image `vllm/vllm-openai-rocm:v0.18.0`.
+          - Qwen3.5-4B failed during engine init with HIP OOM (256 GiB
+            attempted allocation path in mm attention).
+      rocm_v0_17_1_rollback:
+        status: working
+        backend_systems:
+          - vllm_rocm0171_rollback
+        notes:
+          - Official ROCm image `vllm/vllm-openai-rocm:latest` on v0.17.1.
+          - Qwen3.5-27B AWQ returned a chat completion on the dual XTX host
+            with `max_model_len=2048`, `max_num_batched_tokens=2048`, and
+            `--language-model-only`.
+          - Standard compare prompt benchmark measured 3.41 tok/s over 300
+            completion tokens.
+      amd_dev_stream:
+        status: historical_working
+        backend_systems:
+          - vllm_rocm_amd_dev
+        notes:
+          - AMD dev stream is useful for build-stream comparisons.
+      regression_navi_base:
+        status: historical_working
+        backend_systems:
+          - vllm_rocm_navi_base
+        notes:
+          - Historical RDNA3 comparison branch.
+
+  tgi:
+    versions:
+      latest_rocm:
+        status: blocked_on_gfx1100
+        backend_systems:
+          - tgi_rocm_current
+        notes:
+          - Qwen3.5-4B fails with unsupported model type qwen3_5.
+          - Qwen2.5-0.5B fails later with HIP invalid device function.
+      rocm_3_3_7_tag:
+        status: blocked_on_release_tag
+        backend_systems:
+          - tgi_rocm_current
+        notes:
+          - Tried `ghcr.io/huggingface/text-generation-inference:3.3.7-rocm`.
+          - Tag was not found in GHCR.
+      rocm_3_3_5:
+        status: blocked_on_gfx1100
+        backend_systems:
+          - tgi_rocm_current
+        notes:
+          - Model-family and HIP errors both appear on this host.
+
+  sglang:
+    versions:
+      rocm_0_5_10rc0_mi30x:
+        status: blocked_on_gfx1100
+        backend_systems:
+          - sglang_rocm_current
+        notes:
+          - Current ROCm image family is MI300-targeted.
+          - Generic latest image still needs a confirmed gfx1100 run.
+
+  ollama:
+    versions:
+      rocm:
+        status: working
+        backend_systems:
+          - ollama_rocm_current
+
+  aphrodite:
+    versions:
+      latest:
+        status: blocked
+        backend_systems:
+          - aphrodite_source_build
+
+  zinc:
+    versions:
+      git_head_20260330:
+        status: working
+        backend_systems:
+          - zinc_source_build
+        notes:
+          - Source-built on the benchmark server with Zig 0.15.2, Bun 1.3.11, and Vulkan SDK 1.4.341.1.
+          - zig build, zig build test, and ./zig-out/bin/zinc --check pass with warnings.

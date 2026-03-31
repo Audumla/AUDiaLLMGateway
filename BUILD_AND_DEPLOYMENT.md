@@ -160,7 +160,7 @@ curl http://localhost:8080/api/v1/logs
 
 ### Option C: Docker Compose
 ```bash
-docker-compose -f docker-compose.dashboard.yml up -d dashboard
+docker compose --project-directory . -f docker/compose/docker-compose.dashboard.yml up -d dashboard
 ```
 
 ---
@@ -297,4 +297,3 @@ docker build -f src/monitoring/Dockerfile -t audia-monitoring:v0.14.0 .
 ---
 
 **Status:** 🚀 **Ready for Production Deployment**
-

@@ -48,12 +48,12 @@ if errorlevel 1 (
 
 REM Start compose services
 echo Starting Docker Compose services...
-docker compose up -d >> "%LOG_FILE%" 2>&1
+docker compose --project-directory . -f docker\compose\docker-compose.yml up -d >> "%LOG_FILE%" 2>&1
 
 if errorlevel 1 (
     echo Failed to start Docker Compose. Check logs:
     echo [%date% %time%] ERROR: Docker compose up -d failed >> "%LOG_FILE%"
-    docker compose logs --tail 50 >> "%LOG_FILE%" 2>&1
+    docker compose --project-directory . -f docker\compose\docker-compose.yml logs --tail 50 >> "%LOG_FILE%" 2>&1
     pause
     exit /b 1
 )
@@ -63,8 +63,8 @@ echo [%date% %time%] Services started successfully >> "%LOG_FILE%"
 echo.
 echo Status:
 timeout /t 3 /nobreak
-docker compose ps >> "%LOG_FILE%" 2>&1
-docker compose ps
+docker compose --project-directory . -f docker\compose\docker-compose.yml ps >> "%LOG_FILE%" 2>&1
+docker compose --project-directory . -f docker\compose\docker-compose.yml ps
 
 echo [%date% %time%] Startup script completed successfully >> "%LOG_FILE%"
 exit /b 0

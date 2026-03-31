@@ -170,8 +170,8 @@ echo "  vLLM image: $VLLM_IMAGE"
 
 echo
 echo "Next steps:"
-echo "  docker compose pull"
-echo "  docker compose up -d"
+echo "  docker compose --project-directory . -f docker/compose/docker-compose.yml pull"
+echo "  docker compose --project-directory . -f docker/compose/docker-compose.yml up -d"
 echo
 echo "If you want to force a fresh runtime reprovision later:"
 echo "  rm -rf ${BACKEND_RUNTIME_ROOT%/}/*"

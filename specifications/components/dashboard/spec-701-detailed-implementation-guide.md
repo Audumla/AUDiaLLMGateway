@@ -1134,12 +1134,12 @@ export class PrometheusClient {
 #
 # What this file DOES NOT define:
 # - Service host/port (defined in config/project/stack.base.yaml, exported as env vars)
-# - Docker image (defined in docker-compose.yml)
+# - Docker image (defined in docker/compose/docker-compose.yml)
 # - Model definitions (defined in LiteLLM config)
 #
 # Configuration Sources:
 #   Host/Port:  ${LITELLM_HOST:-127.0.0.1}  ← from stack.yaml export
-#   Container:  audia-litellm               ← from docker-compose.yml
+#   Container:  audia-litellm               ← from docker/compose/docker-compose.yml
 #   API Key:    ${LITELLM_MASTER_KEY}       ← from .env
 #
 # Do NOT hardcode or duplicate these values.

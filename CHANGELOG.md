@@ -1,67 +1,5 @@
 # Changelog
 
-## [0.14.0](https://github.com/example/AUDiaLLMGateway/compare/v0.13.1...v0.14.0) (2026-03-28)
-
-
-### Features
-
-* **action-executor:** implement execution coordinator with history tracking ([aaaab91](https://github.com/example/AUDiaLLMGateway/commit/aaaab91829eb59c803c463585d772e6c0d0ae3b2))
-* **action-runner:** implement action dispatch system with multi-handler support ([9005583](https://github.com/example/AUDiaLLMGateway/commit/9005583023757cc6d92e16b932faf6ff3b4f4b60))
-* add Docker containerization and test infrastructure ([157855a](https://github.com/example/AUDiaLLMGateway/commit/157855ad436aeb2392cc4d65dae82d8d4c59be36))
-* **components-router:** implement components management router with action execution ([e438a06](https://github.com/example/AUDiaLLMGateway/commit/e438a06ec39f51f1af5b8f6ddf08d9055aab8773))
-* **docker-handler:** implement Docker socket integration for container operations ([0ddae51](https://github.com/example/AUDiaLLMGateway/commit/0ddae51a48b8836864246bb046cc4e8627611bff))
-* enable monitoring manifests and fix port resolution ([b3f97e1](https://github.com/example/AUDiaLLMGateway/commit/b3f97e180b587981906920fdfdf68d1a81574d57))
-* **gateway-config:** implement configuration service for stack and models ([e086db1](https://github.com/example/AUDiaLLMGateway/commit/e086db1e0620da944ce9f2776447f810d0abfbd4))
-* implement Phase 1 dashboard backend infrastructure ([5a9326f](https://github.com/example/AUDiaLLMGateway/commit/5a9326f9fdf16ce43c5c57d22faf63cbecbc01b6))
-* **logger:** implement centralized logging service for SSE streaming ([60114af](https://github.com/example/AUDiaLLMGateway/commit/60114af93026a35002014505c1c7345f53077705))
-* **logs-router:** implement log streaming endpoints with filtering ([9f24fec](https://github.com/example/AUDiaLLMGateway/commit/9f24fec3cf46f63e33a280d741e5cdab6bebe00b))
-* **manifests-router:** implement component manifest discovery endpoints ([fb2716b](https://github.com/example/AUDiaLLMGateway/commit/fb2716bea6eb6ff307522af58e19ade4f1779bd9))
-* **prometheus-client:** implement Prometheus metrics client with query support ([8d58700](https://github.com/example/AUDiaLLMGateway/commit/8d58700582e6d45c582619fbc089b1c8495ae986))
-
-
-### Bug Fixes
-
-* /litellm/ proxies to LiteLLM root (Swagger), not dashboard ([ca441c2](https://github.com/example/AUDiaLLMGateway/commit/ca441c2ca594deb0fe75618887b6819eea8a7af4))
-* add allow_requests_on_db_unavailable to litellm config ([f0b7226](https://github.com/example/AUDiaLLMGateway/commit/f0b722637babdb8900924f18178cf66c1740c68b))
-* correct logger statistics and test hanging issues ([20cb271](https://github.com/example/AUDiaLLMGateway/commit/20cb271e2596eb417ba61504f1b648f7bd3b5bd4))
-* correct pagination total count in logs endpoint ([f3a7d82](https://github.com/example/AUDiaLLMGateway/commit/f3a7d823aa40951d51dd871c060d19f91ce52c49))
-* handle invalid log level gracefully ([89c07d2](https://github.com/example/AUDiaLLMGateway/commit/89c07d2baa8212aed37d561431a303e9ebd0fb62))
-* proxy llamaswap API routes through nginx so UI works behind /llamaswap/ prefix ([7087f81](https://github.com/example/AUDiaLLMGateway/commit/7087f81fe43ac36b0a54fe4c8ce9dc04e48ae2a6))
-* redirect /litellm and /litellm/ to dashboard (/litellm/ui/) ([63acdb4](https://github.com/example/AUDiaLLMGateway/commit/63acdb4297070d1ba4333cc7bcb780ceb0b8417a))
-* redirect /litellm/ to dashboard and add swagger/openapi nginx routes ([e1d3ae1](https://github.com/example/AUDiaLLMGateway/commit/e1d3ae1b9598fabb45fe1e3e53b2bd6b38884a99))
-* resolve CI build failures - nfpm packaging and Docker base image access ([413e3a6](https://github.com/example/AUDiaLLMGateway/commit/413e3a68f5e21866187aaf927ad1ca09f40c2c14))
-* resolve Docker matrix build and E2E test failures ([94ded30](https://github.com/example/AUDiaLLMGateway/commit/94ded30c2b6a5700f4207fdbc4ccf2047f5e14db))
-* resolve manifest schema validation errors ([7bda2e1](https://github.com/example/AUDiaLLMGateway/commit/7bda2e1d2268dfb5b2ded17d71e7344cea42c17a))
-* revert litellm redirect — /litellm/ proxies to litellm root (Swagger catalog) ([b4a39fa](https://github.com/example/AUDiaLLMGateway/commit/b4a39fa6501642c297a171396cb74f8a790f226c))
-* update Dockerfile for src/monitoring refactoring ([aa5047c](https://github.com/example/AUDiaLLMGateway/commit/aa5047c0cc92152b45d6f980b2c8bb6161478456))
-* use minimal test config in E2E test to avoid litellm 1.70+ routing regression ([91d193b](https://github.com/example/AUDiaLLMGateway/commit/91d193b533c6ad92f9e302711451ea284fdf0df7))
-
-
-### Performance Improvements
-
-* optimize Docker build for monitoring API ([dcac744](https://github.com/example/AUDiaLLMGateway/commit/dcac744d4a46ec4582c9b078eacd05a4cd3e94ac))
-
-
-### Documentation
-
-* add aggregate model_name=\"active\" metrics for dashboard ([74dce24](https://github.com/example/AUDiaLLMGateway/commit/74dce24ada638daaf57471e333c6c3ed366838b3))
-* add changelog entry for nginx proxy routing fix ([cdd0974](https://github.com/example/AUDiaLLMGateway/commit/cdd09742bc1bba3952f23ecc65b275c9e454366c))
-* add critical blockers & mitigation strategies (75% → 85% readiness) ([a441550](https://github.com/example/AUDiaLLMGateway/commit/a441550b4d0c47409d37843ba182c467a293115d))
-* add Docker build and deployment script for Docker Hub ([90258c6](https://github.com/example/AUDiaLLMGateway/commit/90258c696b4bffd6578831e6d97339cc6555b3b0))
-* add tier 2 active-model detailed metrics to hybrid monitoring ([6988f14](https://github.com/example/AUDiaLLMGateway/commit/6988f1412e3686e790774488bd516db753c5eaa9))
-* API reference with data structures and examples for Vue frontend ([a13260d](https://github.com/example/AUDiaLLMGateway/commit/a13260d766abe3fffbb4e6030f9708acaa9be91c))
-* apply aggregate model_name=\"active\" metrics to vLLM ([99e9fb3](https://github.com/example/AUDiaLLMGateway/commit/99e9fb346070a4a276ff3ea61ab945373d04ab30))
-* comprehensive build and deployment report for v0.14.0 ([24c9fdb](https://github.com/example/AUDiaLLMGateway/commit/24c9fdb6244cd1c5644e4b2757331104d0886dea))
-* enforce dashboard component independence & separation of concerns ([a459ec1](https://github.com/example/AUDiaLLMGateway/commit/a459ec1c3a063c96bb09d4f84d81a6a5e12d32a8))
-* optimize dashboard monitoring to single-query approach ([40d4cc4](https://github.com/example/AUDiaLLMGateway/commit/40d4cc40a20e76dca6ded43fa4fe80600ec9d514))
-* Phase 2 completion summary - Docker integration and action dispatch ([0bb8000](https://github.com/example/AUDiaLLMGateway/commit/0bb800080cf887e93e2023aaa631478f77494614))
-* Phase 3 Part 1 progress - infrastructure services complete ([c3a041e](https://github.com/example/AUDiaLLMGateway/commit/c3a041ecbf0898955473fcfbd332acc0e775f750))
-* Phase 3 Part 2 completion summary ([81f7f49](https://github.com/example/AUDiaLLMGateway/commit/81f7f49009cd916b23cf30bf088c7951f67ad4c1))
-* release summary for v0.14.0 ([2af56ca](https://github.com/example/AUDiaLLMGateway/commit/2af56ca2e409d97953615ffb6125d908fcd0e1ac))
-* update dashboard specs with readiness assessment and implementation guidance ([7cd47e9](https://github.com/example/AUDiaLLMGateway/commit/7cd47e960d07e9afe1f1e1443d219827e8cad054))
-
-## Changelog
-
 ## Unreleased
 
 ### Scaffolded a native Windows local LLM gateway workspace in AUDiaLLMGateway. (New Feature)
@@ -621,5 +559,172 @@
 - Phase 5: hwexp and node-exporter scraping OK, no LLM inference metrics in Prometheus
 - Phase 6: All nginx proxy routes PASS
 - Phase 7: 7 issues documented including vLLM bugs and missing Prometheus LLM metrics
+
+### Completed exhaustive vLLM optimization benchmark on RX 7900 XTX (RDNA3); documented all results in llm-backend-performance.md (Documentation Update, Performance Improvement)
+- Plan B (TunableOp): 520/522 GEMM shapes tuned — no improvement (10.80 tok/s); Triton AWQ dequant not covered by TunableOp
+- Plan C (speculative ngram): 11.06 tok/s (+2.4%); low acceptance rate on technical text
+- Plan E (3-GPU Vulkan): 21.98 tok/s — worse than 2-XTX; 6900 XT becomes bottleneck in unequal split
+- Plan A (BF16): blocked — TP=3 invalid (64 heads not divisible by 3); TP=2+cpu-offload broken in vLLM v1
+- Plan D (SGLang): dead end — all ROCm images target MI-series CDNA only
+- Updated llm-backend-performance.md with 2026-03-29 session results and complete plan outcomes
+- BF16 model (Qwen/Qwen3.5-27B) downloaded to server for future testing on larger hardware
+
+### Identified 4 separate vLLM ROCm build streams and planned new benchmark test series for gfx1100 kernel optimization (Documentation Update)
+- Official vLLM nightly — tests upstream fixes since 0.17.1 stable
+- Self-built Dockerfile.rocm with ARG_PYTORCH_ROCM_ARCH=gfx1100 — explicit arch targeting
+- AMD rocm/vllm-dev:nightly — AMD curated ROCm/Torch/Triton combos
+- AMD rocm/vllm-dev:rocm721_torch210_triton36_preview_* — preview Triton/kernel combinations
+- Four-test benchmark plan added to llm-backend-performance.md for execution on server gpu-host.example
+
+### Created exhaustive llama.cpp ROCm test matrix with 10 tests covering build flags, kernel backends, and hardware scaling (Documentation Update)
+- Tests 1-8: Build variables (baseline prebuilt, explicit arch, rocBLAS vs hipBLASLt, gfx1100-only, ROCm 6.3 era, latest main, HSA_OVERRIDE)
+- Tests 9-10: Hardware scaling (single GPU, all 3 GPUs with balanced split)
+- Success criteria: >22 tok/s = kernel improvement; rocBLAS/main >22 = rollout candidate
+- All tests use same model/prompt/methodology for direct comparison
+- Targets untested combinations of ROCm version, BLAS backend, and arch targeting
+
+### Created complete benchmark matrix combining vLLM and llama.cpp tests with 4-tier priority system and execution roadmap (Documentation Update)
+- Tier 1 (highest impact): AMD preview vLLM, rocBLAS-only llama.cpp, upstream nightlies
+- Tier 2 (secondary): Self-built gfx1100, explicit arch targeting
+- Tier 3 (sanity checks): Single GPU baseline, all 3 GPU bottleneck, hardware scaling
+- Tier 4 (optional regression): ROCm 6.3 era, HSA_OVERRIDE tests
+- Success criteria: >22 tok/s = improvement; rocBLAS/main >22 = rollout candidate
+- Three decision paths documented (improvement found, no improvement, mixed results)
+- Server gpu-host.example ready with models, scripts, and all exact test commands
+
+### Added 7 Vulkan optimization tests targeting driver, Mesa, and runtime tuning on RDNA3 gfx1100 (Documentation Update)
+- Test V1: Baseline RADV explicit driver pinning
+- Test V2: Flash Attention OFF stability baseline
+- Test V3: Prefill batch size -ub 2048 (+5-10% expected)
+- Test V4: PCIe ASPM performance mode (+10.8% expected)
+- Test V5: Self-built upstream Vulkan release
+- Test V6: AMDVLK vs RADV driver comparison
+- Test V7: Mesa 26.x+ upgrade for cooperative-matrix (+5-10% expected)
+- Target: 27.5-28.5 tok/s (5-8% over current 26.41 baseline)
+- Validations based on RDNA4 testing; apply cautiously to RDNA3
+- Completes 21-test matrix across Vulkan, vLLM ROCm, llama.cpp ROCm
+
+### Completed V1-V7 GPU benchmark matrix for Qwen3.5-27B Q6_K on RDNA3 Vulkan; resolved LD_LIBRARY_PATH regression (Performance Improvement)
+- Fixed missing /app/runtime-root/vulkan/bin in LD_LIBRARY_PATH that prevented libggml-vulkan.so from loading
+- All 3 RDNA3 GPUs (RX 6900 XT + 2x RX 7900 XTX) confirmed via Vulkan backend with 65/65 layers offloaded
+- V1-V7 benchmark results: avg 6.52 tok/s gen, best 7.00 tok/s (V1/V2/V4), worst 5.64 tok/s (V5 ubatch=2K)
+- Performance ceiling is architecture-limited by Qwen3.5-27B Mamba/SSM hybrid recurrence (sequential by design)
+- Documented in RESOLUTION_SUMMARY.md and QUICK_FIX_GUIDE.md under plan_runs artifact directory
+
+### Documented backend benchmark handoff and build catalog (Documentation Update)
+- Updated backend performance doc with 2026-03-30 sweep results and blockers
+- Added repeatable backend build/run catalog
+- Added 20260330 benchmark JSON
+
+### Added likely-candidate backend list (Documentation Update)
+- Documented MLC-LLM Vulkan and other candidates with exclusions
+
+### Recorded manual rotation backend results (Documentation Update)
+- Captured llama-swap and vLLM AWQ/BF16 metrics in benchmark docs
+- Added manual-rotation results JSON artifact
+
+### Corrected TGI ROCm image tag in backend docs (Documentation Update)
+- Verified latest-rocm exists on GHCR
+- Documented that 3.3.5-rocm is not available
+
+### Clarified the safe runtime-python invocation for changelog updates. (Documentation Update)
+- This prevents Windows editor associations from opening Visual Studio when logging changes.
+
+### Separated benchmark execution into its own workspace and added repeatable lifecycle scripts for backend benchmarking. (Documentation Update)
+- Added bench/bin helpers for preflight, kill, reset, wait, and metrics collection.
+- Documented Zinc as an experimental Vulkan-native AMD candidate and kept the benchmark guidance isolated from gateway docs.
+
+### Added PowerShell-native equivalents for the benchmark lifecycle helpers so the benchmark harness can be validated on Windows without bash. (Documentation Update)
+- Created preflight, kill, reset, wait, and collect companions in benchmarks/bin.
+- Updated the benchmark docs to point at the Windows-native path alongside the bash scripts.
+
+### Added a one-command PowerShell benchmark wrapper to orchestrate preflight, cleanup, backend start, readiness wait, and optional metrics capture. (New Feature)
+- The wrapper reuses the existing benchmark lifecycle helpers in benchmarks/bin.
+- This keeps Windows-native benchmark runs repeatable without relying on bash.
+
+### Captured a fresh benchmark sweep from the live server and recorded the latest backend results and failures in the benchmark workspace. (Performance Improvement)
+- Added a new results snapshot for the 2026-03-30 03:37Z sweep.
+- Updated the latest run notes to reflect the new Ollama and vLLM measurements plus the remaining blocked backends.
+
+### Standardized backend comparisons on Qwen3.5-4B and recorded the live single-model benchmark sweep. (Performance Improvement)
+- Updated the benchmark workspace to use one shared Qwen3.5-4B compare model across llama-swap, Ollama, vLLM, TGI, SGLang, and Aphrodite.
+- Patched the live server benchmark runner to use the Qwen3.5-4B compare model and a shorter token budget, then captured fresh results.
+- Recorded the new benchmark results and compatibility notes in the separate benchmarks workspace.
+
+### Added named benchmark profiles for the shared Qwen3.5-4B compare run and the real Qwen3.5-27B dual-XTX target, plus failure log capture on the live runner. (Performance Improvement)
+- Created a benchmark profile catalog so model, topology, and backend-specific settings can be swapped without rewriting the workflow.
+- Updated the live server benchmark runner to preserve container logs and inspect data when a backend exits before readiness.
+- Linked the new profile catalog from the benchmark docs and roadmap.
+
+### Added a maintained backend source and release catalog for ROCm and related backends. (Documentation Update)
+- Created benchmarks/data/backend-benchmarks/backend-catalog.yaml to track maintained prebuilt channels, source-build-only paths, and last known good variants.
+- Added benchmarks/docs/backend-catalog.md and linked the catalog into the benchmark workspace and backend version reference docs.
+- Recorded Lemonade nightly, vLLM ROCm, TGI ROCm, SGLang ROCm, Ollama ROCm, and Aphrodite source status so future backend work starts from history instead of rediscovery.
+
+### Split vLLM into current-supported and regression tracks and corrected the AMD support note. (Documentation Update)
+- Updated the backend catalog so vLLM records both the current ROCm path and the historical rocm/vllm-dev:navi_base regression branch.
+- Corrected the benchmark notes to reflect the current official vLLM AMD docs: ROCm 6.3+ support, RX 7900 series support, and pre-built wheels for ROCm 7.0.
+- Added explicit vLLM track guidance in the optimization roadmap so Qwen2.5-14B BF16 and GPTQ can be used before returning to the 27B AWQ regression case.
+
+### Separated backend source catalogs from engine-version compatibility catalogs. (Documentation Update)
+- Kept benchmarks/data/backend-benchmarks/backend-catalog.yaml focused on source and release channels only.
+- Added benchmarks/data/backend-benchmarks/engine-version-catalog.yaml to record which engine versions work with which backend systems.
+- Updated the benchmark and backend-version docs so the catalogs are discoverable without mixing source channels and engine compatibility.
+
+### Recovered vLLM on the live host and captured the current ROCm failures for TGI, SGLang, and Aphrodite. (Bug Fix)
+- Enabled vLLM with AUDIA_ENABLE_VLLM=true and confirmed the small Qwen3-0.6B path responds successfully on the live AMD box.
+- Retried TGI on latest-rocm and 3.3.4-rocm; Qwen3.5-4B fails with Unsupported model type qwen3_5 and Qwen2.5-0.5B-Instruct fails later with HIP invalid device function.
+- Updated the benchmark catalogs and latest run notes so source channels and engine-version compatibility stay separate and the live failure modes are preserved.
+
+### Removed scratch workspaces and cache artifacts to free local disk space. (Configuration Cleanup)
+- Added ignore rules for .tmp_prisma_pkg/ and benchmarks.zip so the cleanup stays clean.
+
+### Built and validated the Zinc source-build lane on the server. (Build / Packaging)
+- Updated the benchmark source, engine-version, compatibility, and latest-run notes catalogs for Zinc.
+
+### Retested qwen27 on the dual 7900 XTX benchmark target and recorded the current engine results and regressions. (Performance Improvement)
+- Added qwen27 dual-XTX results JSON and updated benchmark notes and compatibility matrix with llama.cpp engine results, Ollama qwen27 performance, vLLM regression behavior, and Zinc crash behavior.
+
+### Added ROCm 7.2.1 prebuilt and local-build lanes to backend benchmark matrix with verified qwen27 results. (Documentation Update, Performance Improvement)
+- Recorded both lanes in backend catalog, engine version catalog, and compatibility matrix.
+- Added 20260331_rocm721_prebuilt_local_results.json with measured throughput and failure/fix trail.
+- Updated latest run notes with reproducible build/runtime fixes for ROCm 7.2.1 local source lane.
+
+### Added Lychee Strix Halo llama.cpp release lane as an architecture-scoped backend matrix entry. (Documentation Update, Configuration Cleanup)
+- Registered Lychee source channel and release metadata (b8580, rocm-7.2.1, gfx1151) in backend catalog.
+- Added architecture-scoped engine/version and compatibility entries for non-gfx1151 host separation.
+- Updated benchmark docs so this lane is tracked and tested via prebuilt-first then source-fallback policy.
+
+### Ran updated backend implementation refresh benchmarks and captured working/blocked outcomes in matrix catalogs. (Performance Improvement, Documentation Update)
+- Benchmarked lemonade-sdk b1224 prebuilt on qwen27 dual-XTX at 21.85 tok/s after installing host libatomic1.
+- Tested Lychee b8580 Strix Halo prebuilt and captured dependency fixes plus final Illegal instruction block on gfx1100 host.
+- Tested vLLM v0.18.0 startup path (Qwen3.5-4B HIP OOM) and recorded TGI 3.3.7-rocm tag-not-found result in catalogs and run notes.
+
+### Recorded Lychee source-fallback constraint after validation on server. (Documentation Update)
+- Confirmed Lychee repo is a prebuilt/packaging wrapper with no direct CMake source tree.
+- Updated benchmark catalogs and run notes to prevent repeated failed source-build attempts from that repo.
+
+### Added the documented vLLM ROCm 7.2.1 wheel lane to the benchmark matrix and recorded the small-model smoke result. (Documentation Update, Performance Improvement)
+- Switched from the generic CUDA nightly wheel lane to the official ROCm nightly wheel lane from the vLLM docs.
+- Recorded Qwen3-0.6B success at 75.05 eval tok/s on local/vllm-rocm721-wheel:nightly.
+- Recorded Qwen3.5-4B engine-init failure with HIP OOM so the lane stays marked as small-model-only for now.
+
+### Validated the vLLM ROCm wheel lane boundary for qwen27 on the dual-XTX host. (Performance Improvement)
+- Both 4096 and 2048 max-model-len runs failed later with KV-cache page-size unification errors, so the lane remains small-model-only.
+
+### Confirmed the ROCm wheel lane only remains viable for small Qwen3.5 models; Qwen3.5-4B and 27B still fail in vLLM 0.18.1. (Performance Improvement)
+- Qwen3.5-4B and Qwen3.5-27B both failed later during KV-cache page-size unification, so the lane is not yet a large-model path.
+
+### Confirmed the vLLM 0.17.1 rollback lane can serve Qwen3.5-27B on dual XTX with 2048 context. (Bug Fix)
+- Recorded the rollback lane separately from the v0.18.x hybrid KV-cache regression.
+
+### Benchmarked the vLLM 0.17.1 rollback lane on Qwen3.5-27B and established a clean line-in-the-sand baseline. (Performance Improvement)
+- Keep this lane separate from the v0.18.x hybrid KV-cache regression.
+
+### Reconfirmed the managed llama.cpp Vulkan qwen27 lane on the dual-XTX host and captured a warm baseline. (Performance Improvement)
+- This keeps Vulkan as the current interactive winner and gives us a fresh line-in-the-sand recheck.
+
+### Registered the latest ggml ROCm lane as a selectable qwen27 gateway deployment. (New Feature)
+- Updated the backend version docs to note the new qwen27_fast_rocm_latest option.
 
 ---

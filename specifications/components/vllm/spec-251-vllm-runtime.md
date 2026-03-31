@@ -7,7 +7,7 @@
 ## Requirements
 
 - **Deployment Mode**: Docker-only. The host should provide GPU passthrough (NVIDIA Toolkit or ROCm/Vulkan devices).
-- **Managed Lifecycle**: Orchestrated via `docker-compose.yml`. The `llm-server-vllm` service is in the `vllm` and `full` compose profiles; it is **not started by default**. To enable it, set `COMPOSE_PROFILES=watcher,vllm` (or `full`) in `.env` and `AUDIA_ENABLE_VLLM=true`.
+- **Managed Lifecycle**: Orchestrated via `docker/compose/docker-compose.yml`. The `llm-server-vllm` service is in the `vllm` and `full` compose profiles; it is **not started by default**. To enable it, set `COMPOSE_PROFILES=watcher,vllm` (or `full`) in `.env` and `AUDIA_ENABLE_VLLM=true`.
 - **Hot Reload**: LiteLLM configuration is updated when a `vLLM` model is added or changed in the catalog.
 - **Wrapper Runtime**: The entrypoint must work in images that provide `python3` but not `python`.
 - **Model Cache Layout**: Hugging Face weights must mount from a dedicated cache root (`MODEL_HF_ROOT`) separate from GGUF model storage.
@@ -51,7 +51,7 @@ when `AUDIA_ENABLE_VLLM=true`. The generator emits direct LiteLLM routes for
 
 For AMD Docker deployments, the validated path is the AMD compose profile using
 the official ROCm image (`vllm/vllm-openai-rocm:latest`) with `/dev/kfd`,
-`/dev/dri`, `ipc: host`, and `SYS_PTRACE`. The root compose's `llm-server-vllm`
+`/dev/dri`, `ipc: host`, and `SYS_PTRACE`. The main compose's `llm-server-vllm`
 section is NVIDIA-oriented unless explicitly overridden.
 
 ### Health Check

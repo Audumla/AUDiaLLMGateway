@@ -107,7 +107,7 @@ All files present and referenced:
 
 ### Docker Composition
 
-**File:** `docker-compose.yml`
+**File:** `docker/compose/docker-compose.yml`
 - ✅ Health checks configured for llama-cpp (30s interval, 60s start period)
 - ✅ Health checks configured for gateway
 - ✅ Health checks configured for PostgreSQL
@@ -163,7 +163,7 @@ All files present and referenced:
 - PostgreSQL health monitoring
 - Gateway liveliness checks
 - llama-cpp status endpoints
-- Docs: SUPPORTED_FEATURES.md, docker-compose.yml
+- Docs: SUPPORTED_FEATURES.md, docker/compose/docker-compose.yml
 
 ✅ **Version Management**
 - Build number versioning (b8508, b8153, etc.)

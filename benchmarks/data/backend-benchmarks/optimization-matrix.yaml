@@ -1,0 +1,73 @@
+version: 1
+title: AUDia backend optimization matrix
+purpose: >-
+  Repeatable test order for the benchmark workspace. This matrix separates
+  interactive latency, serving throughput, and known dead ends so we can keep
+  future runs focused.
+reference_model:
+  hf: Qwen/Qwen3.5-4B
+  gguf: Qwen3.5-4B-Q5_K_XL.gguf
+
+tracks:
+  interactive:
+    description: Lowest-latency single-user inference path.
+    primary_target: llama.cpp Vulkan on the two RX 7900 XTX cards
+    secondary_target: llama.cpp ROCm preview build
+
+  serving:
+    description: Concurrency and API-serving path.
+    primary_target: vLLM only when it wins under concurrent load or on smaller dense models
+
+phases:
+  phase_0_harden_harness:
+    goal: Eliminate false failures before comparing engines.
+    steps:
+      - replace fuser-based cleanup with explicit process-kill cleanup
+      - restart the llama.cpp container before Tier 2 ROCm runs
+      - enforce ROCR_VISIBLE_DEVICES=0,1 and HIP_VISIBLE_DEVICES=0,1 for ROCm tests
+      - keep one backend running at a time
+    exit_criteria:
+      - same backend can be run three times in a row without stale-port or stale-state failures
+
+  phase_1_rebaseline:
+    goal: Reconfirm the currently useful baselines under the cleaned harness.
+    tests:
+      - llama.cpp Vulkan, Qwen3.5-4B, dual XTX
+      - llama.cpp ROCm preview, Qwen3.5-4B, dual XTX
+      - vLLM Qwen3.5-4B BF16 baseline
+      - Ollama ROCm, Qwen3.5-4B, single model path
+    exit_criteria:
+      - current best performers remain stable and measured on a clean run
+
+  phase_2_vllm_decision:
+    goal: Determine whether vLLM has a viable non-AWQ path on RDNA3.
+    tests:
+      - Qwen3.5-4B BF16 on the two XTX cards
+      - one build-stream variant only after the model-size path is understood
+    exit_criteria:
+      - decide whether vLLM should be retained for serving-class workloads or limited to concurrency experiments
+
+  phase_3_rocm_llamacpp_refinement:
+    goal: Keep only ROCm llama.cpp variants that beat or match the preview build.
+    tests:
+      - latest upstream main
+      - explicit gfx1100 build
+      - rocBLAS-preferred build
+    exit_criteria:
+      - retire any ROCm variant that does not improve on the preview build
+
+  phase_4_vulkan_frontier:
+    goal: Continue optimizing the current winner.
+    tests:
+      - flash-attn off baseline
+      - larger prefill batch
+      - driver/runtime variants
+      - self-built upstream release
+    exit_criteria:
+      - keep Vulkan as the primary interactive path unless another backend clearly overtakes it
+
+  dead_ends:
+  - vLLM Qwen3.5-27B AWQ tuning with the same hardware and same kernel family
+  - 3-GPU large-model splits that include the RX 6900 XT on the 27B fast path
+  - SGLang MI300-oriented ROCm images for gfx1100 validation
+  - TGI ROCm on CUDA-only images or unsupported tags

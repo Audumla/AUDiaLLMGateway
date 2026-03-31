@@ -1,0 +1,53 @@
+{
+  "session_date": "2026-03-30",
+  "compare_model": {
+    "hf": "Qwen/Qwen3.5-4B",
+    "gguf": "Qwen3.5-4B-Q5_K_XL.gguf"
+  },
+  "results": [
+    {
+      "backend": "llamaswap",
+      "model": "qwen3-5-4b-ud-q5-k-xl-vision1",
+      "elapsed_s": 0.817,
+      "prompt_tokens": 60,
+      "completion_tokens": 100,
+      "eval_tok_s": 122.39,
+      "status": "confirmed"
+    },
+    {
+      "backend": "ollama_rocm",
+      "model": "qwen35b",
+      "elapsed_s": 72.963,
+      "prompt_tokens": 50,
+      "completion_tokens": 6143,
+      "eval_tok_s": 84.19,
+      "status": "confirmed"
+    }
+  ],
+  "failures": [
+    {
+      "backend": "vllm",
+      "model": "qwen3.5-4b",
+      "status": "failed",
+      "reason": "container exited before readiness"
+    },
+    {
+      "backend": "tgi_single",
+      "model": "qwen3.5-4b",
+      "status": "failed",
+      "reason": "entrypoint missing /usr/src/.venv/bin/activate after startup/download"
+    },
+    {
+      "backend": "sglang",
+      "model": "qwen3.5-4b",
+      "status": "failed",
+      "reason": "container exited before readiness"
+    },
+    {
+      "backend": "aphrodite",
+      "model": "qwen3.5-4b",
+      "status": "failed",
+      "reason": "container exited before readiness"
+    }
+  ]
+}

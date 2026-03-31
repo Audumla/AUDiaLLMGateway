@@ -1,0 +1,23 @@
+{
+  "llamaswap": {
+    "date": "2026-03-30",
+    "model": "ministral3b-vision",
+    "eval_tok_s": 164.84,
+    "prompt_tokens": 584,
+    "completion_tokens": 300
+  },
+  "vllm_awq": {
+    "date": "2026-03-30",
+    "model": "Qwen/Qwen3-0.6B",
+    "eval_tok_s": 120.36,
+    "prompt_tokens": 57,
+    "completion_tokens": 300
+  },
+  "vllm_bf16": {
+    "date": "2026-03-30",
+    "model": "Qwen/Qwen3-0.6B",
+    "eval_tok_s": 120.24,
+    "prompt_tokens": 57,
+    "completion_tokens": 300
+  }
+}

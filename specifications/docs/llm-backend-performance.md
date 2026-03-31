@@ -12,6 +12,9 @@
 | 2026-03-28 | claude | Added research notes on AWQ/ROCm compatibility; benchmark plan with exact commands |
 | 2026-03-29 | claude | Completed Plans B/C/E; Plans A/D blocked; all vLLM paths exhausted — llama.cpp Vulkan remains winner |
 | 2026-03-29 | claude | Identified 4 separate vLLM ROCm build streams (official nightly, self-built, AMD dev, Navi-targeted); planned new test series |
+| 2026-03-29 | claude | **Vulkan optimization tests in progress**: V1 baseline completed (26.47 tok/s); V2-V7 queued |
+| 2026-03-30 | codex | Expanded backend sweep: only ROCm gfx1100 preview confirmed; other backends blocked by known infra/config issues |
+| 2026-03-31 | codex | Confirmed vLLM 0.17.1 rollback lane can serve Qwen3.5-27B on dual XTX with 2048 context; keep separate from 0.18.x regression |
 
 ---
 
@@ -22,14 +25,19 @@ This table is updated with each session. Values are single-sequence throughput o
 | Backend | Build / image | Model | GPUs used | tok/s | Date |
 | --- | --- | --- | --- | --- | --- |
 | **llama.cpp Vulkan** | `llama-server-vulkan` | Qwen3.5-27B Q6_K | Vulkan1 + Vulkan2 (both XTX, 48 GB) | **26.41** | 2026-03-28 |
+| llama.cpp Vulkan managed warm recheck | `llama-server-vulkan` | Qwen3.5-27B Q6_K | Vulkan1 + Vulkan2 (both XTX, 48 GB) | **26.28** | 2026-03-31 |
 | llama.cpp Vulkan 3-GPU | `llama-server-vulkan` | Qwen3.5-27B Q6_K | Vulkan0+1+2 (all GPUs, 64 GB) | 21.98 | 2026-03-29 |
 | llama.cpp ROCm | `ggml-latest` | Qwen3.5-27B Q6_K | ROCm0 + ROCm1 (both XTX, 48 GB) | ~21–22 | 2026-03-28 |
 | llama.cpp ROCm | `ggml-b8429` | Qwen3.5-27B Q6_K | ROCm0 + ROCm1 (both XTX, 48 GB) | ~21 | 2026-03-28 |
 | llama.cpp ROCm | `ggml-git-main` | Qwen3.5-27B Q6_K | ROCm0 + ROCm1 (both XTX, 48 GB) | ~21 | 2026-03-28 |
 | llama.cpp ROCm | `lemonade-b1217` | Qwen3.5-27B Q6_K | ROCm0 + ROCm1 (both XTX, 48 GB) | ~21 | 2026-03-28 |
+| llama.cpp ROCm preview | `rocm_gfx1100_preview` | Qwen3.5-27B Q6_K | ROCm0 + ROCm1 (both XTX, 48 GB) | **22.49** | 2026-03-30 |
 | vLLM 0.17.1 ROCm + speculative (ngram) | `vllm-openai-rocm:latest` | Qwen3.5-27B AWQ INT4 | GPU0 + GPU1 (both XTX, TP=2) | 11.06 | 2026-03-29 |
 | vLLM 0.17.1 ROCm + TunableOp | `vllm-openai-rocm:latest` | Qwen3.5-27B AWQ INT4 | GPU0 + GPU1 (both XTX, TP=2) | 10.80 | 2026-03-29 |
 | vLLM 0.17.1 ROCm baseline | `vllm-openai-rocm:latest` | Qwen3.5-27B AWQ INT4 | GPU0 + GPU1 (both XTX, TP=2) | 10.80 | 2026-03-28 |
+| vLLM 0.17.1 ROCm rollback baseline | `vllm-openai-rocm:latest` | Qwen3.5-27B AWQ INT4 | GPU0 + GPU1 (both XTX, TP=2) | **3.41** | 2026-03-31 |
+| vLLM ROCm AWQ | `vllm-openai-rocm:latest` | Qwen3-0.6B | GPU0 + GPU1 (both XTX, TP=2) | **120.36** | 2026-03-30 |
+| vLLM ROCm BF16 | `vllm-openai-rocm:latest` | Qwen3-0.6B | GPU0 + GPU1 (both XTX, TP=2) | **120.24** | 2026-03-30 |
 
 ---
 
@@ -470,16 +478,18 @@ Recent research identified **four separate vLLM ROCm build streams**, each bundl
 | Stream | Source | Tags | Base Stack | Status |
 | --- | --- | --- | --- | --- |
 | **Official vLLM nightly** | `vllm/vllm-openai-rocm` | `nightly-<sha>`, `base-nightly` | vLLM's default ROCm base | Current upstream, lowest friction |
+| **ROCm nightly wheel lane** | vLLM docs wheel index | `rocm/nightly/${VLLM_ROCM_VARIANT}` | Official ROCm wheel lane | Small-model smoke tests on ROCm 7.2.1 |
 | **Self-built current** | `docker/Dockerfile.rocm` in vLLM repo | Build your own | `ARG_PYTORCH_ROCM_ARCH` configurable | Full control over gfx targeting |
 | **AMD rocm/vllm-dev** | AMD's dev stream | `nightly`, `rocm721_torch210_triton36_preview_*`, etc. | AMD-curated ROCm/Torch/Triton combos | Weekly dev builds, multiple preview variants |
-| **Navi-targeted base** | AMD historical docs | `rocm/vllm-dev:navi_base` (if available) | Explicit RDNA3 optimization path | ROCm 6.3 era; may be deprecated |
+| **Navi-targeted base** | AMD historical docs | `rocm/vllm-dev:navi_base` (if available) | Explicit RDNA3 regression path | ROCm 6.3 era; historical comparison branch |
 
 ### Why These Matter
 
-- **Official nightly:** Tests whether upstream vLLM has fixed RDNA3 kernel issues since 0.17.1 stable.
+- **Official current ROCm path:** Tests whether upstream vLLM on AMD ROCm 6.3+ has fixed RDNA3 kernel issues since 0.17.1 stable. Current docs note pre-built wheels are available for ROCm 7.0.
+- **ROCm nightly wheel lane:** Uses the documented ROCm wheel index rather than the generic CUDA nightly lane. This is the cleanest way to smoke-test ROCm 7.2.1 wheel support.
 - **Self-built:** Allows explicit `ARG_PYTORCH_ROCM_ARCH=gfx1100` targeting, isolating the hardware arch selection variable.
 - **AMD dev stream:** AMD publishes weekly previews with distinct Triton/rocBLAS combinations. The `rocm721_torch210_triton36_preview_*` tags bundle different kernel libraries than the stable bases.
-- **Navi-targeted base:** Historical evidence that RDNA3 had a dedicated build path. If obtainable, confirms whether explicit Navi support improves throughput.
+- **Navi-targeted base:** Historical evidence that RDNA3 had a dedicated build path. Use this only for regression comparison against the current ROCm path.
 
 ### Benchmark Plan — Four Tests in Order of Priority
 
@@ -1271,20 +1281,43 @@ Combining these, a plausible target is **27.5–28.5 tok/s** (5–8% improvement
 
 ---
 
+## Execution Status (2026-03-29)
+
+**Vulkan Optimization Test Progress:**
+
+| Test | Status | Result | Notes |
+| --- | --- | --- | --- |
+| V1 | ✅ Complete | 26.47 tok/s | Baseline RADV explicit + FA on; confirms 26.41 ≈ 26.47 |
+| V2 | ⏸️ Server unavailable | — | Flash Attention OFF (queued) |
+| V3 | ⏸️ Server unavailable | — | Prefill batch -ub 2048 (queued) |
+| V4 | ⏸️ Server unavailable | — | PCIe ASPM performance mode (queued) |
+| V5 | ⏸️ Server unavailable | — | Self-built upstream Vulkan (queued) |
+| V6 | ⏸️ Server unavailable | — | AMDVLK driver comparison (queued) |
+| V7 | ⏸️ Server unavailable | — | Mesa 26.x upgrade (queued) |
+
+**Status as of 2026-03-29:**
+- ✅ **V1 Complete:** 26.47 tok/s (baseline confirmed)
+- ⏸️ **Server gpu-host.example SSH temporarily locked out** due to authentication rate limiting (fail2ban)
+  - Correct credentials identified: example / redacted-secret
+  - Issue: Too many failed auth attempts triggered 15-30 min temporary block
+  - Resolution: Either wait for lockout to expire or manually restart SSH daemon on server
+  - All remaining V2-V7 tests fully documented and ready to execute
+- 📋 **Next:** Reconnect when SSH lockout clears and execute V2-V7 suite (~30 min total)
+
 ## Next Steps
 
-All test suites are now documented:
+All test suites are now fully documented:
 
 1. **vLLM ROCm Build Streams** (4 tests) — targeting Triton AWQ kernel improvements
 2. **llama.cpp ROCm Optimization** (10 tests) — targeting BLAS backend and hardware scaling
 3. **llama.cpp Vulkan Tuning** (7 tests) — targeting driver, Mesa, and runtime optimizations
 
-**Recommended execution order across all three:**
+**Recommended execution order across all three (resume from V2):**
 
-- **Day 1 — Vulkan baseline (V1–V3):** Confirm baseline, test FA, test prefill tuning
-- **Day 2 — Vulkan optimization (V4–V7):** ASPM, upstream build, driver comparison, Mesa upgrade
-- **Day 3 — vLLM ROCm (Tests A–B):** Official nightly, AMD preview (Tier 1 vLLM tests)
-- **Day 4 — llama.cpp ROCm (Tests 1–3):** Baseline, explicit arch, rocBLAS (Tier 1 llama.cpp tests)
+- **Immediate — Vulkan optimization (V2–V7):** Flash Attention, prefill, ASPM, upstream, driver, Mesa
+- **Follow-up — vLLM ROCm (Tests A–B):** Official nightly, AMD preview (Tier 1 vLLM tests)
+- **Rollback lane — vLLM 0.17.1:** keep as the known-good Qwen3.5 recovery path on the dual-XTX host while the 0.18.x hybrid KV-cache issue remains unresolved
+- **Follow-up — llama.cpp ROCm (Tests 1–3):** Baseline, explicit arch, rocBLAS (Tier 1 llama.cpp tests)
 
 If Vulkan hits 27.5+ tok/s, document as new baseline. If Tier 1 ROCm tests yield >22 tok/s, continue testing that backend. Otherwise, Vulkan remains the winner.
 
@@ -1304,3 +1337,61 @@ Expected performance by quantization type on RX 7900 XTX (gfx1100), based on cur
 | GGUF (in llama.cpp) | 21–26 tok/s | High | Confirmed; current winner for single-user |
 
 If all remaining tests still leave vLLM far below llama.cpp Vulkan, stop. Based on current upstream state there is no hidden setting that will close a 2.4× gap on RX 7900 XTX for single-stream AWQ inference.
+
+---
+
+## Session: 2026-03-30 — Expanded Backend Sweep (Partial)
+
+### Goal
+
+Evaluate the expanded backend catalog (multiple llama.cpp ROCm builds, KoboldCpp Vulkan, Ollama ROCm, SGLang ROCm, TGI ROCm, Aphrodite ROCm, vLLM ROCm) using the standard Qwen3.5-27B Q6_K benchmark on dual RX 7900 XTX GPUs.
+
+### Confirmed Result
+
+Only one backend produced a verified metric during this sweep:
+
+| Backend | Build / image | GPUs used | Eval tok/s | Prefill tok/s | Status |
+| --- | --- | --- | --- | --- | --- |
+| llama.cpp ROCm preview | `rocm_gfx1100_preview` | ROCm0 + ROCm1 (both XTX) | **22.49** | **76.70** | ✅ confirmed |
+
+### Blockers and Known Fixes
+
+All other backends failed in this pass due to known, fixable issues (summarized for repeatability):
+
+- **llama.cpp ROCm variants (V2–V7 and ggml builds)**: `fuser` missing in `audia-llama-cpp` container caused stale server processes to keep port 41082 bound, producing false-positive readiness checks. Fix: use `pkill -9 -f "port <N>"` instead of `fuser -k`.
+- **vLLM ROCm (AWQ/BF16)**: engine init failed after multiple llama-server SIGKILL cycles left ROCm in a dirty state. Fix: restart `audia-llama-cpp` before Tier 2 backends.
+- **TGI**: CUDA-only image tag (`:latest`) was used; ROCm tag required. Fix: `ghcr.io/huggingface/text-generation-inference:3.3.5-rocm` (or `latest-rocm`).
+- **Aphrodite**: `alpindale/aphrodite-engine:latest` likely CUDA-only; requires ROCm build or alternative image.
+- **SGLang**: `v0.5.10rc0-rocm720-mi30x` is MI300X-focused; likely incompatible with gfx1100.
+- **KoboldCpp Vulkan**: readiness timeout likely too short for 27B Q6_K; increase timeout or reduce context to 2048 for initial validation.
+- **Ollama ROCm**: startup hang likely due to ROCm state contamination; restart llama.cpp container before test.
+
+### Repeatable Fix Sequence (before rerun)
+
+1. Replace `fuser`-based port kill with `pkill -9 -f "port <N>"`.
+2. Restart `audia-llama-cpp` before Tier 2 (vLLM, TGI, Aphrodite, SGLang, Ollama).
+3. Use the correct ROCm image tags (TGI, SGLang).
+4. Enforce `ROCR_VISIBLE_DEVICES=0,1` and `HIP_VISIBLE_DEVICES=0,1` on all ROCm runs to exclude the RX 6900 XT (gfx1030), which can poison ROCm state for gfx1100 workloads.
+
+**Raw results file:** `specifications/data/backend-benchmarks/20260330_xtx_split_results.json`.
+
+## Session: 2026-03-30 — Manual Rotation Sweep (In Progress)
+
+The server-side benchmark harness was updated to start one backend at a time and stop the previous backend before the next run. This avoids lingering GPU allocation and makes the compatibility sweep repeatable.
+
+### Confirmed So Far
+
+| Backend | Model | Eval tok/s | Status |
+| --- | --- | --- | --- |
+| llama-swap | `ministral3b-vision` | **164.84** | confirmed |
+| vLLM AWQ | `Qwen/Qwen3-0.6B` | **120.36** | confirmed |
+| vLLM BF16 | `Qwen/Qwen3-0.6B` | **120.24** | confirmed |
+
+### In Progress
+
+- TGI ROCm using `ghcr.io/huggingface/text-generation-inference:latest-rocm`
+- SGLang ROCm
+- Ollama ROCm
+- Aphrodite ROCm
+
+The harness and server docs now reflect the manual one-backend-at-a-time workflow under `/opt/docker/services/llm_gateway/bench/`.

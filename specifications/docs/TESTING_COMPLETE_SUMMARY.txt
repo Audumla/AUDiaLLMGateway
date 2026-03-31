@@ -151,7 +151,7 @@ Result: All components validated successfully
   - SETUP_AUTOSTART.md
   - AUTOSTART_QUICKSTART.txt
   - .env
-  - docker-compose.yml
+  - docker/compose/docker-compose.yml
 
 ✓ Script Validation (3 scripts):
   - Batch syntax valid
@@ -161,7 +161,7 @@ Result: All components validated successfully
 ✓ Environment Validated:
   - Docker 29.2.1 installed
   - Docker Compose v2.x.x installed
-  - docker-compose.yml valid
+  - docker/compose/docker-compose.yml valid
   - All .env variables present
 
 Phase 2-4: Ready for Your Testing

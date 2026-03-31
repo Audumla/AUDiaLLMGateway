@@ -1,0 +1,60 @@
+{
+  "session_date": "2026-03-31",
+  "compare_model": {
+    "hf": "Qwen/Qwen3.5-27B",
+    "gguf": "Qwen3.5-27B-Q6_K.gguf"
+  },
+  "topology": {
+    "gpus": [
+      "GPU1 (RX 7900 XTX)",
+      "GPU2 (RX 7900 XTX)"
+    ],
+    "exclude_gpu": "GPU0 (RX 6900 XT)"
+  },
+  "results": [
+    {
+      "backend": "llamacpp_rocm72_prebuilt",
+      "engine": "qwen3.5-27b-(96k-Q6)-rocm-latest",
+      "elapsed_s": 10.018,
+      "prompt_tokens": 39,
+      "completion_tokens": 100,
+      "eval_tok_s": 9.98,
+      "status": "confirmed"
+    },
+    {
+      "backend": "llamacpp_rocm721_local_build",
+      "engine": "ggml-b8583-rocm-7.2.1-local",
+      "elapsed_s": 4.653,
+      "prompt_tokens": 39,
+      "completion_tokens": 100,
+      "eval_tok_s": 21.49,
+      "status": "confirmed"
+    }
+  ],
+  "failures_and_fixes": [
+    {
+      "stage": "release_discovery",
+      "status": "adjusted",
+      "issue": "ROCm/ROCm release rocm-7.2.1 has no direct llama.cpp binary assets",
+      "fix": "used ggml-org/llama.cpp ROCm 7.2 prebuilt as the prebuilt lane and kept ROCm 7.2.1 as runtime/build lane"
+    },
+    {
+      "stage": "local_build",
+      "status": "fixed",
+      "issue": "first source build came up CPU-only",
+      "fix": "rebuilt with GGML_HIP=ON and GGML_HIPBLAS=ON"
+    },
+    {
+      "stage": "local_build",
+      "status": "fixed",
+      "issue": "CMake missing hipBLAS package",
+      "fix": "installed hipblas-dev, rocblas-dev, and hipblaslt-dev in the build lane"
+    },
+    {
+      "stage": "runtime",
+      "status": "fixed",
+      "issue": "runtime failed with missing libhipblas.so.3",
+      "fix": "installed ROCm libs in run container and set LD_LIBRARY_PATH plus ROCBLAS_TENSILE_LIBPATH"
+    }
+  ]
+}

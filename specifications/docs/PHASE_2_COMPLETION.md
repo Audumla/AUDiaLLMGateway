@@ -63,7 +63,7 @@ Phase 2 adds core operational capabilities to the dashboard: Docker-based contai
 
 **Files:**
 - `src/dashboard/Dockerfile` - Multi-stage build
-- `docker-compose.dashboard.yml` - Service orchestration
+- `docker/compose/docker-compose.dashboard.yml` - Service orchestration
 - `scripts/test-dashboard.sh` - Test automation
 
 **Dockerfile Features:**
@@ -140,7 +140,7 @@ Each module is designed for independent testing and deployment:
 ### Deployment Architecture
 
 ```
-docker-compose.dashboard.yml
+docker/compose/docker-compose.dashboard.yml
 ├── Dashboard Service (8080)
 │   ├── FastAPI App
 │   ├── Manifest Loader
@@ -204,7 +204,7 @@ bash scripts/test-dashboard.sh
 docker build -f src/dashboard/Dockerfile -t audia-dashboard:phase-1 .
 
 # Run container
-docker-compose -f docker-compose.dashboard.yml up -d dashboard
+docker compose --project-directory . -f docker/compose/docker-compose.dashboard.yml up -d dashboard
 
 # Test API
 curl http://localhost:8080/healthz
@@ -249,7 +249,7 @@ src/dashboard/
 ├── tests/
 │   ├── test_docker_handler.py  # 241 lines - Docker tests
 │   └── test_action_runner.py   # 279 lines - Action tests
-├── docker-compose.dashboard.yml # Service orchestration
+├── docker/compose/docker-compose.dashboard.yml # Service orchestration
 └── requirements-dashboard.txt   # Dependencies
 ```
 

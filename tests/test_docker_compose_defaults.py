@@ -5,7 +5,7 @@ import yaml
 
 def _load_compose_services() -> dict:
     root = Path(__file__).resolve().parents[1]
-    compose_path = root / "docker-compose.yml"
+    compose_path = root / "docker" / "compose" / "docker-compose.yml"
     compose = yaml.safe_load(compose_path.read_text(encoding="utf-8"))
     return compose.get("services", {})
 

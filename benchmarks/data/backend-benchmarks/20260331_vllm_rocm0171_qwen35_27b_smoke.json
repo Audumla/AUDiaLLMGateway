@@ -1,0 +1,27 @@
+{
+  "date": "2026-03-31",
+  "backend": "vllm/vllm-openai-rocm:latest",
+  "engine_version": "0.17.1",
+  "lane": "vllm_rocm0171_rollback",
+  "model": "QuantTrio/Qwen3.5-27B-AWQ",
+  "served_model_name": "Qwen3.5-27B-0171-2048",
+  "context": 2048,
+  "isolation": {
+    "tensor_parallel_size": 2,
+    "language_model_only": true,
+    "gpus": [
+      "GPU[1]",
+      "GPU[2]"
+    ]
+  },
+  "verification": {
+    "models_endpoint": true,
+    "chat_completion": true,
+    "finish_reason": "length",
+    "response_preview": "Thinking Process: ..."
+  },
+  "notes": [
+    "This is a smoke/roll-back verification, not a throughput benchmark.",
+    "Keep this lane separate from the v0.18.x Qwen3.5 hybrid KV-cache regression."
+  ]
+}

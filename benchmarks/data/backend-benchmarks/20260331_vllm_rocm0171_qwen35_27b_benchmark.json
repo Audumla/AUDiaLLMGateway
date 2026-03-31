@@ -1,0 +1,29 @@
+{
+  "date": "2026-03-31",
+  "backend": "vllm/vllm-openai-rocm:latest",
+  "engine_version": "0.17.1",
+  "lane": "vllm_rocm0171_rollback",
+  "model": "QuantTrio/Qwen3.5-27B-AWQ",
+  "served_model_name": "Qwen3.5-27B-0171-2048",
+  "context": 2048,
+  "prompt": "Explain the difference between transformer attention mechanisms and recurrent neural networks in detail, covering architecture, computational complexity, parallelism, and practical use cases.",
+  "max_tokens": 300,
+  "isolation": {
+    "tensor_parallel_size": 2,
+    "language_model_only": true,
+    "gpus": [
+      "GPU[1]",
+      "GPU[2]"
+    ]
+  },
+  "result": {
+    "elapsed_seconds": 87.905,
+    "completion_tokens": 300,
+    "tok_s": 3.41,
+    "finish_reason": "length"
+  },
+  "notes": [
+    "This is the line-in-the-sand baseline for Qwen3.5-27B on the vLLM 0.17.1 rollback lane.",
+    "Keep it separate from the v0.18.x hybrid KV-cache regression lane."
+  ]
+}

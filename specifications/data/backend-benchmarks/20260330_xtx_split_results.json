@@ -1,0 +1,10 @@
+{
+  "rocm_gfx1100_preview": {
+    "date": "2026-03-30",
+    "model": "Qwen3.5-27B-Q6_K.gguf",
+    "gpus": "ROCm0+ROCm1 (RX 7900 XTX x2)",
+    "eval_tok_s": 22.49,
+    "prefill_tok_s": 76.70,
+    "notes": "Only confirmed result from the expanded backend sweep. Other backends failed due to known infra/config blockers documented in specifications/docs/llm-backend-performance.md."
+  }
+}

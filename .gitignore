@@ -6,6 +6,8 @@ __pycache__/
 state/install-state.json
 config/generated/
 test-work/
+.tmp_prisma_pkg/
+benchmarks.zip
 
 # Test artifacts (logs, reports, temp outputs) — not source code
 tests/output/

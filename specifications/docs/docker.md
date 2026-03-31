@@ -87,7 +87,7 @@ If you do not change it, the Docker install defaults LiteLLM to:
 - Password: `sk-local-dev`
 
 That password is the LiteLLM `LITELLM_MASTER_KEY`. Change it before exposing the gateway on a network.
-The default root compose also starts PostgreSQL and wires `DATABASE_URL`, so LiteLLM UI login works against a real database by default.
+The main compose stack also starts PostgreSQL and wires `DATABASE_URL`, so LiteLLM UI login works against a real database by default.
 
 If you want guided first-time setup on Linux, run:
 
@@ -120,12 +120,12 @@ backslashes even on Windows hosts.
 ### 3. Start the stack
 
 ```bash
-docker compose up -d
+docker compose --project-directory . -f docker/compose/docker-compose.yml up -d
 ```
 
-The root [`docker-compose.yml`](../docker-compose.yml) is image-only and safe to
-copy onto a clean host with just `.env`, `config/`, and `models/`. It does not
-require a git checkout or local Docker build context.
+The canonical compose stack now lives under [`docker/compose/`](../../docker/compose/),
+and the files are safe to copy onto a clean host with just `.env`, `config/`, and
+`models/`. It does not require a git checkout or local Docker build context.
 
 On first start the gateway container automatically seeds `config/local/` with
 commented template files if they do not already exist:
@@ -161,7 +161,7 @@ To force regeneration without restarting the full stack:
 
 Choose the compose file that matches your hardware. Each profile is self-contained.
 vLLM is available as an optional add-on, but the validated AMD path is the AMD
-compose profile rather than the root compose file.
+compose profile rather than the generic deployment file.
 
 ### 1. Universal (auto-detect)
 
@@ -170,20 +170,20 @@ first start. Best choice for most home-lab deployments.
 
 ```bash
 # llama.cpp only (auto-detect GPU)
-docker compose up -d
+docker compose --project-directory . -f docker/compose/docker-compose.yml up -d
 
-# With vLLM added (root compose / NVIDIA-oriented path)
-AUDIA_ENABLE_VLLM=true docker compose --profile vllm up -d
+# With vLLM added (main compose / NVIDIA-oriented path)
+AUDIA_ENABLE_VLLM=true docker compose --project-directory . -f docker/compose/docker-compose.yml --profile vllm up -d
 ```
 
-This uses the root `docker-compose.yml`. On first start, the backend container
+This uses `docker/compose/docker-compose.yml`. On first start, the backend container
 downloads and caches the appropriate llama.cpp binary. Subsequent starts reuse the
 host-mounted runtime base directory at `BACKEND_RUNTIME_ROOT` (default:
 `./config/data/backend-runtime`), with one sibling directory per backend such as
 `vulkan/`, `rocm/`, `cuda/`, or `cpu/`. Source-build worktrees are persisted separately
 under `BACKEND_BUILD_ROOT` (default `./config/data/backend-build`).
 
-Full compose definition: [`docker-compose.yml`](../docker-compose.yml)
+Full compose definition: [`docker/compose/docker-compose.yml`](../../docker/compose/docker-compose.yml)
 
 ---
 
@@ -707,7 +707,7 @@ The update preserves:
 
 On a clean remote host you only need:
 
-- `docker-compose.yml`
+- `docker/compose/docker-compose.yml`
 - `.env`
 - `config/`
 - `models/`
@@ -741,7 +741,7 @@ For local source-driven iteration with Compose, layer the dev override on top of
 the deployment compose:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+docker compose --project-directory . -f docker/compose/docker-compose.yml -f docker/compose/docker-compose.dev.yml up -d --build
 ```
 
 --- 

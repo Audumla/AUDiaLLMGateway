@@ -1,0 +1,38 @@
+{
+  "run_id": "20260331_vllm_rocm721_qwen35_textonly_results",
+  "timestamp": "2026-03-31T03:16:52+11:00",
+  "build_image": "local/vllm-rocm721-wheel:nightly",
+  "engine_version": "0.18.1",
+  "backend": "vllm",
+  "lane": "rocm721_wheel_nightly",
+  "gpu_topology": "dual_rx_7900_xtx",
+  "attempts": [
+    {
+      "model": "Qwen/Qwen3.5-4B",
+      "snapshot": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+      "served_model_name": "Qwen3.5-4B-textonly",
+      "tensor_parallel_size": 2,
+      "max_model_len": 2048,
+      "max_num_batched_tokens": 2048,
+      "language_model_only": true,
+      "status": "failed",
+      "failure": "Engine core initialization failed with NotImplementedError: The page size of the layer is not divisible by the maximum page size. Cannot unify by adjusting block_size."
+    },
+    {
+      "model": "Qwen/Qwen3.5-27B",
+      "snapshot": "b7ca741b86de18df552fd2cc952861e04621a4bd",
+      "served_model_name": "Qwen3.5-27B-textonly",
+      "tensor_parallel_size": 2,
+      "max_model_len": 2096,
+      "max_num_batched_tokens": 2096,
+      "language_model_only": true,
+      "status": "failed",
+      "failure": "WorkerProc initialization failed with the same KV-cache page-size unification NotImplementedError."
+    }
+  ],
+  "observations": [
+    "The text-only flag works: vLLM logs report that all multimodal limits are set to 0 and the run is in text-only mode.",
+    "Both Qwen3.5-4B and Qwen3.5-27B then fail after graph compilation while building KV cache groups.",
+    "This points to a Qwen3.5 + vLLM 0.18.1 hybrid KV-cache regression on the ROCm wheel lane rather than a plain VRAM fit issue."
+  ]
+}

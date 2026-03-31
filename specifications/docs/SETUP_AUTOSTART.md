@@ -330,7 +330,7 @@ You can trigger startup at:
 
 ### Reduce Startup Time
 
-1. **Pre-load models**: Add to `docker-compose.yml`:
+1. **Pre-load models**: Add to `docker/compose/docker-compose.yml`:
    ```yaml
    environment:
      - PRELOAD_MODELS=true

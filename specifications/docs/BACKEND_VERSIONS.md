@@ -6,6 +6,13 @@ The AUDia LLM Gateway supports **8 different llama.cpp backend configurations** 
 - **4 backends are actively enabled** by default
 - **4 specialized variants are available** but disabled to reduce boot time
 
+For the maintained machine-readable source/release catalog, see:
+
+- [benchmarks/data/backend-benchmarks/backend-catalog.yaml](../../benchmarks/data/backend-benchmarks/backend-catalog.yaml)
+- [benchmarks/data/backend-benchmarks/engine-version-catalog.yaml](../../benchmarks/data/backend-benchmarks/engine-version-catalog.yaml)
+- [benchmarks/docs/backend-catalog.md](../../benchmarks/docs/backend-catalog.md)
+- [benchmarks/docs/engine-version-catalog.md](../../benchmarks/docs/engine-version-catalog.md)
+
 ---
 
 ## Active Backends (Enabled by Default)
@@ -56,6 +63,10 @@ Runtime: ubuntu-rocm.*x64
 **Performance:** Fast, standard ROCm support
 **Requirements:** AMD GPU + ROCm drivers
 **Asset Pattern:** `ubuntu-rocm.*x64.(tar.gz|zip)`
+
+The gateway also exposes a selectable `qwen27_fast_rocm_latest` deployment
+that points at the versioned `llama-server-rocm-ggml-latest` alias for the
+current ggml ROCm lane.
 
 ---
 
@@ -138,7 +149,9 @@ Build:        Custom CMake with GGML_HIPBLAS
 Status:       ❌ DISABLED (CMake failures)
 ```
 
-**Why Disabled:** Repository clone fails, CMake configuration errors prevent compilation
+**Why Disabled (historical path):** Repository clone/CMake failures prevented the old
+startup path from compiling. The maintained Lemonade nightly channel is tracked in
+the benchmark backend catalog.
 
 ---
 

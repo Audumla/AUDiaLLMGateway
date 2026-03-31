@@ -78,6 +78,21 @@ presets:
         parallel: 1
         gpu_layers: all
         metrics: true
+    llamacpp_rocm_ggml_latest_dual_xtx:
+      framework: llama_cpp
+      transport: llama-swap
+      executable_macro: llama-server-rocm-ggml-latest
+      llama_cpp_options:
+        device:
+          - ROCm1
+          - ROCm2
+        split_mode: layer
+        tensor_split:
+          - 1
+          - 1
+        gpu_layers: 99
+        parallel: 1
+        metrics: true
     vllm_rocm_single_gpu1:
       framework: vllm
       transport: direct
@@ -187,6 +202,11 @@ model_profiles:
         profile: llamacpp_vulkan_split_gpu2
         llama_swap_model: qwen3.5-27b-(96k-Q6)
         backend_model_name: qwen3.5-27b-(96k-Q6)
+      llamacpp_rocm_latest:
+        label: local/qwen27_fast_rocm_latest
+        profile: llamacpp_rocm_ggml_latest_dual_xtx
+        llama_swap_model: qwen3.5-27b-(96k-Q6)-rocm-latest
+        backend_model_name: qwen3.5-27b-(96k-Q6)-rocm-latest
   qwen122_smart:
     mode: chat
     family: qwen3.5

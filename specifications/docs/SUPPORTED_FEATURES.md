@@ -285,7 +285,7 @@ Tests:
 ✓ All files present (7 files)
 ✓ Scripts syntax valid (3 scripts)
 ✓ Docker/Compose installed
-✓ docker-compose.yml valid
+✓ docker/compose/docker-compose.yml valid
 ✓ .env configuration correct
 
 Time: ~1 hour (already completed)

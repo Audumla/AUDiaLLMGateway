@@ -1,0 +1,183 @@
+version: 1
+title: AUDia backend source and release catalog
+purpose: >-
+  Keep a durable record of which backend source channels exist and which ones
+  are maintained upstream as prebuilts or source-build lanes.
+last_updated: 2026-03-31
+
+backends:
+  llama_cpp:
+    sources:
+      ggml_org_release:
+        maintainer: ggml-org
+        url: https://github.com/ggml-org/llama.cpp
+        prebuilt: true
+        status: maintained
+        notes:
+          - Primary prebuilt channel used by the gateway runtime.
+          - Current project config treats these assets as the default CPU/CUDA/
+            ROCm/Vulkan release lane.
+          - Qwen3.5 support floor in the docs is b8153 or newer.
+      rocm_official_preview:
+        maintainer: ROCm
+        url: https://github.com/ROCm/llama.cpp
+        prebuilt: false
+        source_build: true
+        status: maintained
+        notes:
+          - Source-build path for ROCm preview branches.
+          - Used when testing ROCm preview branches instead of release assets.
+      lemonade_nightly:
+        maintainer: lemonade-sdk
+        url: https://github.com/lemonade-sdk/llamacpp-rocm
+        prebuilt: true
+        status: maintained
+        notes:
+          - Nightly builds are published for AMD ROCm 7 acceleration.
+          - The repo is explicitly geared toward AMD RDNA3/RDNA4 targets.
+          - Latest observed release is b1224.
+          - The b1224 gfx110X prebuilt was benchmarked successfully on qwen27.
+      lychee_strix_halo_release:
+        maintainer: Lychee-Technology
+        url: https://github.com/Lychee-Technology/llama-cpp-for-strix-halo/releases
+        prebuilt: true
+        status: maintained
+        notes:
+          - Latest observed release is b8580 with asset
+            llama-cpp-b8580-rocm-7.2.1-gfx1151.tar.xz.
+          - This is a Strix Halo-targeted (gfx1151) lane and should be tracked
+            separately from the dual-XTX (gfx1100) host lanes.
+          - Apply prebuilt first, then local-source build fallback for
+            non-gfx1151 hardware.
+          - On the current gfx1100 host, startup reached dependency fixes but
+            then failed with Illegal instruction.
+          - Repository currently acts as a packaging/prebuilt wrapper and does
+            not expose a direct CMake source tree for local build fallback.
+      rocm_7_2_1_runtime_release:
+        maintainer: ROCm
+        url: https://github.com/ROCm/ROCm/releases/tag/rocm-7.2.1
+        prebuilt: true
+        status: maintained
+        notes:
+          - ROCm runtime release lane used for the new matrix pass.
+          - GitHub release entry is published as a release marker and does not
+            ship llama.cpp binaries directly.
+          - Verified in practice via the ROCm 7.2.1 build/runtime container lane.
+
+  vllm:
+    sources:
+      rocm_current:
+        maintainer: vllm-project
+        url: https://docs.vllm.ai/en/latest/getting_started/installation/gpu.html
+        prebuilt: true
+        status: maintained
+        notes:
+          - Current official docs say AMD ROCm 6.3+ is supported.
+          - Official docs also say pre-built wheels are available for ROCm 7.0.
+          - On this host, Qwen3-0.6B is working while Qwen3.5-4B still needs triage.
+      rocm_0_17_1_rollback:
+        maintainer: vllm-project
+        url: https://github.com/vllm-project/vllm
+        prebuilt: true
+        status: historical_working
+        notes:
+          - Rollback lane used the official ROCm image at v0.17.1.
+          - Qwen3.5-27B AWQ on the dual 7900 XTX cards returned a chat
+            completion with `max_model_len=2048` and `--language-model-only`.
+          - Standard compare prompt benchmark on that lane measured 3.41 tok/s
+            over 300 completion tokens.
+          - Keep this lane distinct from the v0.18.x hybrid KV-cache regression.
+      rocm_7_2_1_wheel_nightly:
+        maintainer: vllm-project
+        url: https://docs.vllm.ai/en/latest/getting_started/installation/gpu/#pre-built-wheels
+        prebuilt: true
+        status: maintained
+        notes:
+          - Official docs provide a ROCm nightly wheel lane for `rocm721`.
+          - Use the documented ROCm wheel index instead of the generic nightly
+            CUDA lane.
+          - This lane built successfully as `local/vllm-rocm721-wheel:nightly`
+            and served Qwen3-0.6B at 75.05 eval tok/s.
+          - Qwen3.5-4B text-only now gets past multimodal profiling, but still
+            fails during KV-cache page-size unification.
+          - Qwen3.5-27B text-only at 2096 tokens also fails with the same
+            KV-cache page-size unification error.
+          - Keep this lane for small-model smoke tests until vLLM's Qwen3.5
+            hybrid KV-cache path is fixed upstream.
+      amd_dev_stream:
+        maintainer: AMD
+        url: https://hub.docker.com/r/rocm/vllm-dev
+        prebuilt: true
+        status: maintained
+        notes:
+          - AMD dev images ship explicit ROCm/Triton/rocBLAS combinations.
+      regression_navi_base:
+        maintainer: vllm-project
+        url: https://docs.vllm.ai/en/v0.9.1/getting_started/installation/gpu.html
+        prebuilt: true
+        status: historical
+        notes:
+          - Older ROCm 6.3-era path used as a regression comparison branch.
+          - Useful when reproducing earlier RX 7900-specific behavior.
+          - Keep separate from the current supported ROCm path.
+
+  tgi:
+    sources:
+      rocm_docker:
+        maintainer: huggingface
+        url: https://huggingface.co/docs/text-generation-inference/main/en/installation_amd
+        prebuilt: true
+        status: maintained
+        notes:
+          - Official ROCm Docker is maintained.
+          - On this host, qwen3_5 is not supported by the current ROCm image line.
+
+  sglang:
+    sources:
+      rocm_docker:
+        maintainer: lmsys
+        url: https://docs.sglang.ai/platforms/amd_gpu.html
+        prebuilt: true
+        status: maintained
+        notes:
+          - Official ROCm Docker images exist.
+          - Current AMD docs are MI300-centric and remain unproven on gfx1100 here.
+
+  ollama:
+    sources:
+      rocm_docker:
+        maintainer: ollama
+        url: https://docs.ollama.com/gpu
+        prebuilt: true
+        status: maintained
+        notes:
+          - Official ROCm image is available.
+
+  aphrodite:
+    sources:
+      source_build:
+        maintainer: aphrodite-engine
+        url: https://github.com/aphrodite-engine/aphrodite-engine
+        prebuilt: false
+        source_build: true
+        status: experimental
+        notes:
+          - No confirmed AMD prebuilt channel recorded here.
+
+  zinc:
+    sources:
+      source_build:
+        maintainer: zolotukhin
+        url: https://github.com/zolotukhin/zinc
+        prebuilt: false
+        source_build: true
+        status: experimental
+        notes:
+          - Vulkan-native AMD inference engine.
+          - Staged build/test on the server used Zig 0.15.2, Bun 1.3.11, and Vulkan SDK 1.4.341.1.
+
+update_policy:
+  - Add a new entry here whenever a backend gains a new maintained source or
+    release channel.
+  - Record the latest confirmed build or tag in specifications/docs/llm-backend-performance.md.
+  - Mirror the current status in benchmarks/data/backend-benchmarks/compatibility-matrix.yaml.

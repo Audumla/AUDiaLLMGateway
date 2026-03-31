@@ -85,10 +85,10 @@ if [ ! -f "$DASHBOARD_ROOT/Dockerfile" ]; then
 fi
 echo -e "${GREEN}✓ Dockerfile present${NC}"
 
-if [ ! -f "docker-compose.dashboard.yml" ]; then
-    echo -e "${YELLOW}⚠ docker-compose.dashboard.yml not found${NC}"
+if [ ! -f "docker/compose/docker-compose.dashboard.yml" ]; then
+    echo -e "${YELLOW}⚠ docker/compose/docker-compose.dashboard.yml not found${NC}"
 else
-    echo -e "${GREEN}✓ docker-compose.dashboard.yml present${NC}"
+    echo -e "${GREEN}✓ docker/compose/docker-compose.dashboard.yml present${NC}"
 fi
 echo
 
@@ -110,7 +110,7 @@ echo "   docker build -f src/monitoring/Dockerfile -t audia-monitoring:phase-1 .
 echo "   docker run -p 8080:8080 audia-monitoring:phase-1"
 echo
 echo "2. Or use docker-compose:"
-echo "   docker-compose -f docker-compose.dashboard.yml up -d dashboard"
+echo "   docker compose --project-directory . -f docker/compose/docker-compose.dashboard.yml up -d dashboard"
 echo
 echo "3. Test the API:"
 echo "   curl http://localhost:8080/healthz"

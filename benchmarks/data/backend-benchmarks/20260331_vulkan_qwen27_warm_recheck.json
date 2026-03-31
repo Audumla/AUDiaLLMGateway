@@ -1,0 +1,30 @@
+{
+  "date": "2026-03-31",
+  "backend": "llama-server-vulkan",
+  "lane": "llamacpp_vulkan",
+  "model": "Qwen3.5-27B-Q6_K.gguf",
+  "served_model_name": "qwen3.5-27b-(96k-Q6)",
+  "context": 131072,
+  "prompt": "Explain the difference between transformer attention mechanisms and recurrent neural networks in detail, covering architecture, computational complexity, parallelism, and practical use cases.",
+  "max_tokens": 300,
+  "isolation": {
+    "device": "Vulkan2,Vulkan1",
+    "gpu_layers": 99,
+    "flash_attn": "on",
+    "gpus": [
+      "Vulkan1",
+      "Vulkan2"
+    ]
+  },
+  "result": {
+    "cold_request_elapsed_seconds": 21.696,
+    "cold_request_tok_s": 13.83,
+    "warm_request_elapsed_seconds": 11.416,
+    "warm_request_tok_s": 26.28,
+    "finish_reason": "length"
+  },
+  "notes": [
+    "The first managed request included startup/cold-path overhead and is not the number to compare against the established baseline.",
+    "The warm request matches the known-good llama.cpp Vulkan class of result on the dual-XTX host."
+  ]
+}

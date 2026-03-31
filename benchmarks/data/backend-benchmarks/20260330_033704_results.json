@@ -1,0 +1,58 @@
+{
+  "session_date": "2026-03-30T03:37:04Z",
+  "results": [
+    {
+      "backend": "llama-swap",
+      "model": "ministral3b-vision",
+      "elapsed_s": 1.545,
+      "prompt_tokens": 584,
+      "completion_tokens": 300,
+      "eval_tok_s": 194.18,
+      "status": "confirmed"
+    },
+    {
+      "backend": "vllm_awq",
+      "model": "Qwen/Qwen3-0.6B",
+      "elapsed_s": 2.639,
+      "prompt_tokens": 57,
+      "completion_tokens": 300,
+      "eval_tok_s": 113.7,
+      "status": "confirmed"
+    },
+    {
+      "backend": "ollama_rocm",
+      "model": "qwen25b",
+      "elapsed_s": 4.399,
+      "prompt_tokens": 49,
+      "completion_tokens": 1048,
+      "eval_tok_s": 238.26,
+      "status": "confirmed"
+    }
+  ],
+  "failures": [
+    {
+      "backend": "vllm_bf16",
+      "model": "Qwen/Qwen3-0.6B",
+      "status": "failed",
+      "reason": "Remote end closed connection without response"
+    },
+    {
+      "backend": "tgi_rocm",
+      "model": "Qwen/Qwen3-0.6B",
+      "status": "failed",
+      "reason": "Connection refused"
+    },
+    {
+      "backend": "sglang_rocm",
+      "model": "Qwen/Qwen3-0.6B",
+      "status": "failed",
+      "reason": "Connection refused"
+    },
+    {
+      "backend": "aphrodite_rocm",
+      "model": "Qwen/Qwen3-0.6B",
+      "status": "failed",
+      "reason": "Connection refused"
+    }
+  ]
+}

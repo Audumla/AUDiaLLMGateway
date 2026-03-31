@@ -49,6 +49,20 @@ Legend: **Implemented** | *Draft / in progress* | Planned
 
 ---
 
+## Operational & Performance Docs
+
+Living documents updated as the system is deployed and tuned. Each entry is dated; append rather than overwrite.
+
+| Document | Description |
+| -------- | ----------- |
+| [benchmarks/README.md](../benchmarks/README.md) | Separate backend benchmark workspace and migration entry point |
+| [docs/llm-backend-performance.md](docs/llm-backend-performance.md) | Backend throughput benchmarks and optimization findings — vLLM, llama.cpp, quantization, GPU tuning |
+| [docs/llm-backend-builds.md](docs/llm-backend-builds.md) | Backend build + runtime catalog with repeatable commands and known issues |
+| [docs/docker-field-notes.md](docs/docker-field-notes.md) | Real deployment issues and fixes found during AMD/Linux Docker validation |
+| [docs/runbook.md](docs/runbook.md) | Day-to-day operations reference |
+
+---
+
 ## Reading order
 
 For a new contributor:
@@ -58,4 +72,6 @@ For a new contributor:
 3. [spec-001](spec-001-local-llm-gateway-mid-level.md) — component topology and deployment models
 4. [spec-002](spec-002-model-catalog-and-config-lifecycle.md) — model catalog and config lifecycle (draft)
 5. [docs/runbook.md](docs/runbook.md) — operations reference
+6. [docs/llm-backend-performance.md](docs/llm-backend-performance.md) — benchmark results and tuning notes
+7. [docs/llm-backend-builds.md](docs/llm-backend-builds.md) — backend build/run recipes
 

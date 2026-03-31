@@ -1,0 +1,35 @@
+{
+  "session_date": "2026-03-30",
+  "results": [
+    {
+      "backend": "ollama_rocm",
+      "model": "qwen25b",
+      "elapsed_s": 1.921,
+      "prompt_tokens": 49,
+      "completion_tokens": 304,
+      "eval_tok_s": 158.27,
+      "status": "confirmed"
+    }
+  ],
+  "failures": [
+    {
+      "backend": "tgi_rocm",
+      "model": "Qwen/Qwen3-0.6B",
+      "status": "failed",
+      "reason": "ShardCannotStart / KeyError: 'LOCAL_RANK'"
+    },
+    {
+      "backend": "sglang_rocm",
+      "model": "Qwen/Qwen3-0.6B",
+      "status": "failed",
+      "reason": "startup exit on current image"
+    },
+    {
+      "backend": "aphrodite_rocm",
+      "model": "Qwen/Qwen3-0.6B",
+      "status": "failed",
+      "reason": "ImportError: libcuda.so.1 missing"
+    }
+  ]
+}
+

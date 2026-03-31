@@ -1,0 +1,82 @@
+version: 1
+title: AUDia benchmark profile catalog
+purpose: >-
+  Named benchmark profiles for repeatable backend comparison runs. Profiles
+  describe the model, GPU topology, and the backend-specific configuration
+  family so the same test can be rerun without rewriting the harness.
+
+profiles:
+  qwen35_compare_4b:
+    description: Shared smaller model for backend bring-up and compatibility checks.
+    model:
+      hf: Qwen/Qwen3.5-4B
+      gguf: Qwen3.5-4B-Q5_K_XL.gguf
+    topology:
+      gpu_set: dual_xtx
+      exclude_gpu: rx6900_xt
+    backend_families:
+      llamacpp:
+        vulkan:
+          container_hint: llama-swap
+          served_model: qwen3-5-4b-ud-q5-k-xl-vision1
+        rocm_preview:
+          container_hint: llama-swap
+          served_model: qwen3-5-4b-ud-q5-k-xl-vision1
+      vllm:
+        rocm:
+          served_model: qwen3.5-4b
+          tensor_parallel_size: 2
+          dtype: bfloat16
+          max_model_len: 2048
+      ollama:
+        rocm:
+          served_model: qwen35b
+      tgi:
+        rocm:
+          served_model: qwen3.5-4b
+          num_shard: 2
+          fallback_num_shard: 1
+      sglang:
+        rocm:
+          served_model: qwen3.5-4b
+      aphrodite:
+        rocm:
+          served_model: qwen3.5-4b
+
+  qwen35_27b_dual_xtx:
+    description: Real performance target for the main benchmark campaign.
+    model:
+      hf: Qwen/Qwen3.5-27B
+      gguf: Qwen3.5-27B-Q6_K.gguf
+    topology:
+      gpu_set: dual_xtx
+      exclude_gpu: rx6900_xt
+    backend_families:
+      llamacpp:
+        vulkan:
+          container_hint: llama-swap
+          served_model: qwen3.5-27b-(96k-Q6)
+          target_device_set: Vulkan1,Vulkan2
+        rocm_preview:
+          container_hint: llama-swap
+          served_model: qwen3.5-27b-(96k-Q6)-rocm-latest
+      vllm:
+        rocm:
+          served_model: qwen3.5-27b
+          tensor_parallel_size: 2
+          dtype: bfloat16
+          max_model_len: 2048
+      ollama:
+        rocm:
+          served_model: qwen27b
+      tgi:
+        rocm:
+          served_model: qwen3.5-27b
+          num_shard: 2
+          fallback_num_shard: 1
+      sglang:
+        rocm:
+          served_model: qwen3.5-27b
+      aphrodite:
+        rocm:
+          served_model: qwen3.5-27b

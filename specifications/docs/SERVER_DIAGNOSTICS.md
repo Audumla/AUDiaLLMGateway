@@ -92,7 +92,7 @@ defaults:
 
 **Fix Applied:**
 ```yaml
-# docker-compose.yml
+# docker/compose/docker-compose.yml
 healthcheck:
   test: ["CMD", "curl", "-f", "http://localhost:41008/health"]
   interval: 30s
@@ -148,7 +148,7 @@ VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/radeon_icd.json
    - Prevents GFX1030/1100 preview builds
    - Sets `always: false` to only auto-provision running backend
 
-3. **`docker-compose.yml`** → Added llama-cpp health check
+3. **`docker/compose/docker-compose.yml`** → Added llama-cpp health check
    - Now properly signals readiness to dependent services
    - Enables health monitoring
 

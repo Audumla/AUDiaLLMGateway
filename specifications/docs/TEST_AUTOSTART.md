@@ -56,7 +56,7 @@ ls -lh scripts/register-startup-task.ps1
 ls -lh SETUP_AUTOSTART.md
 ls -lh AUTOSTART_QUICKSTART.txt
 ls -lh .env
-ls -lh docker-compose.yml
+ls -lh docker/compose/docker-compose.yml
 ```
 
 **Expected:** All files present with reasonable sizes
@@ -381,7 +381,7 @@ PHASE 1: COMPONENT VALIDATION
 [x] All files exist
 [x] Script syntax valid
 [x] Docker/Compose installed
-[x] docker-compose.yml valid
+[x] docker/compose/docker-compose.yml valid
 [x] .env configured correctly
 
 Result: PASS
@@ -495,7 +495,7 @@ Use this checklist to verify the process is repeatable:
 
 1. Check file permissions
 2. Verify .env file is properly formatted (no BOM, UTF-8)
-3. Check docker-compose.yml syntax with: `docker compose config`
+3. Check docker/compose/docker-compose.yml syntax with: `docker compose config`
 4. Verify Docker/Compose are in PATH
 
 ### If Phase 2 Fails

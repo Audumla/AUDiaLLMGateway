@@ -1,0 +1,36 @@
+{
+  "run_id": "20260331_vllm_rocm721_qwen27_context_attempts",
+  "timestamp": "2026-03-31T02:29:43+11:00",
+  "build_image": "local/vllm-rocm721-wheel:nightly",
+  "backend": "vllm",
+  "engine_version": "0.18.1",
+  "model": "QuantTrio/Qwen3.5-27B-AWQ",
+  "served_model_name": "Qwen3.5-27B-AWQ-vLLM",
+  "tensor_parallel_size": 2,
+  "gpu_visibility": [
+    "ROCR_VISIBLE_DEVICES=0",
+    "ROCR_VISIBLE_DEVICES=1"
+  ],
+  "gpu_topology": "dual_rx_7900_xtx",
+  "attempts": [
+    {
+      "max_model_len": 4096,
+      "max_num_batched_tokens": 4096,
+      "max_num_seqs": 1,
+      "status": "failed",
+      "failure": "Engine core initialization failed with NotImplementedError: The page size of the layer is not divisible by the maximum page size. Cannot unify by adjusting block_size."
+    },
+    {
+      "max_model_len": 2048,
+      "max_num_batched_tokens": 2048,
+      "max_num_seqs": 1,
+      "status": "failed",
+      "failure": "Engine core initialization failed with the same page-size unification NotImplementedError."
+    }
+  ],
+  "observations": [
+    "The earlier multimodal profiling OOM path was successfully bypassed by patching the real wheel file under /opt/venv.",
+    "The model loads weight shards successfully and compiles the first graph range before the KV cache unification failure appears.",
+    "This lane is not yet a viable qwen27 runtime on the current 0.18.1 ROCm wheel without additional engine changes."
+  ]
+}

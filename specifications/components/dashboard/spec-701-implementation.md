@@ -13,20 +13,21 @@
 
 | Component | Status | Blocker? | Notes |
 | --- | --- | --- | --- |
-| Manifest schema | ✅ Defined | No | `litellm.yaml`, `llamaswap.yaml` exist; vLLM needs review |
+| Manifest schema | ✅ Updated | No | `hardware_correlation` added for PCI joining |
 | AUDiotMonitor hwexp | ⏳ Not started | **YES** | spec-801 must be complete before Phase 2 |
 | FastAPI backend | 🔄 Scaffolding only | No | Routes defined, no implementation |
 | Vue3 frontend | 🔄 Design only | No | Component structure designed, not coded |
 | Prometheus integration | ⚠️ Partial | No | hwexp adapter needed (blocks SPA) |
 | llama.cpp metrics | ✅ Enabled | No | `metrics: true` added by Gemini fix |
 | vLLM metrics | ⚠️ Needs verification | No | Check if vLLM profiles have metrics enabled |
-| Docker service | ⏳ Not defined | No | Needs docker-compose.yml update |
+| Docker service | ⏳ Not defined | No | Needs docker/compose/docker-compose.yml update |
 
 **Critical path to Phase 1 completion:**
 
 1. Verify vLLM has `metrics: true` (check models.override.yaml)
 2. Validate all manifest YAML files
 3. Create manifest_loader.py + FastAPI scaffolding (3-4 days)
+4. Verify PCI slot identifiers are available in stack config (for correlation)
 
 **Critical path to Phase 2 (SPA launch):**
 
@@ -509,7 +510,7 @@ services:
   litellm:
     host: 127.0.0.1
     port: 4000
-    image: litellm:latest  # ← This is in docker-compose.yml!
+    image: litellm:latest  # ← This is in docker/compose/docker-compose.yml!
 
 # ✅ CORRECT: reference source of truth only
 # config/monitoring/litellm.yaml
@@ -532,8 +533,8 @@ connection:
 | --- | --- |
 | Service port | In stack.yaml, exported as env var |
 | Service host | In stack.yaml, exported as env var |
-| Docker image | In docker-compose.yml |
-| Startup command | In docker-compose.yml or config/*.yaml |
+| Docker image | In docker/compose/docker-compose.yml |
+| Startup command | In docker/compose/docker-compose.yml or config/*.yaml |
 | Model lists | Component-specific, dashboard doesn't care |
 | Runtime environment | Component-specific, not dashboard's concern |
 
@@ -594,7 +595,23 @@ Result:
 - ✅ Metrics scraped automatically
 - ✅ Restart button available
 - ✅ ZERO code changes to dashboard
-- ✅ ZERO changes to docker-compose.yml (assumes ollama service already exists)
+- ✅ ZERO changes to docker/compose/docker-compose.yml (assumes ollama service already exists)
+
+---
+
+## Phase 0.5: Hardware Correlation Contract
+
+**Goal:** Ensure every component manifest can be joined with its physical hardware.
+
+- [ ] **0.5.1** Identify PCI slots for all GPUs on `gpu-host.example`
+- [ ] **0.5.2** Update `config/local/stack.override.yaml` to export `GPU_PCI_SLOT_0`, etc.
+- [ ] **0.5.3** Update `config/monitoring/llamaswap.yaml` with correlation block:
+  ```yaml
+  hardware_correlation:
+    device_class: gpu
+    pci_slot: "${GPU_PCI_SLOT_0}"
+  ```
+- [ ] **0.5.4** Verify `manifest_loader.py` can parse the new block.
 
 ---
 
@@ -1379,7 +1396,7 @@ models:
 
 ### 4.3 Docker Compose
 
-Add to `docker-compose.yml`:
+Add to `docker/compose/docker-compose.yml`:
 
 ```yaml
 audia-dashboard:

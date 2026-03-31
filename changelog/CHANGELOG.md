@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Refreshed the primary gateway docs and specs to match the current compose layout and backend configuration paths. (Documentation Update)
+- Reworked the main Docker guide, top-level README, and major specs to point at docker/compose instead of the old root compose filenames.
+- Updated dashboard, vLLM, and deployment references so the repo presents a single canonical compose layout.
+- Verified the moved compose stack and the changelog JSON remain valid after the documentation sweep.
+
+### Rehomed the root compose files into docker/compose and updated the main entry points to use the new layout. (Configuration Cleanup, Documentation Update)
+- Moved the main, dev, and dashboard compose files out of the repository root.
+- Updated the README, scripts, tests, and Docker guide to point at docker/compose with --project-directory.
+- Verified the moved compose stack with the compose-defaults test.
+
 ### Scaffolded a native Windows local LLM gateway workspace in AUDiaLLMGateway. (New Feature)
 - Created a Git-backed repo scaffold with config, docs, PowerShell wrappers, and Python orchestration for llama-server plus LiteLLM.
 - Added health checks, routing tests, and config generation for local model profiles and future MCP registration.
@@ -559,5 +569,172 @@
 - Phase 5: hwexp and node-exporter scraping OK, no LLM inference metrics in Prometheus
 - Phase 6: All nginx proxy routes PASS
 - Phase 7: 7 issues documented including vLLM bugs and missing Prometheus LLM metrics
+
+### Completed exhaustive vLLM optimization benchmark on RX 7900 XTX (RDNA3); documented all results in llm-backend-performance.md (Documentation Update, Performance Improvement)
+- Plan B (TunableOp): 520/522 GEMM shapes tuned — no improvement (10.80 tok/s); Triton AWQ dequant not covered by TunableOp
+- Plan C (speculative ngram): 11.06 tok/s (+2.4%); low acceptance rate on technical text
+- Plan E (3-GPU Vulkan): 21.98 tok/s — worse than 2-XTX; 6900 XT becomes bottleneck in unequal split
+- Plan A (BF16): blocked — TP=3 invalid (64 heads not divisible by 3); TP=2+cpu-offload broken in vLLM v1
+- Plan D (SGLang): dead end — all ROCm images target MI-series CDNA only
+- Updated llm-backend-performance.md with 2026-03-29 session results and complete plan outcomes
+- BF16 model (Qwen/Qwen3.5-27B) downloaded to server for future testing on larger hardware
+
+### Identified 4 separate vLLM ROCm build streams and planned new benchmark test series for gfx1100 kernel optimization (Documentation Update)
+- Official vLLM nightly — tests upstream fixes since 0.17.1 stable
+- Self-built Dockerfile.rocm with ARG_PYTORCH_ROCM_ARCH=gfx1100 — explicit arch targeting
+- AMD rocm/vllm-dev:nightly — AMD curated ROCm/Torch/Triton combos
+- AMD rocm/vllm-dev:rocm721_torch210_triton36_preview_* — preview Triton/kernel combinations
+- Four-test benchmark plan added to llm-backend-performance.md for execution on server gpu-host.example
+
+### Created exhaustive llama.cpp ROCm test matrix with 10 tests covering build flags, kernel backends, and hardware scaling (Documentation Update)
+- Tests 1-8: Build variables (baseline prebuilt, explicit arch, rocBLAS vs hipBLASLt, gfx1100-only, ROCm 6.3 era, latest main, HSA_OVERRIDE)
+- Tests 9-10: Hardware scaling (single GPU, all 3 GPUs with balanced split)
+- Success criteria: >22 tok/s = kernel improvement; rocBLAS/main >22 = rollout candidate
+- All tests use same model/prompt/methodology for direct comparison
+- Targets untested combinations of ROCm version, BLAS backend, and arch targeting
+
+### Created complete benchmark matrix combining vLLM and llama.cpp tests with 4-tier priority system and execution roadmap (Documentation Update)
+- Tier 1 (highest impact): AMD preview vLLM, rocBLAS-only llama.cpp, upstream nightlies
+- Tier 2 (secondary): Self-built gfx1100, explicit arch targeting
+- Tier 3 (sanity checks): Single GPU baseline, all 3 GPU bottleneck, hardware scaling
+- Tier 4 (optional regression): ROCm 6.3 era, HSA_OVERRIDE tests
+- Success criteria: >22 tok/s = improvement; rocBLAS/main >22 = rollout candidate
+- Three decision paths documented (improvement found, no improvement, mixed results)
+- Server gpu-host.example ready with models, scripts, and all exact test commands
+
+### Added 7 Vulkan optimization tests targeting driver, Mesa, and runtime tuning on RDNA3 gfx1100 (Documentation Update)
+- Test V1: Baseline RADV explicit driver pinning
+- Test V2: Flash Attention OFF stability baseline
+- Test V3: Prefill batch size -ub 2048 (+5-10% expected)
+- Test V4: PCIe ASPM performance mode (+10.8% expected)
+- Test V5: Self-built upstream Vulkan release
+- Test V6: AMDVLK vs RADV driver comparison
+- Test V7: Mesa 26.x+ upgrade for cooperative-matrix (+5-10% expected)
+- Target: 27.5-28.5 tok/s (5-8% over current 26.41 baseline)
+- Validations based on RDNA4 testing; apply cautiously to RDNA3
+- Completes 21-test matrix across Vulkan, vLLM ROCm, llama.cpp ROCm
+
+### Completed V1-V7 GPU benchmark matrix for Qwen3.5-27B Q6_K on RDNA3 Vulkan; resolved LD_LIBRARY_PATH regression (Performance Improvement)
+- Fixed missing /app/runtime-root/vulkan/bin in LD_LIBRARY_PATH that prevented libggml-vulkan.so from loading
+- All 3 RDNA3 GPUs (RX 6900 XT + 2x RX 7900 XTX) confirmed via Vulkan backend with 65/65 layers offloaded
+- V1-V7 benchmark results: avg 6.52 tok/s gen, best 7.00 tok/s (V1/V2/V4), worst 5.64 tok/s (V5 ubatch=2K)
+- Performance ceiling is architecture-limited by Qwen3.5-27B Mamba/SSM hybrid recurrence (sequential by design)
+- Documented in RESOLUTION_SUMMARY.md and QUICK_FIX_GUIDE.md under plan_runs artifact directory
+
+### Documented backend benchmark handoff and build catalog (Documentation Update)
+- Updated backend performance doc with 2026-03-30 sweep results and blockers
+- Added repeatable backend build/run catalog
+- Added 20260330 benchmark JSON
+
+### Added likely-candidate backend list (Documentation Update)
+- Documented MLC-LLM Vulkan and other candidates with exclusions
+
+### Recorded manual rotation backend results (Documentation Update)
+- Captured llama-swap and vLLM AWQ/BF16 metrics in benchmark docs
+- Added manual-rotation results JSON artifact
+
+### Corrected TGI ROCm image tag in backend docs (Documentation Update)
+- Verified latest-rocm exists on GHCR
+- Documented that 3.3.5-rocm is not available
+
+### Clarified the safe runtime-python invocation for changelog updates. (Documentation Update)
+- This prevents Windows editor associations from opening Visual Studio when logging changes.
+
+### Separated benchmark execution into its own workspace and added repeatable lifecycle scripts for backend benchmarking. (Documentation Update)
+- Added bench/bin helpers for preflight, kill, reset, wait, and metrics collection.
+- Documented Zinc as an experimental Vulkan-native AMD candidate and kept the benchmark guidance isolated from gateway docs.
+
+### Added PowerShell-native equivalents for the benchmark lifecycle helpers so the benchmark harness can be validated on Windows without bash. (Documentation Update)
+- Created preflight, kill, reset, wait, and collect companions in benchmarks/bin.
+- Updated the benchmark docs to point at the Windows-native path alongside the bash scripts.
+
+### Added a one-command PowerShell benchmark wrapper to orchestrate preflight, cleanup, backend start, readiness wait, and optional metrics capture. (New Feature)
+- The wrapper reuses the existing benchmark lifecycle helpers in benchmarks/bin.
+- This keeps Windows-native benchmark runs repeatable without relying on bash.
+
+### Captured a fresh benchmark sweep from the live server and recorded the latest backend results and failures in the benchmark workspace. (Performance Improvement)
+- Added a new results snapshot for the 2026-03-30 03:37Z sweep.
+- Updated the latest run notes to reflect the new Ollama and vLLM measurements plus the remaining blocked backends.
+
+### Standardized backend comparisons on Qwen3.5-4B and recorded the live single-model benchmark sweep. (Performance Improvement)
+- Updated the benchmark workspace to use one shared Qwen3.5-4B compare model across llama-swap, Ollama, vLLM, TGI, SGLang, and Aphrodite.
+- Patched the live server benchmark runner to use the Qwen3.5-4B compare model and a shorter token budget, then captured fresh results.
+- Recorded the new benchmark results and compatibility notes in the separate benchmarks workspace.
+
+### Added named benchmark profiles for the shared Qwen3.5-4B compare run and the real Qwen3.5-27B dual-XTX target, plus failure log capture on the live runner. (Performance Improvement)
+- Created a benchmark profile catalog so model, topology, and backend-specific settings can be swapped without rewriting the workflow.
+- Updated the live server benchmark runner to preserve container logs and inspect data when a backend exits before readiness.
+- Linked the new profile catalog from the benchmark docs and roadmap.
+
+### Added a maintained backend source and release catalog for ROCm and related backends. (Documentation Update)
+- Created benchmarks/data/backend-benchmarks/backend-catalog.yaml to track maintained prebuilt channels, source-build-only paths, and last known good variants.
+- Added benchmarks/docs/backend-catalog.md and linked the catalog into the benchmark workspace and backend version reference docs.
+- Recorded Lemonade nightly, vLLM ROCm, TGI ROCm, SGLang ROCm, Ollama ROCm, and Aphrodite source status so future backend work starts from history instead of rediscovery.
+
+### Split vLLM into current-supported and regression tracks and corrected the AMD support note. (Documentation Update)
+- Updated the backend catalog so vLLM records both the current ROCm path and the historical rocm/vllm-dev:navi_base regression branch.
+- Corrected the benchmark notes to reflect the current official vLLM AMD docs: ROCm 6.3+ support, RX 7900 series support, and pre-built wheels for ROCm 7.0.
+- Added explicit vLLM track guidance in the optimization roadmap so Qwen2.5-14B BF16 and GPTQ can be used before returning to the 27B AWQ regression case.
+
+### Separated backend source catalogs from engine-version compatibility catalogs. (Documentation Update)
+- Kept benchmarks/data/backend-benchmarks/backend-catalog.yaml focused on source and release channels only.
+- Added benchmarks/data/backend-benchmarks/engine-version-catalog.yaml to record which engine versions work with which backend systems.
+- Updated the benchmark and backend-version docs so the catalogs are discoverable without mixing source channels and engine compatibility.
+
+### Recovered vLLM on the live host and captured the current ROCm failures for TGI, SGLang, and Aphrodite. (Bug Fix)
+- Enabled vLLM with AUDIA_ENABLE_VLLM=true and confirmed the small Qwen3-0.6B path responds successfully on the live AMD box.
+- Retried TGI on latest-rocm and 3.3.4-rocm; Qwen3.5-4B fails with Unsupported model type qwen3_5 and Qwen2.5-0.5B-Instruct fails later with HIP invalid device function.
+- Updated the benchmark catalogs and latest run notes so source channels and engine-version compatibility stay separate and the live failure modes are preserved.
+
+### Removed scratch workspaces and cache artifacts to free local disk space. (Configuration Cleanup)
+- Added ignore rules for .tmp_prisma_pkg/ and benchmarks.zip so the cleanup stays clean.
+
+### Built and validated the Zinc source-build lane on the server. (Build / Packaging)
+- Updated the benchmark source, engine-version, compatibility, and latest-run notes catalogs for Zinc.
+
+### Retested qwen27 on the dual 7900 XTX benchmark target and recorded the current engine results and regressions. (Performance Improvement)
+- Added qwen27 dual-XTX results JSON and updated benchmark notes and compatibility matrix with llama.cpp engine results, Ollama qwen27 performance, vLLM regression behavior, and Zinc crash behavior.
+
+### Added ROCm 7.2.1 prebuilt and local-build lanes to backend benchmark matrix with verified qwen27 results. (Documentation Update, Performance Improvement)
+- Recorded both lanes in backend catalog, engine version catalog, and compatibility matrix.
+- Added 20260331_rocm721_prebuilt_local_results.json with measured throughput and failure/fix trail.
+- Updated latest run notes with reproducible build/runtime fixes for ROCm 7.2.1 local source lane.
+
+### Added Lychee Strix Halo llama.cpp release lane as an architecture-scoped backend matrix entry. (Documentation Update, Configuration Cleanup)
+- Registered Lychee source channel and release metadata (b8580, rocm-7.2.1, gfx1151) in backend catalog.
+- Added architecture-scoped engine/version and compatibility entries for non-gfx1151 host separation.
+- Updated benchmark docs so this lane is tracked and tested via prebuilt-first then source-fallback policy.
+
+### Ran updated backend implementation refresh benchmarks and captured working/blocked outcomes in matrix catalogs. (Performance Improvement, Documentation Update)
+- Benchmarked lemonade-sdk b1224 prebuilt on qwen27 dual-XTX at 21.85 tok/s after installing host libatomic1.
+- Tested Lychee b8580 Strix Halo prebuilt and captured dependency fixes plus final Illegal instruction block on gfx1100 host.
+- Tested vLLM v0.18.0 startup path (Qwen3.5-4B HIP OOM) and recorded TGI 3.3.7-rocm tag-not-found result in catalogs and run notes.
+
+### Recorded Lychee source-fallback constraint after validation on server. (Documentation Update)
+- Confirmed Lychee repo is a prebuilt/packaging wrapper with no direct CMake source tree.
+- Updated benchmark catalogs and run notes to prevent repeated failed source-build attempts from that repo.
+
+### Added the documented vLLM ROCm 7.2.1 wheel lane to the benchmark matrix and recorded the small-model smoke result. (Documentation Update, Performance Improvement)
+- Switched from the generic CUDA nightly wheel lane to the official ROCm nightly wheel lane from the vLLM docs.
+- Recorded Qwen3-0.6B success at 75.05 eval tok/s on local/vllm-rocm721-wheel:nightly.
+- Recorded Qwen3.5-4B engine-init failure with HIP OOM so the lane stays marked as small-model-only for now.
+
+### Validated the vLLM ROCm wheel lane boundary for qwen27 on the dual-XTX host. (Performance Improvement)
+- Both 4096 and 2048 max-model-len runs failed later with KV-cache page-size unification errors, so the lane remains small-model-only.
+
+### Confirmed the ROCm wheel lane only remains viable for small Qwen3.5 models; Qwen3.5-4B and 27B still fail in vLLM 0.18.1. (Performance Improvement)
+- Qwen3.5-4B and Qwen3.5-27B both failed later during KV-cache page-size unification, so the lane is not yet a large-model path.
+
+### Confirmed the vLLM 0.17.1 rollback lane can serve Qwen3.5-27B on dual XTX with 2048 context. (Bug Fix)
+- Recorded the rollback lane separately from the v0.18.x hybrid KV-cache regression.
+
+### Benchmarked the vLLM 0.17.1 rollback lane on Qwen3.5-27B and established a clean line-in-the-sand baseline. (Performance Improvement)
+- Keep this lane separate from the v0.18.x hybrid KV-cache regression.
+
+### Reconfirmed the managed llama.cpp Vulkan qwen27 lane on the dual-XTX host and captured a warm baseline. (Performance Improvement)
+- This keeps Vulkan as the current interactive winner and gives us a fresh line-in-the-sand recheck.
+
+### Registered the latest ggml ROCm lane as a selectable qwen27 gateway deployment. (New Feature)
+- Updated the backend version docs to note the new qwen27_fast_rocm_latest option.
 
 ---

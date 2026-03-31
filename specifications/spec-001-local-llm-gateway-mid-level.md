@@ -36,7 +36,7 @@ catalog.
 
 ### Path A: Docker (Linux — recommended for servers)
 
-`docker-compose.yml` orchestrates the stack. Hardware detection and binary
+`docker/compose/docker-compose.yml` orchestrates the stack. Hardware detection and binary
 provisioning happen inside the backend container on first start.
 
 On first gateway container start, `docker/gateway-entrypoint.sh` auto-seeds
@@ -48,7 +48,7 @@ Deployment profiles in `docker/examples/`:
 
 | Profile | File | Use case |
 | ------- | ---- | -------- |
-| Universal | `docker-compose.yml` (root) | Auto-detects NVIDIA/AMD |
+| Universal | `docker/compose/docker-compose.yml` | Auto-detects NVIDIA/AMD |
 | NVIDIA only | `docker/examples/docker-compose.nvidia.yml` | CUDA systems |
 | AMD unified | `docker/examples/docker-compose.amd.yml` | Same config supports `LLAMA_BACKEND=vulkan` or `LLAMA_BACKEND=rocm`; optional `vLLM` stays ROCm |
 | External proxy | `docker/examples/docker-compose.external-proxy.yml` | Behind Traefik/nginx |

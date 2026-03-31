@@ -163,7 +163,7 @@ Symptom:
 
 Resolution:
 
-- the default root compose now includes PostgreSQL
+- the main compose stack now includes PostgreSQL
 - the gateway receives `DATABASE_URL` by default
 - PostgreSQL data is persisted visibly under `POSTGRES_DATA_ROOT`
 

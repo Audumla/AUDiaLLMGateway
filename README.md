@@ -30,7 +30,7 @@ Provides an OpenAI-compatible API endpoint backed by local models:
 ```bash
 cp config/env.example .env
 # optional: edit .env to replace the default LITELLM key before exposing the gateway
-docker compose up -d
+docker compose --project-directory . -f docker/compose/docker-compose.yml up -d
 ```
 
 For guided Docker setup on Linux, use:
@@ -45,9 +45,9 @@ so you can inspect, back up, or repair the downloaded binaries directly. Source
 build worktrees for git variants are persisted under
 `./config/data/backend-build/` (`BACKEND_BUILD_ROOT` in `.env`).
 
-The root [`docker-compose.yml`](docker-compose.yml) is deployment-oriented and
-pulls published images only, so a remote host can stay a clean Docker Compose
-install without a git checkout.
+The canonical compose stack now lives under [`docker/compose/`](docker/compose/),
+keeping the repo root clear of stack files while still allowing a clean Docker
+Compose install on a remote host.
 
 Compose service names follow the deployment naming convention:
 `llm-gateway`, `llm-server-llamacpp`, `llm-server-vllm`, and
@@ -58,10 +58,10 @@ On first Docker start, LiteLLM Admin UI login defaults to username `admin` and p
 The default Docker stack also provisions PostgreSQL and sets `DATABASE_URL`, so the LiteLLM UI has a real DB-backed login path on first install.
 
 To add the optional `vLLM` backend, set `AUDIA_ENABLE_VLLM=true` in `.env` and start the profile.
-For NVIDIA hosts, the root compose profile is the direct path:
+For NVIDIA hosts, the main compose profile is the direct path:
 
 ```bash
-docker compose --profile vllm up -d
+docker compose --project-directory . -f docker/compose/docker-compose.yml --profile vllm up -d
 ```
 
 For AMD hosts, use the unified AMD compose profile from [docker.md](specifications/docs/docker.md),
@@ -73,7 +73,7 @@ See [docker.md](specifications/docs/docker.md) for all deployment profiles (Univ
 For local source-based Docker development, use:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+docker compose --project-directory . -f docker/compose/docker-compose.yml -f docker/compose/docker-compose.dev.yml up -d --build
 ```
 
 **Smart Binary Caching:** Backend binaries use prebuilt releases from ggml-org with smart caching — binaries are downloaded once per version change and reused on subsequent restarts. See [PREBUILT_BINARIES_STRATEGY.md](specifications/docs/PREBUILT_BINARIES_STRATEGY.md) for details.
@@ -132,6 +132,7 @@ Services auto-start on next logon (PostgreSQL, llama-cpp, gateway, nginx). See [
 | [PREBUILT_BINARIES_STRATEGY.md](specifications/docs/PREBUILT_BINARIES_STRATEGY.md) | Prebuilt binary distribution with smart caching (45-90s boot time) |
 | [BACKEND_VERSIONS.md](specifications/docs/BACKEND_VERSIONS.md) | Complete backend version reference and compatibility |
 | [FAILING_BUILDS_INVESTIGATION.md](specifications/docs/FAILING_BUILDS_INVESTIGATION.md) | Root cause analysis and solutions for previously failing builds |
+| [benchmarks/README.md](benchmarks/README.md) | Separate backend benchmark workspace and migration entry point |
 
 ### Setup & Testing
 
