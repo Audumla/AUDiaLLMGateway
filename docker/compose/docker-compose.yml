@@ -124,7 +124,7 @@ services:
               capabilities: [gpu]
     restart: unless-stopped
 
-  # --- Hot-Reload Watcher (optional) ---
+  # --- Hot-Reload Watcher (optional, but required for live local-config edits) ---
   # Watches config/local/ for changes, regenerates configs, reloads nginx,
   # and restarts the gateway when LiteLLM auth/config changes.
   llm-config-watcher:

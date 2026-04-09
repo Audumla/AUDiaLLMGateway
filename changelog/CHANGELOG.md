@@ -751,4 +751,13 @@
 - Restored anonymized config/docs/code changes, including private overlay loading and sample compose guidance, after the history rewrite.
 - Re-ran py_compile, targeted pytest suites, and strict separation checks; bash -n still fails on this Windows host because /bin/bash is unavailable.
 
+### Warn when local config edits are newer than generated gateway config and clarify watcher requirements. (Bug Fix)
+- Updated docker/gateway-entrypoint.sh to warn at startup when config/local is newer than config/generated so operators do not assume a restart alone regenerates llama-swap and LiteLLM config.
+- Updated docker/compose/docker-compose.yml and README.md to clarify that llm-config-watcher or generate-configs is required for local override edits to reach runtime.
+
+### Finished the hosted history scrub and restored the final generated-config guidance updates. (Configuration Cleanup)
+- Force-pushed the rewritten branches and tags so the hosted GitHub refs now match the scrubbed history with the targeted personal strings removed.
+- Kept the sample-safe repo restore intact and finalized the Docker entrypoint and docs guidance around stale generated config versus llm-config-watcher regeneration.
+- Validated docker/gateway-entrypoint.sh with sh -n and reran test_config_loading.py successfully.
+
 ---

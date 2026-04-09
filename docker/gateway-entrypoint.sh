@@ -8,6 +8,44 @@ UVICORN_LOG_CONFIG_PATH="/app/config/project/uvicorn.log-config.json"
 DATABASE_WAIT_SECONDS="${DATABASE_WAIT_SECONDS:-120}"
 DATABASE_WAIT_INTERVAL_SECONDS="${DATABASE_WAIT_INTERVAL_SECONDS:-2}"
 
+warn_if_generated_configs_stale() {
+    source_files="
+$CONFIG/local/stack.override.yaml
+$CONFIG/local/stack.private.yaml
+$CONFIG/local/models.override.yaml
+$CONFIG/local/models.private.yaml
+$CONFIG/local/backend-runtime.override.yaml
+$CONFIG/local/backend-runtime.private.yaml
+"
+    generated_files="
+$CONFIG/generated/llama-swap/llama-swap.generated.yaml
+$CONFIG/generated/litellm/litellm.config.yaml
+$CONFIG/generated/llama-swap/backend-runtime.catalog.json
+"
+
+    newest_source=""
+    for path in $source_files; do
+        [ -f "$path" ] || continue
+        if [ -z "$newest_source" ] || [ "$path" -nt "$newest_source" ]; then
+            newest_source="$path"
+        fi
+    done
+
+    newest_generated=""
+    for path in $generated_files; do
+        [ -f "$path" ] || continue
+        if [ -z "$newest_generated" ] || [ "$path" -nt "$newest_generated" ]; then
+            newest_generated="$path"
+        fi
+    done
+
+    if [ -n "$newest_source" ] && { [ -z "$newest_generated" ] || [ "$newest_source" -nt "$newest_generated" ]; }; then
+        echo ">>> WARNING: config/local changes are newer than generated gateway configs."
+        echo ">>> Run 'python -m src.launcher.process_manager --root . generate-configs' or start the llm-config-watcher service."
+        echo ">>> A plain gateway restart will keep using stale generated files until configs are regenerated."
+    fi
+}
+
 # --- Seed config/local/ on first run ---
 mkdir -p "$CONFIG/local"
 
@@ -45,7 +83,8 @@ if [ ! -f "$CONFIG/local/stack.override.yaml" ]; then
     cat > "$CONFIG/local/stack.override.yaml" <<'EOF'
 # AUDia LLM Gateway — local stack overrides.
 # Merged on top of config/project/stack.base.yaml.
-# Regenerated configs take effect on next gateway restart.
+# Regenerate configs after editing. If llm-config-watcher is not running, a
+# plain gateway restart is not enough on its own.
 # Keep tracked values generic; machine-specific settings can live in
 # config/local/stack.private.yaml.
 #
@@ -74,7 +113,8 @@ if [ ! -f "$CONFIG/local/models.override.yaml" ]; then
 # Model files must be placed in the models/ directory (or MODEL_ROOT).
 # Keep tracked values generic; host-only routing belongs in
 # config/local/models.private.yaml.
-# After editing, restart the gateway: docker compose restart gateway
+# After editing, regenerate configs. If llm-config-watcher is not running,
+# restart the gateway after regeneration so the updated generated files are used.
 #
 # Example — add a local GGUF model:
 # models:
@@ -85,6 +125,8 @@ if [ ! -f "$CONFIG/local/models.override.yaml" ]; then
 #     # executable_macro: llama-server-rocm
 EOF
 fi
+
+warn_if_generated_configs_stale
 
 if [ ! -f "$CONFIG/local/backend-runtime.override.yaml" ]; then
     echo ">>> First run: seeding config/local/backend-runtime.override.yaml"
