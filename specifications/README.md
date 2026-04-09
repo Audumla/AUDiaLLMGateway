@@ -17,6 +17,24 @@ Legend: **Implemented** | *Draft / in progress* | Planned
 
 ---
 
+## Phase 5: Backend Lifecycle Governance
+
+Tight version management, build/deploy pipelines, and validation gates for all backend types.
+No `latest` — all versions explicitly pinned. Measurement uncertainty handled rigorously.
+
+| Spec | Status | Description |
+| ---- | ------ | ----------- |
+| [backend-lifecycle/spec-801-backend-version-registry.md](backend-lifecycle/spec-801-backend-version-registry.md) | *Draft* | Version pinning schema, source channels, drift policies, integrity verification |
+| [backend-lifecycle/spec-802-backend-build-deploy.md](backend-lifecycle/spec-802-backend-build-deploy.md) | *Draft* | Build pipeline, provisioning paths (prebuilt, Docker, source-build), rollback support |
+| [backend-lifecycle/spec-803-backend-validation-gates.md](backend-lifecycle/spec-803-backend-validation-gates.md) | *Draft* | Benchmark methodology, measurement uncertainty, promotion workflow, deprecation criteria |
+
+Supporting files:
+
+- `benchmarks/data/backend-benchmarks/benchmark-result-schema.yaml` — Canonical format for benchmark results
+- `benchmarks/data/backend-benchmarks/backend-version-registry.yaml` — Current pinned versions and channel registry
+
+---
+
 ## Components
 
 | Spec | Status | Description |

@@ -1,3 +1,6 @@
+# AUDia LLM Gateway — sample stack overrides.
+# Keep tracked values portable. Machine-specific hosts, ports, and bind-path
+# settings belong in config/local/stack.private.yaml.
 component_settings:
   llama_cpp:
     selected_profile: auto

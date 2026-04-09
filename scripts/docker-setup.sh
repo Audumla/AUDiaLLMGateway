@@ -89,7 +89,7 @@ fi
 
 DEFAULT_BACKEND="cpu"
 DEFAULT_ENABLE_VLLM="false"
-DEFAULT_VLLM_IMAGE="example/audia-llm-gateway-vllm:latest"
+DEFAULT_VLLM_IMAGE="${DOCKER_IMAGE_NAMESPACE:-example}/audia-llm-gateway-vllm:latest"
 DEFAULT_LLAMA_VERSION="latest"
 
 if $HAS_NVIDIA; then

@@ -18,14 +18,26 @@ if [ ! -f "$CONFIG/local/env" ]; then
 # Changes take effect on next container restart.
 #
 # REQUIRED: Set a strong key before exposing the gateway on a network.
+# Keep this tracked file sample-safe. Private secrets can go in
+# config/local/env.private (git-ignored) or Compose environment variables.
 LITELLM_MASTER_KEY=sk-local-dev
 EOF
 fi
 
-if [ -z "${LITELLM_MASTER_KEY:-}" ] && [ -f "$CONFIG/local/env" ]; then
-    # Reuse the seeded first-run key unless Compose or the host already provided one.
-    LITELLM_MASTER_KEY="$(grep '^LITELLM_MASTER_KEY=' "$CONFIG/local/env" | tail -n 1 | cut -d= -f2-)"
-    export LITELLM_MASTER_KEY
+if [ -z "${LITELLM_MASTER_KEY:-}" ]; then
+    # Reuse the seeded key unless Compose or the host already provided one.
+    # env.private is read last so it can override the sample file safely.
+    for env_file in "$CONFIG/local/env" "$CONFIG/local/env.private"; do
+        if [ -f "$env_file" ]; then
+            value="$(grep '^LITELLM_MASTER_KEY=' "$env_file" | tail -n 1 | cut -d= -f2-)"
+            if [ -n "$value" ]; then
+                LITELLM_MASTER_KEY="$value"
+            fi
+        fi
+    done
+    if [ -n "${LITELLM_MASTER_KEY:-}" ]; then
+        export LITELLM_MASTER_KEY
+    fi
 fi
 
 if [ ! -f "$CONFIG/local/stack.override.yaml" ]; then
@@ -34,6 +46,8 @@ if [ ! -f "$CONFIG/local/stack.override.yaml" ]; then
 # AUDia LLM Gateway — local stack overrides.
 # Merged on top of config/project/stack.base.yaml.
 # Regenerated configs take effect on next gateway restart.
+# Keep tracked values generic; machine-specific settings can live in
+# config/local/stack.private.yaml.
 #
 # --- Common customisations ---
 #
@@ -58,6 +72,8 @@ if [ ! -f "$CONFIG/local/models.override.yaml" ]; then
 # AUDia LLM Gateway — local model overrides.
 # Add entries here to expose local GGUF models through the gateway.
 # Model files must be placed in the models/ directory (or MODEL_ROOT).
+# Keep tracked values generic; host-only routing belongs in
+# config/local/models.private.yaml.
 # After editing, restart the gateway: docker compose restart gateway
 #
 # Example — add a local GGUF model:
@@ -76,6 +92,8 @@ if [ ! -f "$CONFIG/local/backend-runtime.override.yaml" ]; then
 # AUDia LLM Gateway — backend runtime variant overrides.
 # Merged on top of config/project/backend-runtime.base.yaml.
 # Use this file to add extra backend binaries (alternate tags, repos, direct URLs, git builds).
+# Keep tracked values generic; machine-specific runtime pins belong in
+# config/local/backend-runtime.private.yaml.
 #
 # profiles:
 #   build-rocm-gfx1030-gfx1100:
@@ -128,6 +146,8 @@ if [ ! -f "$CONFIG/local/llama-swap.override.yaml" ]; then
     cat > "$CONFIG/local/llama-swap.override.yaml" <<'EOF'
 # AUDia LLM Gateway — llama-swap substrate overrides.
 # Merged on top of config/project/llama-swap.base.yaml.
+# Keep tracked overrides generic; private executable paths and host-only
+# mounts belong in config/local/llama-swap.private.yaml.
 # After editing, restart the gateway: docker compose restart gateway
 #
 # --- Global settings ---

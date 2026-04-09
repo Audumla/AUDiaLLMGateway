@@ -19,7 +19,8 @@ def test_build_litellm_config_contains_expected_models() -> None:
     config = build_litellm_config(stack)
 
     model_names = [entry["model_name"] for entry in config["model_list"]]
-    assert model_names[:2] == ["local/qwen27_fast", "local/qwen122_smart"]
+    assert model_names[0] == "local/qwen27_fast"
+    assert "local/qwen122_smart" in model_names
     assert config["model_list"][0]["litellm_params"]["api_base"] == "http://127.0.0.1:41080/v1"
     assert config["model_list"][0]["litellm_params"]["extra_headers"]["X-LLAMA-SWAP-MODEL"] == "qwen3.5-27b-(96k-Q6)"
     assert "model_url" in config["model_list"][0]["model_info"]
@@ -27,7 +28,121 @@ def test_build_litellm_config_contains_expected_models() -> None:
     assert config["model_list"][0]["model_info"]["revision"] == "main"
     assert config["model_list"][0]["model_info"]["model_filename"] == "Qwen3.5-27B.Q6_K.gguf"
     assert "coding_active" in config["model_list"][0]["model_info"]["load_groups"]
-    assert len(config["model_list"][1]["model_info"]["additional_model_urls"]) == 2
+    # Find qwen122_smart in the list and verify it has the expected properties
+    qwen122_idx = next((i for i, m in enumerate(config["model_list"]) if m["model_name"] == "local/qwen122_smart"), None)
+    assert qwen122_idx is not None, "qwen122_smart not found in model list"
+    assert len(config["model_list"][qwen122_idx]["model_info"]["additional_model_urls"]) == 2
+
+
+def test_build_litellm_config_derives_model_filenames_from_artifact_paths(tmp_path: Path) -> None:
+    (tmp_path / "config" / "project").mkdir(parents=True)
+    (tmp_path / "config" / "local").mkdir(parents=True)
+
+    (tmp_path / "config" / "project" / "stack.base.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "network": {
+                    "services": {
+                        "llama_swap": {"port": 41080},
+                        "litellm": {"port": 4000},
+                        "vllm": {"port": 8000},
+                        "nginx": {"port": 8080},
+                    }
+                },
+                "llama_swap": {},
+                "litellm": {},
+                "mcp": {},
+                "routing": {},
+                "reverse_proxy": {},
+                "nginx": {"enabled": False},
+                "systemd": {"enabled": False},
+                "project": {"installer": {"state_path": "state/install-state.json"}},
+                "models": {
+                    "project_config_path": "config/project/models.base.yaml",
+                    "local_override_path": "config/local/models.override.yaml",
+                },
+                "backend_runtime": {
+                    "project_config_path": "config/project/backend-runtime.base.yaml",
+                    "local_override_path": "config/local/backend-runtime.override.yaml",
+                },
+                "backend_support": {
+                    "project_config_path": "config/project/backend-support.base.yaml",
+                    "local_override_path": "config/local/backend-support.override.yaml",
+                },
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "config" / "project" / "models.base.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "frameworks": {
+                    "llama_cpp": {
+                        "type": "llama_cpp",
+                        "supports": ["llama-swap", "litellm"],
+                        "llama_swap": {
+                            "executable_macro": "llama-server-vulkan",
+                            "server_args_macro": "server-args",
+                            "model_path_macro": "model-path",
+                            "mmproj_path_macro": "mmproj-path",
+                            "context_macro_name_template": "context-{alias}-args",
+                            "context_arg_template": "--ctx-size {tokens}",
+                        },
+                    }
+                },
+                "presets": {
+                    "contexts": {"32k": {"tokens": 32768}},
+                    "deployment_profiles": {
+                        "llamacpp_vulkan_single": {
+                            "framework": "llama_cpp",
+                            "transport": "llama-swap",
+                            "executable_macro": "llama-server-vulkan",
+                            "llama_cpp_options": {"device": "Vulkan0"},
+                        }
+                    },
+                },
+                "model_profiles": {
+                    "filename_defaults": {
+                        "mode": "chat",
+                        "purpose": "filename derivation test",
+                        "defaults": {"context_preset": "32k"},
+                        "artifacts": {
+                            "revision": "main",
+                            "model_file": "nested/model-z.gguf",
+                            "model_url": "https://example.invalid/model-z.gguf",
+                            "mmproj_file": "nested/mmproj-z.gguf",
+                            "mmproj_url": "https://example.invalid/mmproj-z.gguf",
+                            "source_page_url": "https://example.invalid/source",
+                        },
+                        "deployments": {
+                            "llamacpp_vulkan": {
+                                "label": "local/filename_defaults",
+                                "profile": "llamacpp_vulkan_single",
+                                "llama_swap_model": "filename-defaults",
+                            }
+                        },
+                    }
+                },
+                "load_groups": {},
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "config" / "project" / "backend-runtime.base.yaml").write_text(yaml.safe_dump({"variants": {}}, sort_keys=False), encoding="utf-8")
+    (tmp_path / "config" / "project" / "backend-support.base.yaml").write_text(yaml.safe_dump({"rules": []}, sort_keys=False), encoding="utf-8")
+    (tmp_path / "config" / "local" / "stack.override.yaml").write_text(yaml.safe_dump({}), encoding="utf-8")
+    (tmp_path / "config" / "local" / "models.override.yaml").write_text(yaml.safe_dump({}), encoding="utf-8")
+    (tmp_path / "config" / "local" / "backend-runtime.override.yaml").write_text(yaml.safe_dump({}), encoding="utf-8")
+    (tmp_path / "config" / "local" / "backend-support.override.yaml").write_text(yaml.safe_dump({}), encoding="utf-8")
+
+    stack = load_stack_config(tmp_path)
+    config = build_litellm_config(stack)
+
+    entry = next(item for item in config["model_list"] if item["model_name"] == "local/filename_defaults")
+    assert entry["model_info"]["model_filename"] == "model-z.gguf"
+    assert entry["model_info"]["mmproj_filename"] == "mmproj-z.gguf"
 
 
 def test_build_litellm_config_adds_vllm_routes_when_enabled(monkeypatch) -> None:
@@ -59,6 +174,34 @@ def test_build_vllm_config_uses_model_catalog_runtime_overrides(monkeypatch) -> 
     # Model name comes from vllm_default.backend_model_name in models.override.yaml
     assert startup["model"] == "Qwen2.5-0.5B-Instruct"
     assert "extra_args" in startup
+
+
+def test_build_nginx_config_prefers_env_private(tmp_path: Path) -> None:
+    source_root = Path(__file__).resolve().parents[1]
+    for rel_path in [
+        "config/project/stack.base.yaml",
+        "config/project/llama-swap.base.yaml",
+        "config/project/models.base.yaml",
+        "config/project/backend-runtime.base.yaml",
+        "config/project/mcp.base.yaml",
+        "config/local/stack.override.yaml",
+        "config/local/llama-swap.override.yaml",
+        "config/local/models.override.yaml",
+        "config/local/backend-runtime.override.yaml",
+        "config/local/mcp.override.yaml",
+    ]:
+        source = source_root / rel_path
+        target = tmp_path / rel_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+
+    (tmp_path / "config" / "local" / "env").write_text("LITELLM_MASTER_KEY=sk-public\n", encoding="utf-8")
+    (tmp_path / "config" / "local" / "env.private").write_text("LITELLM_MASTER_KEY=sk-private\n", encoding="utf-8")
+
+    stack = load_stack_config(tmp_path)
+    nginx_text = build_nginx_config(stack)
+
+    assert 'Authorization "Bearer sk-private"' in nginx_text
 
 
 def test_build_vllm_config_supports_vllm_preset(tmp_path: Path, monkeypatch) -> None:
@@ -467,7 +610,7 @@ def test_backend_runtime_variants_generate_versioned_macros_and_catalog(tmp_path
         target.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
 
     runtime_override = tmp_path / "config" / "local" / "backend-runtime.override.yaml"
-    data = yaml.safe_load(runtime_override.read_text(encoding="utf-8"))
+    data = yaml.safe_load(runtime_override.read_text(encoding="utf-8")) or {}
     data.setdefault("variants", {})
     data["variants"]["rocm-b8429"] = {
         "backend": "rocm",
@@ -482,7 +625,7 @@ def test_backend_runtime_variants_generate_versioned_macros_and_catalog(tmp_path
     backend_catalog = json.loads((tmp_path / "config" / "generated" / "llama-swap" / "backend-runtime.catalog.json").read_text(encoding="utf-8"))
 
     assert "llama-server-rocm-b8429" in llama_swap_text
-    assert "/app/runtime-root/rocm/b8429/bin/llama-server-rocm" in llama_swap_text
+    assert "/app/runtime-root/rocm/b8429/active/bin/llama-server-rocm" in llama_swap_text
     assert any(
         item.get("macro") == "llama-server-rocm-b8429"
         and item.get("backend") == "rocm"

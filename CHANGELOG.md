@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Refreshed the primary gateway docs and specs to match the current compose layout and backend configuration paths. (Documentation Update)
+- Reworked the main Docker guide, top-level README, and major specs to point at docker/compose instead of the old root compose filenames.
+- Updated dashboard, vLLM, and deployment references so the repo presents a single canonical compose layout.
+- Verified the moved compose stack and the changelog JSON remain valid after the documentation sweep.
+
+### Rehomed the root compose files into docker/compose and updated the main entry points to use the new layout. (Configuration Cleanup, Documentation Update)
+- Moved the main, dev, and dashboard compose files out of the repository root.
+- Updated the README, scripts, tests, and Docker guide to point at docker/compose with --project-directory.
+- Verified the moved compose stack with the compose-defaults test.
+
 ### Scaffolded a native Windows local LLM gateway workspace in AUDiaLLMGateway. (New Feature)
 - Created a Git-backed repo scaffold with config, docs, PowerShell wrappers, and Python orchestration for llama-server plus LiteLLM.
 - Added health checks, routing tests, and config generation for local model profiles and future MCP registration.
@@ -726,5 +736,14 @@
 
 ### Registered the latest ggml ROCm lane as a selectable qwen27 gateway deployment. (New Feature)
 - Updated the backend version docs to note the new qwen27_fast_rocm_latest option.
+
+### Aligned backend version/build/update docs with the live runtime catalog and installer behavior, and fixed legacy asset token compatibility. (Documentation Update)
+- Updated backend maintenance docs to describe the current version/source fields, latest-release lookup flow, and Linux/macOS update/check commands.
+- Fixed release installer compatibility with legacy asset_match_tokens and updated provision-runtime.sh to honor asset_tokens for GitHub release selection.
+
+### Anonymized deployment surfaces and added private overlay support for local deployment state. (Configuration Cleanup)
+- Added optional config/local/*.private.yaml and config/local/env.private support in config loading and gateway startup.
+- Scrubbed tracked local config samples and deployment docs so host-specific values move into ignored overlays.
+- Added regression coverage for private overlay merges and private env precedence, then reran targeted config-generation tests.
 
 ---

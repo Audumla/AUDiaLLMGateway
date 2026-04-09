@@ -34,7 +34,7 @@ services:
 
   # --- API Gateway / Traffic Orchestrator (always on) ---
   llm-gateway:
-    image: example/audia-llm-gateway-orchestrator:latest
+    image: ${DOCKER_IMAGE_NAMESPACE:-example}/audia-llm-gateway-orchestrator:latest
     container_name: audia-gateway
     ports:
       - "${GATEWAY_PORT:-4000}:4000"
@@ -67,7 +67,7 @@ services:
   #   NVIDIA: docker compose --project-directory . -f docker/examples/docker-compose.nvidia.yml up -d
   #   AMD:    docker compose --project-directory . -f docker/examples/docker-compose.amd.yml up -d
   llm-server-llamacpp:
-    image: example/audia-llm-gateway-server:latest
+    image: ${DOCKER_IMAGE_NAMESPACE:-example}/audia-llm-gateway-server:latest
     container_name: audia-llama-cpp
     ports:
       - "${LLAMA_SWAP_PORT:-41080}:41080"
@@ -128,7 +128,7 @@ services:
   # Watches config/local/ for changes, regenerates configs, reloads nginx,
   # and restarts the gateway when LiteLLM auth/config changes.
   llm-config-watcher:
-    image: example/audia-llm-gateway-orchestrator:latest
+    image: ${DOCKER_IMAGE_NAMESPACE:-example}/audia-llm-gateway-orchestrator:latest
     container_name: audia-watcher
     profiles:
       - watcher

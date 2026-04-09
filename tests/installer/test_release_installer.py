@@ -2,6 +2,7 @@ from pathlib import Path
 
 import yaml
 
+from src.installer import release_installer
 from src.installer.release_installer import find_release_asset, resolve_component_selection, resolve_llama_cpp_profile
 from src.launcher.config_loader import validate_layered_configs
 
@@ -80,6 +81,60 @@ def test_resolve_llama_cpp_profile_rejects_wrong_platform() -> None:
         assert "targets platform 'windows'" in str(exc)
     else:
         raise AssertionError("Expected wrong-platform llama.cpp profile selection to fail")
+
+
+def test_install_one_llama_cpp_profile_accepts_legacy_asset_match_tokens(tmp_path: Path, monkeypatch) -> None:
+    install_root = tmp_path / "install-root"
+    extracted_root = tmp_path / "extracted"
+    bin_dir = extracted_root / "bin"
+    bin_dir.mkdir(parents=True)
+    (bin_dir / "llama-server").write_text("stub", encoding="utf-8")
+
+    monkeypatch.setattr(
+        release_installer,
+        "get_release_metadata",
+        lambda owner, repo, version: {
+            "tag_name": "b9999",
+            "assets": [
+                {
+                    "name": "llama-b9999-bin-ubuntu-vulkan-x64.tar.gz",
+                    "browser_download_url": "https://example.invalid/llama.tar.gz",
+                }
+            ],
+        },
+    )
+    monkeypatch.setattr(
+        release_installer,
+        "download_file",
+        lambda url, target: target,
+    )
+    monkeypatch.setattr(
+        release_installer,
+        "extract_component_archive",
+        lambda archive, dest: extracted_root,
+    )
+
+    result = release_installer._install_one_llama_cpp_profile(
+        root=install_root,
+        settings={
+            "repo_owner": "ggml-org",
+            "repo_name": "llama.cpp",
+            "install_root": "tools/llama.cpp",
+            "binary_subdir": "bin",
+            "executable_names": {"linux": "llama-server"},
+        },
+        profile_name="linux-vulkan",
+        profile={
+            "backend": "vulkan",
+            "version": "latest",
+            "asset_match_tokens": ["ubuntu", "vulkan", "x64"],
+        },
+        system="linux",
+    )
+
+    assert result["version"] == "b9999"
+    assert result["asset_name"] == "llama-b9999-bin-ubuntu-vulkan-x64.tar.gz"
+    assert Path(result["install_dir"]).name == "b9999-vulkan"
 
 
 def test_validate_layered_configs_reports_type_conflicts(tmp_path: Path) -> None:

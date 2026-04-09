@@ -57,3 +57,7 @@ GEMINI.md
 # --- end agent-system ---
 .aider*
 .env
+config/local/*.private.yaml
+config/local/env.private
+docker/compose/*.private.yml
+docker/compose/*.private.yaml

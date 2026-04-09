@@ -1,3 +1,7 @@
+# AUDia LLM Gateway — sample model catalog.
+# Keep this tracked file portable and illustrative. Host-only GPU routing,
+# private model roots, and deployment-specific aliases belong in
+# config/local/models.private.yaml.
 frameworks:
   llama_cpp:
     type: llama_cpp
@@ -78,10 +82,10 @@ presets:
         parallel: 1
         gpu_layers: all
         metrics: true
-    llamacpp_rocm_ggml_latest_dual_xtx:
+    llamacpp_rocm_dual_gpu:
       framework: llama_cpp
       transport: llama-swap
-      executable_macro: llama-server-rocm-ggml-latest
+      executable_macro: llama-server-rocm
       llama_cpp_options:
         device:
           - ROCm1
@@ -202,11 +206,11 @@ model_profiles:
         profile: llamacpp_vulkan_split_gpu2
         llama_swap_model: qwen3.5-27b-(96k-Q6)
         backend_model_name: qwen3.5-27b-(96k-Q6)
-      llamacpp_rocm_latest:
-        label: local/qwen27_fast_rocm_latest
-        profile: llamacpp_rocm_ggml_latest_dual_xtx
-        llama_swap_model: qwen3.5-27b-(96k-Q6)-rocm-latest
-        backend_model_name: qwen3.5-27b-(96k-Q6)-rocm-latest
+      llamacpp_rocm:
+        label: local/qwen27_fast_rocm
+        profile: llamacpp_rocm_dual_gpu
+        llama_swap_model: qwen3.5-27b-(96k-Q6)-rocm
+        backend_model_name: qwen3.5-27b-(96k-Q6)-rocm
   qwen122_smart:
     mode: chat
     family: qwen3.5

@@ -126,27 +126,36 @@ docker compose --project-directory . -f docker/compose/docker-compose.yml up -d
 The canonical compose stack now lives under [`docker/compose/`](../../docker/compose/),
 and the files are safe to copy onto a clean host with just `.env`, `config/`, and
 `models/`. It does not require a git checkout or local Docker build context.
+Keep tracked compose and config files generic; host-specific bind mounts and
+secrets belong in a git-ignored overlay such as
+[`docker/compose/docker-compose.private.example.yml`](../../docker/compose/docker-compose.private.example.yml)
+copied to `docker/compose/docker-compose.private.yml`.
 
 On first start the gateway container automatically seeds `config/local/` with
 commented template files if they do not already exist:
 
 | File | Purpose |
 | ---- | ------- |
-| `config/local/env` | Service-level env overrides (hint file — Docker reads `.env` at root) |
-| `config/local/stack.override.yaml` | Port, host, and service overrides |
-| `config/local/models.override.yaml` | Add or override model definitions |
-| `config/local/backend-runtime.override.yaml` | Add backend binary source variants and versioned macros |
+| `config/local/env` | Sample service-level env overrides |
+| `config/local/stack.override.yaml` | Portable sample port, host, and service overrides |
+| `config/local/models.override.yaml` | Portable sample model definitions |
+| `config/local/backend-runtime.override.yaml` | Portable sample backend variant definitions |
 
-Then it generates `config/generated/` from `config/project/` + `config/local/` and
-starts LiteLLM. If `LITELLM_MASTER_KEY` is not already present in the container
-environment, the gateway reuses the seeded value from `config/local/env` on first
-run. Subsequent restarts skip the seed step — your edits are never overwritten.
+Then it generates `config/generated/` from `config/project/`, tracked
+`config/local/*.override.yaml`, and optional git-ignored
+`config/local/*.private.yaml` overlays. If `LITELLM_MASTER_KEY` is not already
+present in the container environment, the gateway reuses the seeded value from
+`config/local/env`, then lets `config/local/env.private` override it if present.
+Subsequent restarts skip the seed step — your edits are never overwritten.
 
-To customise after first start, edit any file under `config/local/` and restart the
-gateway:
+To customise after first start, keep the tracked `*.override.yaml` files generic,
+put machine-specific values in `*.private.yaml`, and restart the gateway:
 
 ```bash
-docker compose restart llm-gateway
+docker compose --project-directory . \
+  -f docker/compose/docker-compose.yml \
+  -f docker/compose/docker-compose.private.yml \
+  restart llm-gateway
 ```
 
 To force regeneration without restarting the full stack:
@@ -219,7 +228,7 @@ Compose file: [`docker/examples/docker-compose.nvidia.yml`](../docker/examples/d
 # docker/examples/docker-compose.nvidia.yml
 services:
   llm-gateway:
-    image: example/audia-llm-gateway-orchestrator:latest
+    image: ${DOCKER_IMAGE_NAMESPACE:-example}/audia-llm-gateway-orchestrator:latest
     container_name: audia-gateway
     ports:
       - "4000:4000"
@@ -231,7 +240,7 @@ services:
       - llm-server-llamacpp
 
   llm-server-llamacpp:
-    image: example/audia-llm-gateway-server:latest
+    image: ${DOCKER_IMAGE_NAMESPACE:-example}/audia-llm-gateway-server:latest
     container_name: audia-llama-cpp
     environment:
       - LLAMA_BACKEND=cuda
@@ -279,7 +288,7 @@ Compose file: [`docker/examples/docker-compose.amd.yml`](../docker/examples/dock
 # docker/examples/docker-compose.amd.yml
 services:
   llm-gateway:
-    image: example/audia-llm-gateway-orchestrator:latest
+    image: ${DOCKER_IMAGE_NAMESPACE:-example}/audia-llm-gateway-orchestrator:latest
     container_name: audia-gateway
     ports:
       - "4000:4000"
@@ -291,7 +300,7 @@ services:
       - llm-server-llamacpp
 
   llm-server-llamacpp:
-    image: example/audia-llm-gateway-server:latest
+    image: ${DOCKER_IMAGE_NAMESPACE:-example}/audia-llm-gateway-server:latest
     container_name: audia-llama-cpp
     environment:
       - LLAMA_BACKEND=${LLAMA_BACKEND:-auto}
@@ -357,7 +366,7 @@ Compose file: [`docker/examples/docker-compose.external-proxy.yml`](../docker/ex
 # docker/examples/docker-compose.external-proxy.yml
 services:
   llm-gateway:
-    image: example/audia-llm-gateway-orchestrator:latest
+    image: ${DOCKER_IMAGE_NAMESPACE:-example}/audia-llm-gateway-orchestrator:latest
     container_name: audia-gateway
     # No port mapping — proxied via the web-proxy network
     environment:
@@ -371,7 +380,7 @@ services:
       - internal
 
   llm-server-llamacpp:
-    image: example/audia-llm-gateway-server:latest
+    image: ${DOCKER_IMAGE_NAMESPACE:-example}/audia-llm-gateway-server:latest
     container_name: audia-llama-cpp
     environment:
       - LLAMA_BACKEND=auto
@@ -407,7 +416,8 @@ Add a label for Traefik, or an upstream block in nginx as appropriate.
 | nginx reverse proxy | 8080 | 8080 | `network.nginx.port` |
 
 Ports are configured centrally in `config/project/stack.base.yaml` under `network`.
-Override machine-specific values in `config/local/stack.override.yaml`:
+Override portable defaults in `config/local/stack.override.yaml`, then place
+host-only values in `config/local/stack.private.yaml`:
 
 ```yaml
 network:
@@ -454,13 +464,14 @@ All variables read from `.env` at compose start time.
 | `VLLM_MOCK_MODE` | No | `false` | Runs the mounted mock vLLM server instead of the real `vllm` process. Intended for Docker validation only. |
 | `LLAMA_BACKEND` | No | `auto` | Override llama.cpp backend detection: `auto`, `cuda`, `rocm`, `vulkan`, `cpu`. |
 | `LLAMA_VERSION` | No | `latest` | llama.cpp release tag to provision (e.g. `b4632`). |
-| `DOCKERHUB_USERNAME` | No | `example` | Override image registry username for self-hosted images. |
+| `DOCKER_IMAGE_NAMESPACE` | No | `example` | Registry namespace used by compose image references. |
 
 ### Versioned llama.cpp backend catalog
 
 You can provision multiple versions of the same backend (for example multiple
 ROCm and Vulkan builds) by adding variants in
-`config/local/backend-runtime.override.yaml` (merged with
+`config/local/backend-runtime.override.yaml` or
+`config/local/backend-runtime.private.yaml` (both merged with
 `config/project/backend-runtime.base.yaml`). Each variant generates:
 
 - a versioned llama-swap macro (for example `llama-server-rocm-b8429`)

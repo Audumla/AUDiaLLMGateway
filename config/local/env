@@ -2,4 +2,6 @@
 # Changes take effect on next container restart.
 #
 # REQUIRED: Set a strong key before exposing the gateway on a network.
+# Keep this tracked file sample-safe. Private secrets can go in
+# config/local/env.private or your process manager / compose environment.
 LITELLM_MASTER_KEY=sk-local-dev

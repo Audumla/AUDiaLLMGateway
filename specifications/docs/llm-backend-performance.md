@@ -1297,10 +1297,9 @@ Combining these, a plausible target is **27.5–28.5 tok/s** (5–8% improvement
 
 **Status as of 2026-03-29:**
 - ✅ **V1 Complete:** 26.47 tok/s (baseline confirmed)
-- ⏸️ **Server gpu-host.example SSH temporarily locked out** due to authentication rate limiting (fail2ban)
-  - Correct credentials identified: example / redacted-secret
-  - Issue: Too many failed auth attempts triggered 15-30 min temporary block
-  - Resolution: Either wait for lockout to expire or manually restart SSH daemon on server
+- ⏸️ **Reference GPU host SSH temporarily locked out** due to authentication rate limiting
+  - Issue: Too many failed auth attempts triggered a temporary block
+  - Resolution: Wait for lockout to expire or restart the SSH daemon on the host
   - All remaining V2-V7 tests fully documented and ready to execute
 - 📋 **Next:** Reconnect when SSH lockout clears and execute V2-V7 suite (~30 min total)
 

@@ -603,7 +603,7 @@ Result:
 
 **Goal:** Ensure every component manifest can be joined with its physical hardware.
 
-- [ ] **0.5.1** Identify PCI slots for all GPUs on `gpu-host.example`
+- [ ] **0.5.1** Identify PCI slots for all GPUs on the target GPU host
 - [ ] **0.5.2** Update `config/local/stack.override.yaml` to export `GPU_PCI_SLOT_0`, etc.
 - [ ] **0.5.3** Update `config/monitoring/llamaswap.yaml` with correlation block:
   ```yaml

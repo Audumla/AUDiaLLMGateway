@@ -128,7 +128,7 @@ Services auto-start on next logon (PostgreSQL, llama-cpp, gateway, nginx). See [
 
 | Document | Contents |
 | -------- | -------- |
-| [SUPPORTED_FEATURES.md](specifications/docs/SUPPORTED_FEATURES.md) | All supported backends (6 variants), versions, features, and status |
+| [SUPPORTED_FEATURES.md](specifications/docs/SUPPORTED_FEATURES.md) | Current backend-management features, supported source types, and update workflow |
 | [PREBUILT_BINARIES_STRATEGY.md](specifications/docs/PREBUILT_BINARIES_STRATEGY.md) | Prebuilt binary distribution with smart caching (45-90s boot time) |
 | [BACKEND_VERSIONS.md](specifications/docs/BACKEND_VERSIONS.md) | Complete backend version reference and compatibility |
 | [FAILING_BUILDS_INVESTIGATION.md](specifications/docs/FAILING_BUILDS_INVESTIGATION.md) | Root cause analysis and solutions for previously failing builds |
@@ -169,12 +169,13 @@ llama-swap loads and unloads llama.cpp model processes as requests arrive.
 
 ### Config layering
 
-The system uses three config layers that merge at generation time:
+The system uses four config layers at generation time:
 
 | Layer | Location | Managed by |
 | ----- | -------- | ---------- |
 | Project base | `config/project/` | Release updates |
-| Local overrides | `config/local/` | You — never overwritten |
+| Tracked local samples | `config/local/*.override.yaml` | Repo examples — keep portable |
+| Private local overlays | `config/local/*.private.yaml` and `config/local/env.private` | You — git-ignored |
 | Generated | `config/generated/` | Config generator — safe to overwrite |
 
 Project base files:
@@ -185,13 +186,22 @@ Project base files:
 - `config/project/llama-swap.base.yaml` — llama-swap substrate
 - `config/project/mcp.base.yaml` — MCP scaffold
 
-Local override files:
+Tracked sample override files:
 
 - `config/local/stack.override.yaml`
 - `config/local/models.override.yaml`
 - `config/local/backend-runtime.override.yaml`
 - `config/local/llama-swap.override.yaml`
 - `config/local/mcp.override.yaml`
+
+Optional private overlays:
+
+- `config/local/stack.private.yaml`
+- `config/local/models.private.yaml`
+- `config/local/backend-runtime.private.yaml`
+- `config/local/llama-swap.private.yaml`
+- `config/local/mcp.private.yaml`
+- `config/local/env.private`
 
 Generated outputs:
 
@@ -216,7 +226,8 @@ the scaffold and merge targets used by the local catalog. The catalog holds:
 - load groups (coding, reasoning, vision)
 
 The config generator translates the catalog into backend-specific config at
-generation time. Machine-specific additions go in `config/local/models.override.yaml`.
+generation time. Keep the tracked file sample-safe and place machine-specific
+additions in `config/local/models.private.yaml`.
 
 ### Backend runtime catalog
 
@@ -225,6 +236,7 @@ definitions in:
 
 - `config/project/backend-runtime.base.yaml`
 - `config/local/backend-runtime.override.yaml`
+- `config/local/backend-runtime.private.yaml` (optional, git-ignored)
 
 Each variant can use `github_release`, `direct_url`, or `git` source types and
 produces a versioned backend macro (for example `llama-server-rocm-b8429`) that
@@ -236,13 +248,14 @@ official, lemonade fork, preview refs).
 How to add a new backend variant:
 
 1. (Optional) Add reusable `profiles` under `config/local/backend-runtime.override.yaml`.
-2. Add a variant under `config/local/backend-runtime.override.yaml` and reference
-   one or more profiles via `profile` or `profiles`.
-3. Reference its macro in `config/local/models.override.yaml` deployment
-   (`executable_macro: <macro>`).
-4. Regenerate and restart:
-   - `python -m src.launcher.process_manager --root . generate-configs`
-   - `docker compose restart llm-server-llamacpp` (Docker)
+2. Put host-specific pins and runtime variants in `config/local/backend-runtime.private.yaml`.
+3. Add a variant under the tracked or private runtime override file and reference
+    one or more profiles via `profile` or `profiles`.
+4. Reference its macro in `config/local/models.override.yaml` or `config/local/models.private.yaml`
+    (`executable_macro: <macro>`).
+5. Regenerate and restart:
+    - `python -m src.launcher.process_manager --root . generate-configs`
+    - `docker compose restart llm-server-llamacpp` (Docker)
 
 ### Central network config
 

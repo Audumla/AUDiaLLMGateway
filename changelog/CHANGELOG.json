@@ -5,7 +5,7 @@
     "change_group": "docs-refresh-compose-layout",
     "plugin_version": "unreleased",
     "date": "2026-03-31",
-    "recorded_at": "2026-03-31T09:16:12.2619666Z",
+    "recorded_at": "2026-03-31T09:16:12.261966Z",
     "summary_tags": [
       "Documentation Update"
     ],
@@ -22,7 +22,7 @@
     "change_group": "compose-layout-cleanup",
     "plugin_version": "unreleased",
     "date": "2026-03-31",
-    "recorded_at": "2026-03-31T09:16:12.2619666Z",
+    "recorded_at": "2026-03-31T09:16:12.261966Z",
     "summary_tags": [
       "Configuration Cleanup",
       "Documentation Update"
@@ -2524,6 +2524,39 @@
     "summary": "Registered the latest ggml ROCm lane as a selectable qwen27 gateway deployment.",
     "details": [
       "Updated the backend version docs to note the new qwen27_fast_rocm_latest option."
+    ]
+  },
+  {
+    "id": "CHG-699545ef",
+    "agent": "codex",
+    "change_group": "backend-versioning-docs",
+    "plugin_version": "unreleased",
+    "date": "2026-04-05",
+    "recorded_at": "2026-04-05T03:11:06.275636Z",
+    "summary_tags": [
+      "Documentation Update"
+    ],
+    "summary": "Aligned backend version/build/update docs with the live runtime catalog and installer behavior, and fixed legacy asset token compatibility.",
+    "details": [
+      "Updated backend maintenance docs to describe the current version/source fields, latest-release lookup flow, and Linux/macOS update/check commands.",
+      "Fixed release installer compatibility with legacy asset_match_tokens and updated provision-runtime.sh to honor asset_tokens for GitHub release selection."
+    ]
+  },
+  {
+    "id": "CHG-699545ef-1",
+    "agent": "codex",
+    "change_group": "repo-anonymize-private-overlays",
+    "plugin_version": "unreleased",
+    "date": "2026-04-09",
+    "recorded_at": "2026-04-09T12:02:28.144901Z",
+    "summary_tags": [
+      "Configuration Cleanup"
+    ],
+    "summary": "Anonymized deployment surfaces and added private overlay support for local deployment state.",
+    "details": [
+      "Added optional config/local/*.private.yaml and config/local/env.private support in config loading and gateway startup.",
+      "Scrubbed tracked local config samples and deployment docs so host-specific values move into ignored overlays.",
+      "Added regression coverage for private overlay merges and private env precedence, then reran targeted config-generation tests."
     ]
   }
 ]

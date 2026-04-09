@@ -1,255 +1,210 @@
-# LLM Backend Build and Usage Catalog
+# LLM Backend Build and Update Workflow
 
-This document consolidates build and runtime steps for every backend we have tested or attempted on the dual RX 7900 XTX server. The goal is repeatability: no re-investigation each time a backend is added or revisited.
+**Last reviewed:** 2026-04-05
 
----
+This document is the maintainer-facing guide for building, provisioning, and
+updating differing backend variants.
 
-## Common Environment (gpu-host.example)
+## Canonical implementation files
 
-### GPU Isolation
+- Runtime variant definitions:
+  `config/project/backend-runtime.base.yaml`
+- Machine-local runtime overrides:
+  `config/local/backend-runtime.override.yaml`
+- Native managed-component install profiles:
+  `config/project/stack.base.yaml`
+- Generated runtime catalog:
+  `config/generated/llama-swap/backend-runtime.catalog.json`
+- Runtime provisioner:
+  `scripts/provision-runtime.sh`
+- Release installer and update checks:
+  `src/installer/release_installer.py`
 
-Always exclude the RX 6900 XT (gfx1030) when benchmarking Qwen3.5-27B on ROCm.
+## Current model
 
-```
-ROCR_VISIBLE_DEVICES=0,1
-HIP_VISIBLE_DEVICES=0,1
-```
+There are two distinct flows:
 
-### Paths
+1. Native component install
+   - downloads `llama.cpp` and `llama-swap` into the install root
+   - uses install profiles under `component_settings.llama_cpp`
+2. Runtime provisioning for backend variants
+   - downloads or builds backend binaries into `/app/runtime-root/<runtime_subdir>/active`
+   - supports multiple variants concurrently
 
-- GGUF model: `/opt/docker/services/llm_gateway/models/gguf/qwen3.5-27B/Qwen3.5-27B-Q6_K.gguf`
-- HF models: `/opt/docker/services/llm_gateway/models-hf`
-- Runtime root (llama.cpp): `/opt/docker/services/llm_gateway/config/data/backend-runtime`
+## Runtime variant fields that matter
 
-### Ports
+Release-backed variants:
 
-- llama-swap: `41080`
-- benchmark llama-server variants: `41082`
-- vLLM: `41090` (bench variants use 41111/41112 in scripts)
-- TGI: `41120`
-- SGLang: `41110`
-- Ollama: `41100`
-- KoboldCpp: `41101`
-- Aphrodite: `41130`
+- `version`
+- `source_type: github_release`
+- `repo_owner`
+- `repo_name`
+- `asset_tokens`
+- `runtime_subdir`
+- `macro`
 
----
+Source-build variants:
 
-## Backend Catalog
+- `version`
+- `source_type: git`
+- `git_url`
+- `git_ref`
+- `configure_command`
+- `build_command`
+- `binary_glob`
+- `library_glob`
 
-### 0. Likely Candidates (Not Yet Tested)
+## Current enabled runtime variants
 
-These are included because they are plausible on AMD RDNA3, but not yet validated.
+Project defaults currently enable:
 
-- **MLC-LLM (Vulkan)**: Likely candidate. MLC can target Vulkan via TVM; would require model compilation to the target GPU. Not compatible with GGUF directly.
-- **LMDeploy (ROCm)**: Possible but unverified on RDNA3; primarily documented for NVIDIA/CUDA. Include only if ROCm support is confirmed.
-- **Text-Generation-WebUI backends (Vulkan/ROCm)**: Potential wrapper for llama.cpp / exllama. Not a backend itself; only worth including if we want a unified UI layer.
+- `cpu`
+- `cuda`
+- `rocm`
+- `vulkan`
+- `rocm-gfx1100-prebuilt`
+- `rocm-gfx1030-prebuilt`
 
-Explicitly excluded (not good candidates for this hardware):
+These all currently resolve through ggml release assets unless locally
+overridden.
 
-- **TensorRT-LLM**: NVIDIA-only.
-- **exllama/exllamav2**: NVIDIA-only (CUDA).
-- **OpenVINO**: Intel-focused.
+## Finding the latest upstream releases
 
-### 1. llama.cpp (Vulkan)
+Verified on 2026-04-05:
 
-**Source:** ggml-org llama.cpp releases or build from source with Vulkan enabled.
+- ggml latest: `b8661`
+  https://github.com/ggml-org/llama.cpp/releases/latest
+- Lemonade ROCm latest: `b1199`
+  https://github.com/lemonade-sdk/llamacpp-rocm/releases/latest
+- llama-swap latest: `v199`
+  https://github.com/mostlygeek/llama-swap/releases/latest
 
-**Build (from source):**
-
-```bash
-cmake -B build -DGGML_VULKAN=ON
-cmake --build build -j
-```
-
-**Runtime:**
-
-```bash
-/app/runtime-root/vulkan/bin/llama-server-vulkan \
-  --host 0.0.0.0 --port 41082 \
-  -m /app/models/gguf/qwen3.5-27B/Qwen3.5-27B-Q6_K.gguf \
-  --ctx-size 4096 -n 128 --gpu-layers 99
-```
-
-**Notes:** Vulkan currently leads on dual XTX (26.41 tok/s baseline). Keep the 6900 XT out of the split for 27B tests.
-
-### 2. llama.cpp (ROCm variants)
-
-ROCm backends are managed by the backend runtime catalog:
-
-- `config/project/backend-runtime.base.yaml`
-- `config/local/backend-runtime.override.yaml`
-
-Each variant declares a `macro` and a `version` to support compatibility rules.
-
-**Example variants:**
-
-- `rocm_gfx1100_preview` (confirmed 22.49 tok/s)
-- `rocm_ggml_latest`
-- `rocm_ggml_b8429`
-- `rocm_ggml_git_main`
-- `rocm_lemonade_b1217`
-- `rocm_gfx1030_bin` (only for gfx1030 hardware)
-
-**Runtime (inside `audia-llama-cpp` container):**
+From the repo, use:
 
 ```bash
-docker exec -d audia-llama-cpp bash -c '
-  export ROCR_VISIBLE_DEVICES=0,1
-  export HIP_VISIBLE_DEVICES=0,1
-  export LD_LIBRARY_PATH=/app/runtime-root/rocm/gfx1100/preview/lib:/app/runtime-root/rocm/gfx1100/preview/bin:$LD_LIBRARY_PATH
-  /app/runtime-root/rocm/gfx1100/preview/bin/llama-server-rocm \
-    --host 0.0.0.0 --port 41082 \
-    -m /app/models/gguf/qwen3.5-27B/Qwen3.5-27B-Q6_K.gguf \
-    --ctx-size 4096 -n 128 --gpu-layers 99 \
-    > /tmp/llama_bench.log 2>&1
-'
+python -m src.installer.release_installer check-updates --root .
 ```
 
-**Important:** `fuser` is not installed in the container. Use:
+Windows wrapper:
+
+```powershell
+.\scripts\AUDiaLLMGateway.ps1 check
+```
+
+## Updating versions
+
+### Update the AUDia release itself
 
 ```bash
-docker exec audia-llama-cpp bash -c 'pkill -9 -f "port 41082" 2>/dev/null; sleep 3'
+python -m src.installer.release_installer update-release --root .
 ```
 
-### 3. KoboldCpp (Vulkan)
+Windows wrapper:
 
-**Source:** `https://github.com/LostRuins/koboldcpp/releases/latest`
+```powershell
+.\scripts\AUDiaLLMGateway.ps1 update
+```
 
-**Runtime (inside `audia-llama-cpp` container):**
+### Update all ggml-backed runtime variants together
+
+Set the shared runtime default:
+
+```yaml
+defaults:
+  version: b8661
+```
+
+or set `LLAMA_VERSION=b8661` in `.env`.
+
+### Update one runtime variant independently
+
+```yaml
+variants:
+  vulkan:
+    version: b8661
+
+  rocm:
+    version: b8583
+```
+
+This is the current supported way to maintain differing backend builds at the
+same time.
+
+### Add a separate upstream lane
+
+Example: Lemonade ROCm lane
+
+```yaml
+variants:
+  rocm-lemonade:
+    backend: rocm
+    macro: llama-server-rocm-lemonade
+    runtime_subdir: rocm/lemonade
+    source_type: github_release
+    repo_owner: lemonade-sdk
+    repo_name: llamacpp-rocm
+    version: b1199
+    asset_tokens:
+      - ubuntu
+      - rocm
+    enabled: false
+```
+
+### Add a reproducible source-build lane
+
+Prefer a commit SHA in `git_ref`:
+
+```yaml
+variants:
+  rocm-gfx1100-preview:
+    backend: rocm
+    macro: llama-server-rocm-gfx1100-preview
+    runtime_subdir: rocm/gfx1100/preview
+    source_type: git
+    git_url: https://github.com/ROCm/llama.cpp.git
+    git_ref: 0123456789abcdef0123456789abcdef01234567
+    configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_HIPBLAS=ON -DAMDGPU_TARGETS=gfx1100 -DCMAKE_HIP_ARCHITECTURES=gfx1100 -DCMAKE_BUILD_TYPE=Release
+    build_command: cmake --build build --config Release --parallel
+    binary_glob: build/bin/llama-server
+    library_glob: build/bin/*.so*
+    enabled: false
+```
+
+## After editing versions or variants
+
+1. Regenerate configs:
 
 ```bash
-docker exec -d audia-llama-cpp bash -c '
-  VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/radeon_icd.json \
-  /tmp/koboldcpp \
-    --model /app/models/gguf/qwen3.5-27B/Qwen3.5-27B-Q6_K.gguf \
-    --port 41101 --host 0.0.0.0 \
-    --usevulkan --gpulayers 99 \
-    --contextsize 4096 \
-    > /tmp/kobold_bench.log 2>&1
-'
+python -m src.launcher.process_manager --root . generate-configs
 ```
 
-**Known issue:** readiness timeout; increase to 900s or start with `--contextsize 2048`.
-
-### 4. Ollama (ROCm)
-
-**Image:** `ollama/ollama:rocm`
-
-**Runtime:**
+2. Inspect the generated runtime catalog:
 
 ```bash
-docker run -d --name bench-ollama \
-  --device /dev/kfd --device /dev/dri --group-add video --group-add render \
-  -e ROCR_VISIBLE_DEVICES=0,1 -e HIP_VISIBLE_DEVICES=0,1 \
-  -v /opt/docker/services/llm_gateway/models:/app/models:ro \
-  -p 41100:11434 \
-  -e OLLAMA_HOST=0.0.0.0 \
-  ollama/ollama:rocm
+python -m json.tool config/generated/llama-swap/backend-runtime.catalog.json
 ```
 
-**Known issue:** startup hang if ROCm is in a dirty state. Restart `audia-llama-cpp` before running.
+3. Restart the runtime:
+   - native: restart the managed processes
+   - Docker: restart the backend container or compose stack
 
-### 5. vLLM (ROCm)
+## Asset selector vocabulary
 
-**Image:** `vllm/vllm-openai-rocm:latest`
+Current implementation status:
 
-**Runtime (AWQ):**
+- Native install profiles still use `asset_match_tokens` in
+  `config/project/stack.base.yaml`
+- Runtime variants use `asset_tokens`
+- The installer now accepts both names for native profiles
+- The runtime provisioner accepts `asset_tokens` and still tolerates
+  legacy `asset_pattern`
 
-```bash
-docker run -d --name bench-vllm-awq \
-  --device /dev/kfd --device /dev/dri --group-add video --group-add render \
-  -e ROCR_VISIBLE_DEVICES=0,1 -e HIP_VISIBLE_DEVICES=0,1 \
-  --ipc host \
-  -v /opt/docker/services/llm_gateway/models-hf:/models:ro \
-  -p 41111:8000 \
-  vllm/vllm-openai-rocm:latest \
-  --model /models/hub/models--QuantTrio--Qwen3.5-27B-AWQ/snapshots/<hash> \
-  --served-model-name qwen27b \
-  --tensor-parallel-size 2 \
-  --quantization awq \
-  --gpu-memory-utilization 0.85 \
-  --max-model-len 4096 \
-  --trust-remote-code
-```
+## What is not yet wired end-to-end
 
-**Known issue:** Engine core init failure if ROCm is dirty. Restart `audia-llama-cpp` before vLLM tests.
+The benchmark lifecycle registry under
+`benchmarks/data/backend-benchmarks/backend-version-registry.yaml` tracks
+governance metadata such as `pinned_version`, but the runtime provisioner still
+uses the generated runtime catalog's `version` and `git_ref` fields.
 
-### 6. TGI (ROCm)
-
-**Image:** `ghcr.io/huggingface/text-generation-inference:latest-rocm`
-
-`3.3.5-rocm` was checked and not found on GHCR. `latest-rocm` is the verified ROCm tag.
-
-**Runtime:**
-
-```bash
-docker run -d --name bench-tgi \
-  --device /dev/kfd --device /dev/dri --group-add video --group-add render \
-  -e ROCR_VISIBLE_DEVICES=0,1 -e HIP_VISIBLE_DEVICES=0,1 \
-  -v /opt/docker/services/llm_gateway/models-hf:/models:ro \
-  -p 41120:80 \
-  ghcr.io/huggingface/text-generation-inference:3.3.5-rocm \
-  --model-id /models/hub/models--Qwen--Qwen3.5-27B/snapshots/<hash> \
-  --num-shard 2 \
-  --dtype bfloat16 \
-  --max-total-tokens 4096 \
-  --trust-remote-code
-```
-
-**Known issue:** `:latest` is CUDA-only and hangs; use `:3.3.5-rocm` or `:latest-rocm`.
-
-### 7. SGLang (ROCm)
-
-**Image:** `lmsysorg/sglang:v0.5.10rc0-rocm720-mi30x`
-
-This image targets MI300X (gfx942) and may not support gfx1100. If it fails, try `lmsysorg/sglang:latest` or build from source with ROCm 7.x.
-
-```bash
-docker run -d --name bench-sglang \
-  --device /dev/kfd --device /dev/dri --group-add video --group-add render \
-  -e ROCR_VISIBLE_DEVICES=0,1 -e HIP_VISIBLE_DEVICES=0,1 \
-  --ipc host \
-  -v /opt/docker/services/llm_gateway/models-hf:/models:ro \
-  -p 41110:30000 \
-  -e SGLANG_USE_AITER=0 \
-  lmsysorg/sglang:v0.5.10rc0-rocm720-mi30x \
-  python3 -m sglang.launch_server \
-    --model-path /models/hub/models--Qwen--Qwen3.5-27B/snapshots/<hash> \
-    --tensor-parallel-size 2 \
-    --port 30000 \
-    --host 0.0.0.0 \
-    --trust-remote-code \
-    --dtype bfloat16
-```
-
-### 8. Aphrodite Engine
-
-**Image:** `alpindale/aphrodite-engine:latest` (likely CUDA-only).
-
-If ROCm support is required, build from source:
-
-```bash
-git clone https://github.com/PygmalionAI/aphrodite-engine
-cd aphrodite-engine
-docker build -f Dockerfile.rocm -t aphrodite-rocm .
-```
-
----
-
-## Repeatable Benchmark Steps
-
-1. Stop production traffic or run in a dedicated benchmark window.
-2. Export `ROCR_VISIBLE_DEVICES=0,1` and `HIP_VISIBLE_DEVICES=0,1` for all ROCm runs.
-3. For llama.cpp variants, use `pkill -9 -f "port <N>"` between runs.
-4. Restart `audia-llama-cpp` before Tier 2 backends (vLLM, TGI, Aphrodite, SGLang, Ollama).
-5. Record both eval tok/s and prefill tok/s; update `specifications/docs/llm-backend-performance.md`.
-6. Save raw run results under `specifications/data/backend-benchmarks/` with a timestamped filename.
-
----
-
-## Config References
-
-- Backend runtime catalog: `config/project/backend-runtime.base.yaml`
-- Backend runtime overrides: `config/local/backend-runtime.override.yaml`
-- Backend support matrix: `config/project/backend-support.base.yaml`
-- Backend support overrides: `config/local/backend-support.override.yaml`
+Use the registry for planning and audit context, not as proof that the running
+system is already pinned to those values.

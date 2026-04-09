@@ -1,12 +1,7 @@
+# AUDia LLM Gateway — sample llama-swap overrides.
+# Keep tracked macros generic. Host-only executable paths and version-pinned
+# aliases belong in config/local/llama-swap.private.yaml.
 macros:
-  llama-server-rocm: "env LD_LIBRARY_PATH=/app/runtime-root/rocm/bin:/app/runtime-root/rocm/lib:/opt/rocm/lib ROCBLAS_TENSILE_LIBPATH=/opt/rocm/lib/rocblas/library /app/runtime-root/rocm/bin/llama-server-rocm"
-  # Versioned ROCm aliases keep the generated runtime catalog loadable while we
-  # compare engine/release combinations for the same qwen27 benchmark target.
-  llama-server-rocm-ggml-latest: "env LD_LIBRARY_PATH=/app/runtime-root/rocm/ggml-latest/bin:/app/runtime-root/rocm/ggml-latest/lib:/opt/rocm/lib ROCBLAS_TENSILE_LIBPATH=/opt/rocm/lib/rocblas/library /app/runtime-root/rocm/ggml-latest/bin/llama-server-rocm"
-  llama-server-rocm-ggml-b8429: "env LD_LIBRARY_PATH=/app/runtime-root/rocm/ggml-b8429/bin:/app/runtime-root/rocm/ggml-b8429/lib:/opt/rocm/lib ROCBLAS_TENSILE_LIBPATH=/opt/rocm/lib/rocblas/library /app/runtime-root/rocm/ggml-b8429/bin/llama-server-rocm"
-  llama-server-rocm-ggml-git-main: "env LD_LIBRARY_PATH=/app/runtime-root/rocm/ggml-git-main/bin:/app/runtime-root/rocm/ggml-git-main/lib:/opt/rocm/lib ROCBLAS_TENSILE_LIBPATH=/opt/rocm/lib/rocblas/library /app/runtime-root/rocm/ggml-git-main/bin/llama-server-rocm"
-  llama-server-rocm-lemonade-b1217: "env LD_LIBRARY_PATH=/app/runtime-root/rocm/lemonade-b1217/bin:/app/runtime-root/rocm/lemonade-b1217/lib:/opt/rocm/lib ROCBLAS_TENSILE_LIBPATH=/opt/rocm/lib/rocblas/library /app/runtime-root/rocm/lemonade-b1217/bin/llama-server-rocm"
-  llama-server-vulkan: "env VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/radeon_icd.json LD_LIBRARY_PATH=/app/runtime-root/vulkan/bin:/app/runtime-root/vulkan/lib /app/runtime-root/vulkan/bin/llama-server-vulkan"
   model-path: "--model /app/models/gguf"
   mmproj-path: "--mmproj /app/models/gguf"
 models: {}

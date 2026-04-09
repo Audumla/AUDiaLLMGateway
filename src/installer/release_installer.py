@@ -291,9 +291,18 @@ def _install_one_llama_cpp_profile(
     binary_subdir = str(settings.get("binary_subdir", "bin"))
     executable_names = settings.get("executable_names", {})
     executable_name = str(executable_names.get(system, "llama-server.exe" if system == "windows" else "llama-server"))
-    asset_tokens = [str(item) for item in profile.get("asset_match_tokens", [])]
+    raw_asset_tokens = profile.get("asset_tokens")
+    if raw_asset_tokens in (None, ""):
+        # Keep accepting the older install-profile field name so existing
+        # project/local configs continue to work while docs converge on the
+        # newer token vocabulary.
+        raw_asset_tokens = profile.get("asset_match_tokens", [])
+    if isinstance(raw_asset_tokens, str):
+        asset_tokens = [item.strip() for item in raw_asset_tokens.split(",") if item.strip()]
+    else:
+        asset_tokens = [str(item) for item in (raw_asset_tokens or [])]
     if not asset_tokens:
-        raise RuntimeError(f"No asset-match tokens configured for llama.cpp profile '{profile_name}'")
+        raise RuntimeError(f"No asset tokens configured for llama.cpp profile '{profile_name}'")
     sidecar_files = [str(item) for item in profile.get("sidecar_files", [])]
     copy_sidecar_to_binary_dir = bool(settings.get("copy_sidecar_to_binary_dir", True))
 

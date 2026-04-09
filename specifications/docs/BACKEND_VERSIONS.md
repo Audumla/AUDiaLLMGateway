@@ -1,326 +1,274 @@
-# Supported llama.cpp Backend Versions
+# Backend Versions and Maintenance
 
-## Overview
+**Last reviewed:** 2026-04-05
 
-The AUDia LLM Gateway supports **8 different llama.cpp backend configurations** across 4 main inference platforms. Of these:
-- **4 backends are actively enabled** by default
-- **4 specialized variants are available** but disabled to reduce boot time
+This document describes the current implementation for downloading, building,
+tracking, and updating backend binaries. It is intentionally grounded in the
+live code paths under `src/installer/`, `src/launcher/`, and
+`scripts/provision-runtime.sh`.
 
-For the maintained machine-readable source/release catalog, see:
+## Current source of truth
 
-- [benchmarks/data/backend-benchmarks/backend-catalog.yaml](../../benchmarks/data/backend-benchmarks/backend-catalog.yaml)
-- [benchmarks/data/backend-benchmarks/engine-version-catalog.yaml](../../benchmarks/data/backend-benchmarks/engine-version-catalog.yaml)
-- [benchmarks/docs/backend-catalog.md](../../benchmarks/docs/backend-catalog.md)
-- [benchmarks/docs/engine-version-catalog.md](../../benchmarks/docs/engine-version-catalog.md)
+There are two parallel version-management surfaces in the repo:
 
----
+1. Native install profiles for managed component downloads:
+   - `config/project/stack.base.yaml`
+   - `config/local/stack.override.yaml`
+2. Docker/backend runtime variants used by `llama-swap` and the backend container:
+   - `config/project/backend-runtime.base.yaml`
+   - `config/local/backend-runtime.override.yaml`
 
-## Active Backends (Enabled by Default)
+The generated Docker/runtime catalog is:
 
-These backends are automatically detected and provisioned on first run.
+- `config/generated/llama-swap/backend-runtime.catalog.json`
 
-### 1. **CPU Backend**
+## Important distinction
+
+The Phase 5 lifecycle docs and benchmark registry track governance metadata such
+as `pinned_version`, `floor_version`, and validation status, but the live
+runtime provisioner still provisions from the runtime catalog's `version`
+field (or `git_ref` for source builds). Treat the benchmark registry as
+planning and audit material, not yet the field consumed by the running
+provisioner.
+
+## What the implementation supports today
+
+### Native installer profiles
+
+The release installer manages named `llama.cpp` profiles in
+`config/project/stack.base.yaml`.
+
+Supported profile fields in current use:
+
+- `platform`
+- `backend`
+- `version`
+- `asset_match_tokens` or `asset_tokens`
+- `sidecar_files`
+
+The installer resolves releases through the GitHub API:
+
+- `releases/latest` when `version: latest`
+- `releases/tags/<tag>` when a concrete version is configured
+
+### Backend runtime variants
+
+The Docker/runtime path supports multiple concurrent variants of the same
+backend through distinct `macro` and `runtime_subdir` values.
+
+Supported runtime variant fields in current use:
+
+- `backend`
+- `macro`
+- `runtime_subdir`
+- `version`
+- `source_type`
+- `asset_tokens`
+- `repo_owner`
+- `repo_name`
+- `download_url`
+- `archive_type`
+- `git_url`
+- `git_ref`
+- `configure_command`
+- `build_command`
+- `binary_glob`
+- `library_glob`
+- `apt_packages`
+- `enabled`
+- `always`
+
+Supported runtime source types:
+
+- `github_release`
+- `direct_url`
+- `git`
+
+`asset_tokens` is the canonical runtime selector now. The provisioner still
+accepts the older `asset_pattern` field for compatibility, but new runtime
+variants should use `asset_tokens`.
+
+## Enabled variants in the current project config
+
+The base project config currently enables six ggml release-backed runtime
+variants by default:
+
+- `cpu`
+- `cuda`
+- `rocm`
+- `vulkan`
+- `rocm-gfx1100-prebuilt`
+- `rocm-gfx1030-prebuilt`
+
+The following source-build ROCm variants exist but are disabled by default:
+
+- `rocm-gfx1100-official-custom`
+- `rocm-gfx1100-official-preview`
+- `rocm-gfx1030-official-custom`
+
+Each enabled variant gets its own persisted runtime directory under
+`/app/runtime-root/<runtime_subdir>/active` inside the container.
+
+## Upstream release state
+
+Verified on 2026-04-05:
+
+- `ggml-org/llama.cpp` latest release: `b8661`
+  Source: https://github.com/ggml-org/llama.cpp/releases/latest
+- `lemonade-sdk/llamacpp-rocm` latest release: `b1199`
+  Source: https://github.com/lemonade-sdk/llamacpp-rocm/releases/latest
+- `mostlygeek/llama-swap` latest release: `v199`
+  Source: https://github.com/mostlygeek/llama-swap/releases/latest
+
+Those are upstream observations only. They do not automatically become the
+project's chosen runtime versions unless you update the config that the
+installer or runtime provisioner consumes.
+
+## How updates work today
+
+### Check upstream releases
+
+Use the release installer to inspect current gateway and managed component
+release availability:
+
+```bash
+python -m src.installer.release_installer check-updates --root .
+```
+
+On Windows the PowerShell wrapper also exposes this:
+
+```powershell
+.\scripts\AUDiaLLMGateway.ps1 check
+```
+
+### Update the project release bundle
+
+To update the AUDia gateway release itself:
+
+```bash
+python -m src.installer.release_installer update-release --root .
+```
+
+Windows wrapper:
+
+```powershell
+.\scripts\AUDiaLLMGateway.ps1 update
+```
+
+### Bump all ggml-backed runtime variants together
+
+The runtime catalog defaults to:
 
 ```yaml
-Backend: cpu
-Source:  ggml-org/llama.cpp (GitHub releases)
-Version: ${LLAMA_VERSION} (default: latest)
-Runtime: ubuntu-x64
+defaults:
+  version: ${LLAMA_VERSION}
 ```
 
-**Use Case:** CPU-only inference (no GPU required)
-**Performance:** Slowest but most compatible
-**Asset Pattern:** `ubuntu-x64.(tar.gz|zip)`
+If you want all default ggml release variants to move together, set
+`LLAMA_VERSION` in `.env` or override `defaults.version` locally.
 
----
-
-### 2. **CUDA Backend (NVIDIA GPU)**
+Example:
 
 ```yaml
-Backend: cuda
-Source:  ggml-org/llama.cpp (GitHub releases)
-Version: ${LLAMA_VERSION} (default: latest)
-Runtime: ubuntu-x64
+defaults:
+  version: b8661
 ```
 
-**Use Case:** NVIDIA GPU acceleration
-**Performance:** Fast, widely supported
-**Requirements:** NVIDIA GPU + CUDA drivers
-**Asset Pattern:** `ubuntu-x64.(tar.gz|zip)`
+### Bump one runtime variant without changing the others
 
----
-
-### 3. **ROCm Backend (AMD GPU - Standard)**
-
-```yaml
-Backend: rocm
-Source:  ggml-org/llama.cpp (GitHub releases)
-Version: ${LLAMA_VERSION} (default: latest)
-Runtime: ubuntu-rocm.*x64
-```
-
-**Use Case:** AMD GPU acceleration (generic)
-**Performance:** Fast, standard ROCm support
-**Requirements:** AMD GPU + ROCm drivers
-**Asset Pattern:** `ubuntu-rocm.*x64.(tar.gz|zip)`
-
-The gateway also exposes a selectable `qwen27_fast_rocm_latest` deployment
-that points at the versioned `llama-server-rocm-ggml-latest` alias for the
-current ggml ROCm lane.
-
----
-
-### 4. **Vulkan Backend (Cross-Platform GPU)**
-
-```yaml
-Backend: vulkan
-Source:  ggml-org/llama.cpp (GitHub releases)
-Version: ${LLAMA_VERSION} (default: latest)
-Runtime: ubuntu-vulkan.*x64
-```
-
-**Use Case:** Cross-platform GPU acceleration (AMD, Intel, NVIDIA via Vulkan)
-**Performance:** Fast, hardware agnostic
-**Requirements:** Vulkan-compatible GPU + drivers
-**Asset Pattern:** `ubuntu-vulkan.*x64.(tar.gz|zip)`
-
-**Currently Running:** ✅ Active on gpu-host.example (AMD Radeon)
-
----
-
-## Specialized Variants (Disabled by Default)
-
-These are custom-built variants for specific GPU architectures. They are **disabled** because they require complex build processes during startup and have caused reliability issues.
-
-### 5. **ROCm GFX1100 Official Current**
-
-```yaml
-Backend:      rocm-gfx1100-official-current
-Source:       github.com/ROCm/llama.cpp (git clone)
-Branch:       main
-GPU Targets:  gfx1030, gfx1100
-Build:        Custom CMake with GGML_HIPBLAS
-Status:       ❌ DISABLED (boot failures)
-```
-
-**Why Disabled:** Git clone fails during container startup, blocks service launch
-
----
-
-### 6. **ROCm GFX1100 Official Preview**
-
-```yaml
-Backend:      rocm-gfx1100-official-preview
-Source:       github.com/ROCm/llama.cpp (git clone)
-Branch:       ${ROCM_LLAMA_CPP_PREVIEW_REF}
-Current Ref:  rocm-7.11.0-preview
-GPU Targets:  gfx1030, gfx1100
-Build:        Custom CMake with GGML_HIPBLAS
-Status:       ❌ DISABLED (boot failures)
-```
-
-**Why Disabled:** Git clone fails during container startup, blocks service launch
-
----
-
-### 7. **ROCm GFX1030 Official Current**
-
-```yaml
-Backend:      rocm-gfx1030-official-current
-Source:       github.com/ROCm/llama.cpp (git clone)
-Branch:       main
-GPU Targets:  gfx1030, gfx1100
-Build:        Custom CMake with GGML_HIPBLAS
-Status:       ❌ DISABLED (boot failures)
-```
-
-**Why Disabled:** Git clone fails during container startup, blocks service launch
-
----
-
-### 8. **ROCm GFX1030 Lemonade**
-
-```yaml
-Backend:      rocm-gfx1030-lemonade-main
-Source:       github.com/lemonade-sdk/llamacpp-rocm (git clone)
-Branch:       main
-GPU Targets:  gfx1030, gfx1100
-Build:        Custom CMake with GGML_HIPBLAS
-Status:       ❌ DISABLED (CMake failures)
-```
-
-**Why Disabled (historical path):** Repository clone/CMake failures prevented the old
-startup path from compiling. The maintained Lemonade nightly channel is tracked in
-the benchmark backend catalog.
-
----
-
-## Version Information
-
-### Minimum Version Requirements
-
-| Model Family | Minimum Build | Reason |
-|--------------|--------------|--------|
-| Qwen 3.5 | **b8153** | Model compatibility & optimizations |
-| Qwen 2.7 | latest | Standard support |
-| Other models | latest | Recommended for best results |
-
-### Version Format
-
-Llama.cpp uses **build numbers** (e.g., `b8153`, `b8429`, `b1217`) instead of semantic versioning.
-
-**Reference:**
-- `b8153` - Minimum for Qwen 3.5 models
-- `b8429` - rocm-ggml version (currently cached)
-- `b1217` - rocm-lemonade version (currently cached)
-- `latest` - Auto-selects newest from GitHub releases
-
-### Currently Configured
-
-```
-LLAMA_VERSION=latest
-LLAMA_BACKEND=vulkan
-ROCM_LLAMA_CPP_PREVIEW_REF=rocm-7.11.0-preview
-```
-
----
-
-## Backend Comparison Matrix
-
-| Feature | CPU | CUDA | ROCm | Vulkan |
-|---------|-----|------|------|--------|
-| **Speed** | ⭐ Slow | ⭐⭐⭐⭐⭐ Fast | ⭐⭐⭐⭐ Fast | ⭐⭐⭐⭐ Fast |
-| **GPU Required** | ❌ No | ✅ NVIDIA | ✅ AMD | ✅ Any (AMD/Intel/NVIDIA) |
-| **Complexity** | ⭐ Simple | ⭐⭐⭐ Moderate | ⭐⭐ Moderate | ⭐⭐ Moderate |
-| **Boot Time** | Fast | Moderate | Moderate | Fast |
-| **Compatibility** | ✅ Universal | ✅ NVIDIA only | ✅ AMD only | ✅ Universal (via Vulkan) |
-| **Maintenance** | ✅ Easy | ⚠️ Requires CUDA | ⚠️ Requires ROCm | ✅ Easy |
-| **Status** | ✅ Active | ✅ Active | ✅ Active | ✅ Active (Currently in use) |
-
----
-
-## How Backends Are Selected
-
-### Auto-Detection Process (at container startup)
-
-1. **Detection Order:**
-   - Check LLAMA_BACKEND environment variable
-   - If set to specific backend: use that
-   - If set to `auto`: auto-detect based on system
-
-2. **Auto-Detection Checks (for `auto` mode):**
-   ```
-   Check for: NVIDIA CUDA drivers → Use CUDA backend
-   Check for: AMD ROCm drivers → Use ROCm backend
-   Check for: Vulkan-capable GPU → Use Vulkan backend
-   Fallback: Use CPU backend
-   ```
-
-3. **Current Configuration:**
-   ```
-   LLAMA_BACKEND=vulkan (explicitly set)
-   ```
-   This forces Vulkan backend regardless of available hardware.
-
----
-
-## Enabling Disabled Variants
-
-To enable a disabled variant (e.g., for testing):
-
-### Edit `config/local/backend-runtime.override.yaml`:
+Override that variant in `config/local/backend-runtime.override.yaml`:
 
 ```yaml
 variants:
-  rocm-gfx1100-official-current:
-    enabled: true  # Change from false to true
+  vulkan:
+    version: b8661
+
+  rocm:
+    version: b8583
 ```
 
-### Then restart services:
+This is the current mechanism for maintaining differing backend builds at the
+same time.
+
+### Add an alternate upstream release channel
+
+Example: add a Lemonade ROCm lane as a runtime variant:
+
+```yaml
+variants:
+  rocm-lemonade:
+    backend: rocm
+    macro: llama-server-rocm-lemonade
+    runtime_subdir: rocm/lemonade
+    source_type: github_release
+    repo_owner: lemonade-sdk
+    repo_name: llamacpp-rocm
+    version: b1199
+    asset_tokens:
+      - ubuntu
+      - rocm
+    enabled: false
+```
+
+### Add a reproducible source-build lane
+
+For `git` variants, prefer an immutable commit SHA in `git_ref` when you want
+reproducibility:
+
+```yaml
+variants:
+  rocm-gfx1100-preview:
+    backend: rocm
+    macro: llama-server-rocm-gfx1100-preview
+    runtime_subdir: rocm/gfx1100/preview
+    source_type: git
+    git_url: https://github.com/ROCm/llama.cpp.git
+    git_ref: 0123456789abcdef0123456789abcdef01234567
+    configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_HIPBLAS=ON -DAMDGPU_TARGETS=gfx1100 -DCMAKE_HIP_ARCHITECTURES=gfx1100 -DCMAKE_BUILD_TYPE=Release
+    build_command: cmake --build build --config Release --parallel
+    binary_glob: build/bin/llama-server
+    library_glob: build/bin/*.so*
+    enabled: false
+```
+
+## Operational workflow after a version change
+
+1. Edit the relevant local override.
+2. Regenerate configs:
 
 ```bash
-docker compose down
-docker compose up -d
+python -m src.launcher.process_manager --root . generate-configs
 ```
 
-**⚠️ Warning:** These variants are disabled for a reason. They may fail during startup if:
-- Network connectivity is unavailable (git clone fails)
-- Build dependencies are missing
-- GPU drivers don't match expectations
+3. Restart the runtime path you use:
+   - native: restart the managed processes
+   - Docker: restart the backend container or compose stack
+4. Verify the generated runtime catalog and the resolved variant entry:
 
----
-
-## Runtime Locations
-
-When a backend is provisioned, it's downloaded/built to:
-
-```
-config/data/backend-runtime/
-├── cpu/           (CPU binary)
-├── cuda/          (CUDA binary)
-├── rocm/          (ROCm binary)
-├── vulkan/        (Vulkan binary)
-└── rocm/
-    ├── gfx1030/   (GFX1030 custom builds - if enabled)
-    └── gfx1100/   (GFX1100 custom builds - if enabled)
-```
-
----
-
-## Troubleshooting Backend Issues
-
-### Problem: "Backend not found"
-
-**Solution:** Restart services to trigger auto-detection
 ```bash
-docker compose down
-docker compose up -d
+python -m json.tool config/generated/llama-swap/backend-runtime.catalog.json
 ```
 
-### Problem: "Specific GPU not detected"
+## Current compatibility notes
 
-**Solution:** Change LLAMA_BACKEND in .env
-```
-LLAMA_BACKEND=vulkan    # Force Vulkan
-LLAMA_BACKEND=rocm      # Force ROCm
-LLAMA_BACKEND=cuda      # Force CUDA
-LLAMA_BACKEND=cpu       # Force CPU
-```
+- Native install profiles still use `asset_match_tokens` in
+  `config/project/stack.base.yaml`; the installer now accepts both
+  `asset_match_tokens` and `asset_tokens`.
+- Runtime variants should use `asset_tokens`.
+- The benchmark governance registry in
+  `benchmarks/data/backend-benchmarks/backend-version-registry.yaml` is not yet
+  the provisioner's source of truth.
+- The POSIX wrapper `scripts/AUDiaLLMGateway.sh` does not currently expose
+  `check-updates` or `update-release`; use the Python module directly on
+  Linux/macOS.
 
-### Problem: "Build failed for custom variant"
+## Related files
 
-**Solution:** Ensure enabled variant has:
-1. Network access (for git clone)
-2. Build tools installed
-3. Correct GPU architecture specified
-4. Sufficient disk space
-
----
-
-## Summary
-
-| Category | Details |
-|----------|---------|
-| **Total Backends** | 8 (4 active, 4 specialized) |
-| **Actively Used** | 4 (CPU, CUDA, ROCm, Vulkan) |
-| **Currently Running** | Vulkan (AMD Radeon GPU) |
-| **Minimum llama.cpp** | b8153 (for Qwen 3.5 models) |
-| **Default Version** | latest (auto-updated from GitHub) |
-| **Boot Impact** | Low (4 disabled = faster startup) |
-| **Customizable** | ✅ Yes (edit override.yaml) |
-
----
-
-## Related Documentation
-
-- [SERVER_DIAGNOSTICS.md](SERVER_DIAGNOSTICS.md) - Current server status
-- [DOCKER_AUTOSTART.md](DOCKER_AUTOSTART.md) - Configuration guide
-- [.env](.env) - Environment variables
-- [config/local/backend-runtime.override.yaml](config/local/backend-runtime.override.yaml) - Local overrides
-- [config/project/backend-runtime.base.yaml](config/project/backend-runtime.base.yaml) - Base definitions
-
----
-
-**Last Updated:** 2026-03-25
-**Status:** All active backends verified operational
-**Server gpu-host.example:** Running Vulkan backend ✅
+- `config/project/stack.base.yaml`
+- `config/project/backend-runtime.base.yaml`
+- `config/local/backend-runtime.override.yaml`
+- `config/generated/llama-swap/backend-runtime.catalog.json`
+- `src/installer/release_installer.py`
+- `src/launcher/config_loader.py`
+- `scripts/provision-runtime.sh`
+- `benchmarks/data/backend-benchmarks/backend-version-registry.yaml`

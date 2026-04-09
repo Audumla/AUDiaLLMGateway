@@ -9,7 +9,7 @@
 #   docker compose --project-directory . -f docker/examples/docker-compose.nvidia.yml --profile vllm up -d
 services:
   llm-gateway:
-    image: example/audia-llm-gateway-orchestrator:latest
+    image: ${DOCKER_IMAGE_NAMESPACE:-example}/audia-llm-gateway-orchestrator:latest
     container_name: audia-gateway
     ports:
       - "${GATEWAY_PORT:-4000}:4000"
@@ -26,7 +26,7 @@ services:
     restart: unless-stopped
 
   llm-server-llamacpp:
-    image: example/audia-llm-gateway-server:latest
+    image: ${DOCKER_IMAGE_NAMESPACE:-example}/audia-llm-gateway-server:latest
     container_name: audia-llama-cpp
     environment:
       - LLAMA_BACKEND=cuda

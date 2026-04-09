@@ -49,7 +49,7 @@ Each variant entry must allow:
 - `macro` (for example `llama-server-rocm-b8429`)
 - `runtime_subdir` (backend-specific cache path under runtime root)
 - source controls:
-  - `source_type: github_release` + `repo_owner` + `repo_name` + `version` + `asset_pattern`
+  - `source_type: github_release` + `repo_owner` + `repo_name` + `version` + `asset_tokens`
   - `source_type: direct_url` + `download_url` + optional `archive_type`
   - `source_type: git` + `git_url` + `git_ref` + build commands/globs
 

@@ -130,7 +130,7 @@ default_runtime_catalog_json() {
       "macro": "llama-server-cpu",
       "version": "${_ver}",
       "source_type": "github_release",
-      "asset_pattern": "ubuntu-x64\\\\.(tar\\\\.gz|zip)$",
+      "asset_tokens": ["ubuntu", "x64"],
       "repo_owner": "ggml-org",
       "repo_name": "llama.cpp",
       "runtime_subdir": "cpu",
@@ -143,7 +143,7 @@ default_runtime_catalog_json() {
       "macro": "llama-server-cuda",
       "version": "${_ver}",
       "source_type": "github_release",
-      "asset_pattern": "ubuntu-x64\\\\.(tar\\\\.gz|zip)$",
+      "asset_tokens": ["ubuntu", "cuda", "x64"],
       "repo_owner": "ggml-org",
       "repo_name": "llama.cpp",
       "runtime_subdir": "cuda",
@@ -156,7 +156,7 @@ default_runtime_catalog_json() {
       "macro": "llama-server-rocm",
       "version": "${_ver}",
       "source_type": "github_release",
-      "asset_pattern": "ubuntu-rocm.*x64\\\\.(tar\\\\.gz|zip)$",
+      "asset_tokens": ["ubuntu", "rocm-7.2", "x64"],
       "repo_owner": "ggml-org",
       "repo_name": "llama.cpp",
       "runtime_subdir": "rocm",
@@ -169,7 +169,7 @@ default_runtime_catalog_json() {
       "macro": "llama-server-vulkan",
       "version": "${_ver}",
       "source_type": "github_release",
-      "asset_pattern": "ubuntu-vulkan.*x64\\\\.(tar\\\\.gz|zip)$",
+      "asset_tokens": ["ubuntu", "vulkan", "x64"],
       "repo_owner": "ggml-org",
       "repo_name": "llama.cpp",
       "runtime_subdir": "vulkan",
@@ -358,26 +358,27 @@ provision_variant() {
     local BE="$2"
     local VERSION="$3"
     local PATTERN="$4"
-    local OWNER="$5"
-    local REPO="$6"
-    local RUNTIME_SUBDIR="$7"
-    local SOURCE_TYPE="$8"
-    local DOWNLOAD_URL="$9"
-    local ARCHIVE_TYPE="${10}"
-    local GIT_URL="${11}"
-    local GIT_REF="${12}"
-    local CONFIGURE_COMMAND="${13}"
-    local BUILD_COMMAND="${14}"
-    local BINARY_GLOB="${15}"
-    local LIBRARY_GLOB="${16}"
-    local APT_PACKAGES="${17}"
-    local SOURCE_SUBDIR="${18}"
-    local BUILD_ROOT_SUBDIR="${19}"
-    local BUILD_ENV_JSON="${20}"
-    local PRE_CONFIGURE_COMMAND="${21}"
+    local ASSET_TOKENS_JSON="$5"
+    local OWNER="$6"
+    local REPO="$7"
+    local RUNTIME_SUBDIR="$8"
+    local SOURCE_TYPE="$9"
+    local DOWNLOAD_URL="${10}"
+    local ARCHIVE_TYPE="${11}"
+    local GIT_URL="${12}"
+    local GIT_REF="${13}"
+    local CONFIGURE_COMMAND="${14}"
+    local BUILD_COMMAND="${15}"
+    local BINARY_GLOB="${16}"
+    local LIBRARY_GLOB="${17}"
+    local APT_PACKAGES="${18}"
+    local SOURCE_SUBDIR="${19}"
+    local BUILD_ROOT_SUBDIR="${20}"
+    local BUILD_ENV_JSON="${21}"
+    local PRE_CONFIGURE_COMMAND="${22}"
     local SUFFIX="$BE"
     [ "$SUFFIX" = "cpu" ] && SUFFIX="cpu"
-    local CURRENT_SIG="${CURRENT_SIG_PREFIX}|VARIANT=${NAME}|BACKEND=${BE}|VERSION=${VERSION}|SOURCE=${SOURCE_TYPE}|REPO=${OWNER}/${REPO}|PATTERN=${PATTERN}|URL=${DOWNLOAD_URL}|GIT=${GIT_URL}@${GIT_REF}|SUBDIR=${RUNTIME_SUBDIR}|SRC_SUBDIR=${SOURCE_SUBDIR}|BUILD_SUBDIR=${BUILD_ROOT_SUBDIR}|BUILD_ENV=${BUILD_ENV_JSON}|PRE_CFG=${PRE_CONFIGURE_COMMAND}|CFG=${CONFIGURE_COMMAND}|BUILD=${BUILD_COMMAND}|BIN_GLOB=${BINARY_GLOB}|LIB_GLOB=${LIBRARY_GLOB}|APT=${APT_PACKAGES}"
+    local CURRENT_SIG="${CURRENT_SIG_PREFIX}|VARIANT=${NAME}|BACKEND=${BE}|VERSION=${VERSION}|SOURCE=${SOURCE_TYPE}|REPO=${OWNER}/${REPO}|PATTERN=${PATTERN}|TOKENS=${ASSET_TOKENS_JSON}|URL=${DOWNLOAD_URL}|GIT=${GIT_URL}@${GIT_REF}|SUBDIR=${RUNTIME_SUBDIR}|SRC_SUBDIR=${SOURCE_SUBDIR}|BUILD_SUBDIR=${BUILD_ROOT_SUBDIR}|BUILD_ENV=${BUILD_ENV_JSON}|PRE_CFG=${PRE_CONFIGURE_COMMAND}|CFG=${CONFIGURE_COMMAND}|BUILD=${BUILD_COMMAND}|BIN_GLOB=${BINARY_GLOB}|LIB_GLOB=${LIBRARY_GLOB}|APT=${APT_PACKAGES}"
     local RUNTIME_DIR="$RUNTIME_ROOT/$RUNTIME_SUBDIR"
     local BIN_DIR="$RUNTIME_DIR/bin"
     local LIB_DIR="$RUNTIME_DIR/lib"
@@ -401,9 +402,17 @@ provision_variant() {
                     echo "  WARNING: failed to fetch release metadata for ${OWNER}/${REPO}@${VERSION} — skipping ${NAME}"
                     return
                 fi
-                DL_URL=$(jq -r --arg p "$PATTERN" '.assets[] | select(.name | test($p)) | .browser_download_url' "$RELEASE_META" 2>/dev/null | head -1 || true)
+                if [ -n "$ASSET_TOKENS_JSON" ] && [ "$ASSET_TOKENS_JSON" != "[]" ]; then
+                    DL_URL=$(jq -r --argjson tokens "$ASSET_TOKENS_JSON" '.assets[] | select((.name | ascii_downcase) as $n | reduce $tokens[] as $t (true; . and ($n | contains(($t | tostring | ascii_downcase))))) | .browser_download_url' "$RELEASE_META" 2>/dev/null | head -1 || true)
+                else
+                    DL_URL=$(jq -r --arg p "$PATTERN" '.assets[] | select(.name | test($p)) | .browser_download_url' "$RELEASE_META" 2>/dev/null | head -1 || true)
+                fi
                 if [ -z "$DL_URL" ]; then
-                    echo "  WARNING: no asset found for pattern $PATTERN in ${OWNER}/${REPO}@${VERSION} — skipping ${NAME}"
+                    if [ -n "$ASSET_TOKENS_JSON" ] && [ "$ASSET_TOKENS_JSON" != "[]" ]; then
+                        echo "  WARNING: no asset found for tokens $ASSET_TOKENS_JSON in ${OWNER}/${REPO}@${VERSION} — skipping ${NAME}"
+                    else
+                        echo "  WARNING: no asset found for pattern $PATTERN in ${OWNER}/${REPO}@${VERSION} — skipping ${NAME}"
+                    fi
                     return
                 fi
                 ;;
@@ -564,6 +573,7 @@ for ROW in "${VARIANT_ROWS[@]}"; do
     BACKEND="$(echo "$ROW" | jq -r '.backend // ""' | tr '[:upper:]' '[:lower:]')"
     VERSION="$(echo "$ROW" | jq -r '.version // "latest"')"
     PATTERN="$(echo "$ROW" | jq -r '.asset_pattern // ""')"
+    ASSET_TOKENS_JSON="$(echo "$ROW" | jq -c '.asset_tokens // []')"
     OWNER="$(echo "$ROW" | jq -r '.repo_owner // "ggml-org"')"
     REPO="$(echo "$ROW" | jq -r '.repo_name // "llama.cpp"')"
     RUNTIME_SUBDIR="$(echo "$ROW" | jq -r '.runtime_subdir // ""')"
@@ -586,18 +596,18 @@ for ROW in "${VARIANT_ROWS[@]}"; do
     [ -z "$BACKEND" ] && continue
     [ -z "$NAME" ] && NAME="$BACKEND"
     [ -z "$RUNTIME_SUBDIR" ] && RUNTIME_SUBDIR="$BACKEND"
-    if [ -z "$PATTERN" ]; then
+    if [ "$ASSET_TOKENS_JSON" = "[]" ] && [ -z "$PATTERN" ]; then
         case "$BACKEND" in
-            rocm) PATTERN="ubuntu-rocm.*x64\\.(tar\\.gz|zip)$" ;;
-            vulkan) PATTERN="ubuntu-vulkan.*x64\\.(tar\\.gz|zip)$" ;;
-            cuda) PATTERN="ubuntu-x64\\.(tar\\.gz|zip)$" ;;
-            *) PATTERN="ubuntu-x64\\.(tar\\.gz|zip)$" ;;
+            rocm) ASSET_TOKENS_JSON='["ubuntu","rocm-7.2","x64"]' ;;
+            vulkan) ASSET_TOKENS_JSON='["ubuntu","vulkan","x64"]' ;;
+            cuda) ASSET_TOKENS_JSON='["ubuntu","cuda","x64"]' ;;
+            *) ASSET_TOKENS_JSON='["ubuntu","x64"]' ;;
         esac
     fi
 
     if should_provision_variant "$BACKEND" "$ALWAYS"; then
         provision_variant \
-            "$NAME" "$BACKEND" "$VERSION" "$PATTERN" "$OWNER" "$REPO" "$RUNTIME_SUBDIR" \
+            "$NAME" "$BACKEND" "$VERSION" "$PATTERN" "$ASSET_TOKENS_JSON" "$OWNER" "$REPO" "$RUNTIME_SUBDIR" \
             "$SOURCE_TYPE" "$DOWNLOAD_URL" "$ARCHIVE_TYPE" "$GIT_URL" "$GIT_REF" \
             "$CONFIGURE_COMMAND" "$BUILD_COMMAND" "$BINARY_GLOB" "$LIBRARY_GLOB" "$APT_PACKAGES" \
             "$SOURCE_SUBDIR" "$BUILD_ROOT_SUBDIR" "$BUILD_ENV_JSON" "$PRE_CONFIGURE_COMMAND"
@@ -607,7 +617,7 @@ done
 
 if [ "$PROVISIONED_COUNT" -eq 0 ]; then
     echo "  No runtime variants selected from catalog; provisioning cpu fallback"
-    provision_variant "cpu" "cpu" "${LLAMA_VERSION:-latest}" "ubuntu-x64\\.(tar\\.gz|zip)$" "ggml-org" "llama.cpp" "cpu" "github_release" "" "" "" "" "" "" "" "" ""
+    provision_variant "cpu" "cpu" "${LLAMA_VERSION:-latest}" "" '["ubuntu","x64"]' "ggml-org" "llama.cpp" "cpu" "github_release" "" "" "" "" "" "" "" "" "" "" "" ""
 fi
 
 # ---------------------------------------------------------------------------

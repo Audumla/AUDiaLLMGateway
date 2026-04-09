@@ -1,5 +1,12 @@
-version: 1
+version: 2
 title: AUDia backend compatibility matrix
+description: >
+  Backend compatibility and status tracking. Version 2 adds confidence tracking
+  per spec-803 (Backend Validation and Promotion Gates). Confidence levels:
+  - low: single-run or unknown method, do not promote
+  - uncertain: 2+ runs with >10% variance, track but don't promote
+  - validated: 3+ runs <5% variance, 2+ sessions <5% cross-session variance
+
 reference_model:
   hf: Qwen/Qwen3.5-4B
   gguf: Qwen3.5-4B-Q5_K_XL.gguf
@@ -7,12 +14,14 @@ reference_model:
 backends:
   llamacpp_rocm72_prebuilt:
     status: working
+    confidence: low  # single-run result; requires re-validation with 3+ warm runs per spec-803
     notes:
       - qwen3.5-27B prebuilt ROCm lane validated on `qwen3.5-27b-(96k-Q6)-rocm-latest`
       - benchmark result: 9.98 tok/s
       - backed by ggml prebuilt `llama-b8583-bin-ubuntu-rocm-7.2-x64.tar.gz`
   llamacpp_rocm721_local_build:
     status: working
+    confidence: low  # single-run result from 2026-03-30; requires re-validation
     notes:
       - qwen3.5-27B local source fallback built in `rocm/dev-ubuntu-24.04:7.2.1`
       - benchmark result: 21.49 tok/s
@@ -20,12 +29,14 @@ backends:
       - runtime required `hipblas-dev`, `rocblas-dev`, and `hipblaslt-dev`
   llamacpp_rocm_lemonade_b1224:
     status: working
+    confidence: validated  # 2+ sessions, <2% variance, stable across restarts (per spec-803)
     notes:
       - lemonade-sdk release b1224 `gfx110X` prebuilt validated on qwen27
       - benchmark result: 21.85 tok/s
       - required host package `libatomic1` on openSUSE prior to startup
   llamacpp_rocm_lychee_strix_halo:
     status: architecture_scoped
+    confidence: low  # single failure result; not comparable
     notes:
       - prebuilt lane observed at
         Lychee-Technology/llama-cpp-for-strix-halo release b8580
@@ -38,16 +49,19 @@ backends:
         Illegal instruction
   llamacpp_vulkan:
     status: working
+    confidence: validated  # 2+ sessions, 0.04% cross-session variance (per spec-803)
     notes:
       - best single-user interactive path on the two RX 7900 XTX cards
       - measured against the shared Qwen3.5-4B compare model
   llamacpp_rocm_preview:
     status: working
+    confidence: validated  # 2 sessions, 3% variance (per spec-803)
     notes:
       - best ROCm fallback currently confirmed
       - measured against the shared Qwen3.5-4B compare model
   vllm_awq:
     status: working
+    confidence: low  # per-run timing not individually captured; cold-start possibly included
     notes:
       - worked on Qwen3-0.6B historically
       - current live host again serves Qwen3-0.6B once AUDIA_ENABLE_VLLM=true is set
@@ -55,6 +69,7 @@ backends:
       - qwen3.5-27B AWQ on the live ROCm image now fails during warm-up with a causal_conv1d_update assertion
   vllm_bf16:
     status: working
+    confidence: low  # single-run result; cold-start not isolated
     notes:
       - worked on Qwen3-0.6B historically
       - current live host again serves Qwen3-0.6B once AUDIA_ENABLE_VLLM=true is set
@@ -63,6 +78,7 @@ backends:
       - v0.18.0 image run for Qwen3.5-4B also failed on engine init with HIP OOM
   vllm_rocm0171_rollback:
     status: working
+    confidence: low  # single-run result, slow performance (3.41 tok/s)
     notes:
       - "rollback lane uses vllm/vllm-openai-rocm:latest at v0.17.1"
       - "Qwen3.5-27B AWQ on the dual 7900 XTX cards successfully started with max_model_len=2048, max_num_batched_tokens=2048, and --language-model-only"
@@ -71,6 +87,7 @@ backends:
       - "keep this lane separate from the v0.18.x hybrid KV-cache regression"
   vllm_rocm721_wheel_nightly:
     status: working_on_small_models
+    confidence: low  # small-model only (0.6B works, larger models fail)
     notes:
       - "Installed using the documented ROCm nightly wheel lane from vLLM docs: https://wheels.vllm.ai/rocm/nightly/${VLLM_ROCM_VARIANT}"
       - Build completed as `local/vllm-rocm721-wheel:nightly`
@@ -87,12 +104,14 @@ backends:
         treated as a large-model path
   ollama_rocm:
     status: working
+    confidence: low  # single-run result, operational alternative not performance tier
     notes:
       - usable once the model is created inside the container
       - measured against the shared Qwen3.5-4B compare model
       - qwen3.5-27B Q6_K benchmarked successfully at 18.12 tok/s on qwen27b
   tgi_rocm:
     status: blocked
+    confidence: null  # no successful runs; blocked by unsupported model type
     notes:
       - latest-rocm and 3.3.4-rocm both fail on the current gfx1100 host
       - explicit 3.3.7-rocm tag lookup failed (tag not found)
@@ -100,17 +119,20 @@ backends:
       - Qwen2.5-0.5B-Instruct fails later with HIP invalid device function
   sglang_rocm:
     status: blocked
+    confidence: null  # no successful runs; blocked by MI300 targeting
     notes:
       - current Qwen3.5-4B compare run exits before readiness
       - official ROCm images are MI300-targeted
       - gfx1100 startup still fails
   aphrodite:
     status: blocked
+    confidence: null  # no successful runs; blocked by libcuda.so.1 requirement
     notes:
       - current Qwen3.5-4B compare run exits before readiness
       - current image requires libcuda.so.1
   zinc:
     status: working
+    confidence: low  # crashes during model load; not production-ready
     notes:
       - source-built and test-passed on the live server
       - runtime check reaches READY WITH WARNINGS after staging shader assets

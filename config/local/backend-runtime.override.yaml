@@ -1,50 +1,14 @@
-version: 1
-defaults:
-  # Smart caching: Only provision on startup if:
-  # 1. Binary doesn't exist yet
-  # 2. Version has changed
-  # 3. Binary is corrupted/invalid
-  # Skips rebuild if cached binary matches version
-  always: false
-
-# Backend variant overrides for local environment
-# All variants now use prebuilt binaries (no custom builds)
-variants:
-  # Primary backends: enabled (use prebuilt ggml-org releases)
-  cpu:
-    enabled: true
-
-  cuda:
-    enabled: true
-
-  rocm:
-    enabled: true
-
-  vulkan:
-    enabled: true
-
-  # ROCm GFX variants: enabled (use prebuilt releases)
-  # These previously failed due to build issues - now use prebuilt
-  rocm-gfx1100-prebuilt:
-    enabled: true  # ✅ Enabled (uses prebuilt)
-
-  rocm-gfx1030-prebuilt:
-    enabled: true  # ✅ Enabled (uses prebuilt)
-
-  # Custom builds: disabled by default
-  # Only enable if prebuilt doesn't work for your use case
-  # Smart cache: builds only if version changes (not every restart)
-  rocm-gfx1100-official-custom:
-    enabled: false  # Disabled: prebuilt is preferred
-
-  rocm-gfx1030-official-custom:
-    enabled: false  # Disabled: prebuilt is preferred
-
-# Example variants:
+# AUDia LLM Gateway — sample backend runtime overrides.
+# Keep the checked-in file generic. Machine-specific pins, alternate upstreams,
+# or host-only build variants belong in config/local/backend-runtime.private.yaml.
+#
+# defaults:
+#   always: false
+#
 # profiles:
-#   build-rocm-gfx1030-gfx1100:
+#   build-rocm-sample:
 #     backend: rocm
-#     configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_HIPBLAS=ON -DAMDGPU_TARGETS=gfx1030;gfx1100 -DCMAKE_HIP_ARCHITECTURES=gfx1030;gfx1100 -DCMAKE_BUILD_TYPE=Release
+#     configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_HIPBLAS=ON -DCMAKE_BUILD_TYPE=Release
 #     build_command: cmake --build build --config Release --parallel
 #     binary_glob: build/bin/llama-server
 #     library_glob: build/bin/*.so*
@@ -53,29 +17,12 @@ variants:
 #       - cmake
 #       - build-essential
 #
-#   source-rocm-official-preview:
-#     source_type: git
-#     git_url: https://github.com/ROCm/llama.cpp.git
-#     git_ref: rocm-7.11.0-preview
-#
-#   source-lemonade-rocm:
-#     source_type: git
-#     git_url: https://github.com/lemonade-sdk/llamacpp-rocm.git
-#     git_ref: main
-#
 # variants:
-#   rocm-gfx1100-rocm-preview:
+#   rocm-sample-preview:
 #     profiles:
-#       - source-rocm-official-preview
-#       - build-rocm-gfx1030-gfx1100
-#     macro: llama-server-rocm-gfx1100-rocm-preview
-#     runtime_subdir: rocm/gfx1100/rocm-preview
-#     enabled: true
-#
-#   rocm-gfx1030-lemonade:
-#     profiles:
-#       - source-lemonade-rocm
-#       - build-rocm-gfx1030-gfx1100
-#     macro: llama-server-rocm-gfx1030-lemonade
-#     runtime_subdir: rocm/gfx1030/lemonade
-#     enabled: true
+#       - build-rocm-sample
+#     source_type: git
+#     git_url: https://github.com/ggml-org/llama.cpp.git
+#     git_ref: master
+#     macro: llama-server-rocm-sample-preview
+#     runtime_subdir: rocm/sample-preview

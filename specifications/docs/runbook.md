@@ -275,7 +275,7 @@ Examples:
 ### Linux/macOS
 
 ```bash
-./scripts/AUDiaLLMGateway.sh update
+python -m src.installer.release_installer update-release --root .
 ```
 
 ## Check online release availability
@@ -289,8 +289,12 @@ Examples:
 ### Linux/macOS
 
 ```bash
-./scripts/AUDiaLLMGateway.sh check
+python -m src.installer.release_installer check-updates --root .
 ```
+
+The PowerShell wrapper exposes `update` and `check`. The POSIX wrapper does not
+currently proxy those release-installer actions, so Linux/macOS should call the
+Python module directly.
 
 ## Local developer setup
 

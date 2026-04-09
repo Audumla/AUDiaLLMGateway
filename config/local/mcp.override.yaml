@@ -1,3 +1,5 @@
+# AUDia LLM Gateway — sample MCP overrides.
+# Keep tracked values portable. Machine-specific servers belong in
+# config/local/mcp.private.yaml.
 enabled: false
 servers: []
-

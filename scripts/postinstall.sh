@@ -22,6 +22,8 @@ if [ ! -f config/local/env ]; then
 # AUDia LLM Gateway — service environment overrides.
 # Loaded by the systemd unit (EnvironmentFile). Changes take effect on
 # the next 'systemctl restart audia-gateway'.
+# Keep this file sample-safe; machine-local secrets can live in
+# config/local/env.private on Docker deployments or your service manager.
 LITELLM_MASTER_KEY=sk-local-dev
 EOF
     chmod 600 config/local/env
@@ -35,6 +37,8 @@ if [ ! -f config/local/stack.override.yaml ]; then
 # AUDia LLM Gateway — local stack overrides.
 # Values here are merged on top of config/project/stack.base.yaml.
 # This file is preserved across updates. Edit freely.
+# Keep tracked values generic; machine-specific values can go in
+# config/local/stack.private.yaml.
 # After editing run: ./scripts/AUDiaLLMGateway.sh generate
 #                then: systemctl restart audia-gateway
 #
@@ -67,6 +71,8 @@ if [ ! -f config/local/llama-swap.override.yaml ]; then
     cat > config/local/llama-swap.override.yaml <<'EOF'
 # AUDia LLM Gateway — llama-swap substrate overrides.
 # Merged on top of config/project/llama-swap.base.yaml.
+# Keep tracked overrides generic; host-specific executable paths belong in
+# config/local/llama-swap.private.yaml.
 # After editing run: ./scripts/AUDiaLLMGateway.sh generate
 #               then: systemctl restart audia-gateway
 #
@@ -103,7 +109,9 @@ fi
 if [ ! -f config/local/models.override.yaml ]; then
     cat > config/local/models.override.yaml <<'EOF'
 # AUDia LLM Gateway — local model overrides.
-# Add or override model definitions here.
+# Add or override portable sample model definitions here.
+# Machine-specific GPU routing and private paths belong in
+# config/local/models.private.yaml.
 # After editing run: ./scripts/AUDiaLLMGateway.sh generate
 #               then: systemctl restart audia-gateway
 #
@@ -123,6 +131,8 @@ if [ ! -f config/local/backend-runtime.override.yaml ]; then
     cat > config/local/backend-runtime.override.yaml <<'EOF'
 # AUDia LLM Gateway — backend runtime variant overrides.
 # Merged on top of config/project/backend-runtime.base.yaml.
+# Keep tracked values generic; machine-specific runtime pins belong in
+# config/local/backend-runtime.private.yaml.
 # After editing run: ./scripts/AUDiaLLMGateway.sh generate
 #               then: systemctl restart audia-gateway
 #

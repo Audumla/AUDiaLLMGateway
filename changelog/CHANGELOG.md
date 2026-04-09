@@ -737,4 +737,13 @@
 ### Registered the latest ggml ROCm lane as a selectable qwen27 gateway deployment. (New Feature)
 - Updated the backend version docs to note the new qwen27_fast_rocm_latest option.
 
+### Aligned backend version/build/update docs with the live runtime catalog and installer behavior, and fixed legacy asset token compatibility. (Documentation Update)
+- Updated backend maintenance docs to describe the current version/source fields, latest-release lookup flow, and Linux/macOS update/check commands.
+- Fixed release installer compatibility with legacy asset_match_tokens and updated provision-runtime.sh to honor asset_tokens for GitHub release selection.
+
+### Anonymized deployment surfaces and added private overlay support for local deployment state. (Configuration Cleanup)
+- Added optional config/local/*.private.yaml and config/local/env.private support in config loading and gateway startup.
+- Scrubbed tracked local config samples and deployment docs so host-specific values move into ignored overlays.
+- Added regression coverage for private overlay merges and private env precedence, then reran targeted config-generation tests.
+
 ---

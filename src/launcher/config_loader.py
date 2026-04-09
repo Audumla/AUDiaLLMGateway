@@ -248,14 +248,21 @@ def type_conflicts(base: Any, override: Any, prefix: str = "") -> list[str]:
     return conflicts
 
 
+def _private_overlay_path(local_path: Path) -> Path:
+    return local_path.with_name(f"{local_path.stem.replace('.override', '')}.private{local_path.suffix}")
+
+
 def load_layered_yaml(root: str | Path, project_rel: str, local_rel: str) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     root_path = Path(root).resolve()
     project_path = root_path / project_rel
     local_path = root_path / local_rel
+    private_path = _private_overlay_path(local_path)
     project_data = _load_yaml(project_path)
     local_data = _load_yaml(local_path) if local_path.exists() else {}
-    merged = deep_merge(project_data, local_data)
-    return project_data, local_data, merged
+    private_data = _load_yaml(private_path) if private_path.exists() else {}
+    override_data = deep_merge(local_data, private_data)
+    merged = deep_merge(project_data, override_data)
+    return project_data, override_data, merged
 
 
 def load_stack_config(root: str | Path) -> StackConfig:
@@ -672,6 +679,16 @@ def _format_llama_cpp_option_value(value: Any) -> str:
     return str(value)
 
 
+def _artifact_filename(explicit_filename: Any, artifact_file: Any) -> str:
+    filename = str(explicit_filename or "").strip()
+    if filename:
+        return filename
+    artifact_path = str(artifact_file or "").strip().replace("\\", "/")
+    if not artifact_path:
+        return ""
+    return artifact_path.rsplit("/", 1)[-1]
+
+
 def _apply_device_aliases(options: dict[str, Any], aliases: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(options, dict) or not options:
         return options
@@ -929,14 +946,14 @@ def _resolve_env_token(value: Any, default: str) -> str:
     return default
 
 
-def _default_runtime_asset_pattern(backend: str) -> str:
-    patterns = {
-        "rocm": r"ubuntu-rocm.*x64\.(tar\.gz|zip)$",
-        "vulkan": r"ubuntu-vulkan.*x64\.(tar\.gz|zip)$",
-        "cuda": r"ubuntu-x64\.(tar\.gz|zip)$",
-        "cpu": r"ubuntu-x64\.(tar\.gz|zip)$",
+def _default_runtime_asset_tokens(backend: str) -> list[str]:
+    tokens = {
+        "rocm": ["ubuntu", "rocm-7.2", "x64"],
+        "vulkan": ["ubuntu", "vulkan", "x64"],
+        "cuda": ["ubuntu", "cuda", "x64"],
+        "cpu": ["ubuntu", "x64"],
     }
-    return patterns.get(backend, patterns["cpu"])
+    return tokens.get(backend, tokens["cpu"])
 
 
 def _default_runtime_variant(backend: str, version: str, repo_owner: str, repo_name: str) -> dict[str, Any]:
@@ -945,7 +962,7 @@ def _default_runtime_variant(backend: str, version: str, repo_owner: str, repo_n
         "backend": backend,
         "macro": f"llama-server-{backend}",
         "version": version,
-        "asset_pattern": _default_runtime_asset_pattern(backend),
+        "asset_tokens": _default_runtime_asset_tokens(backend),
         "source_type": "github_release",
         "repo_owner": repo_owner,
         "repo_name": repo_name,
@@ -1042,7 +1059,11 @@ def _collect_backend_runtime_variants(stack: StackConfig) -> list[dict[str, Any]
     default_enabled = bool(defaults.get("enabled", True))
     default_always = bool(defaults.get("always", False))
     default_runtime_subdir_prefix = str(defaults.get("runtime_subdir_prefix", "")).strip().strip("/")
-    default_asset_pattern = str(defaults.get("asset_pattern", "")).strip()
+    default_asset_tokens = defaults.get("asset_tokens", [])
+    if isinstance(default_asset_tokens, str):
+        default_asset_tokens = [s.strip() for s in default_asset_tokens.split(",")]
+    elif not isinstance(default_asset_tokens, list):
+        default_asset_tokens = []
     default_backends = defaults.get("base_backends", ["cpu", "cuda", "rocm", "vulkan"])
     if not isinstance(default_backends, list):
         default_backends = ["cpu", "cuda", "rocm", "vulkan"]
@@ -1066,8 +1087,8 @@ def _collect_backend_runtime_variants(stack: StackConfig) -> list[dict[str, Any]
             variant["always"] = default_always
             if default_runtime_subdir_prefix:
                 variant["runtime_subdir"] = f"{default_runtime_subdir_prefix}/{variant['runtime_subdir']}"
-            if default_asset_pattern:
-                variant["asset_pattern"] = default_asset_pattern
+            if default_asset_tokens:
+                variant["asset_tokens"] = default_asset_tokens
             variants_by_macro[str(variant["macro"])] = variant
         return list(variants_by_macro.values())
 
@@ -1118,18 +1139,20 @@ def _collect_backend_runtime_variants(stack: StackConfig) -> list[dict[str, Any]
         if not macro:
             macro = f"llama-server-{name}"
 
+        # Normalize asset_tokens: support both list and comma-separated string
+        asset_tokens = variant_input.get("asset_tokens", source.get("asset_tokens", default_asset_tokens or _default_runtime_asset_tokens(backend)))
+        if isinstance(asset_tokens, str):
+            asset_tokens = [s.strip() for s in asset_tokens.split(",") if s.strip()]
+        elif not isinstance(asset_tokens, list):
+            asset_tokens = []
+
         variant = {
             "name": name,
             "backend": backend,
             "macro": macro,
             "version": version,
             "source_type": source_type,
-            "asset_pattern": str(
-                variant_input.get(
-                    "asset_pattern",
-                    source.get("asset_pattern", default_asset_pattern or _default_runtime_asset_pattern(backend)),
-                )
-            ).strip(),
+            "asset_tokens": asset_tokens,
             "repo_owner": str(variant_input.get("repo_owner", source.get("repo_owner", default_owner))).strip() or default_owner,
             "repo_name": str(variant_input.get("repo_name", source.get("repo_name", default_repo))).strip() or default_repo,
             "download_url": str(variant_input.get("download_url", source.get("url", ""))).strip(),
@@ -1181,7 +1204,7 @@ def _runtime_variant_macro_command(variant: dict[str, Any]) -> str:
 
     backend = str(variant.get("backend", "cpu")).strip().lower() or "cpu"
     runtime_subdir = str(variant.get("runtime_subdir", backend)).strip() or backend
-    runtime_root = f"/app/runtime-root/{runtime_subdir}"
+    runtime_root = f"/app/runtime-root/{runtime_subdir}/active"
     suffix = "cpu" if backend == "cpu" else backend
     executable = f"{runtime_root}/bin/llama-server-{suffix}"
     if backend == "rocm":
@@ -1567,6 +1590,8 @@ def _catalog_published_models(stack: StackConfig) -> list[PublishedModel]:
                     for member in group.get("members", [])
                 )
             ]
+            artifact_model_file = deployment.get("model_file", artifacts.get("model_file", ""))
+            artifact_mmproj_file = deployment.get("mmproj_file", artifacts.get("mmproj_file", ""))
             result.append(
                 PublishedModel(
                     label=label,
@@ -1577,10 +1602,16 @@ def _catalog_published_models(stack: StackConfig) -> list[PublishedModel]:
                     backend_model_name=backend_model_name,
                     purpose=purpose,
                     revision=str(deployment.get("revision", artifacts.get("revision", ""))),
-                    model_filename=str(deployment.get("model_filename", artifacts.get("model_filename", ""))),
+                    model_filename=_artifact_filename(
+                        deployment.get("model_filename", artifacts.get("model_filename", "")),
+                        artifact_model_file,
+                    ),
                     model_url=str(deployment.get("model_url", artifacts.get("model_url", ""))),
                     additional_model_urls=[str(url) for url in deployment.get("additional_model_urls", artifacts.get("additional_model_urls", []))],
-                    mmproj_filename=str(deployment.get("mmproj_filename", artifacts.get("mmproj_filename", ""))),
+                    mmproj_filename=_artifact_filename(
+                        deployment.get("mmproj_filename", artifacts.get("mmproj_filename", "")),
+                        artifact_mmproj_file,
+                    ),
                     mmproj_url=str(deployment.get("mmproj_url", artifacts.get("mmproj_url", ""))),
                     source_page_url=str(deployment.get("source_page_url", artifacts.get("source_page_url", ""))),
                     load_groups=model_load_groups,
@@ -1968,7 +1999,7 @@ def build_backend_runtime_catalog(stack: StackConfig) -> dict[str, Any]:
                 "macro": str(variant.get("macro", "")),
                 "version": str(variant.get("version", "latest")),
                 "source_type": str(variant.get("source_type", "github_release")),
-                "asset_pattern": str(variant.get("asset_pattern", "")),
+                "asset_tokens": variant.get("asset_tokens", []),
                 "repo_owner": str(variant.get("repo_owner", "ggml-org")),
                 "repo_name": str(variant.get("repo_name", "llama.cpp")),
                 "download_url": str(variant.get("download_url", "")),
@@ -2098,7 +2129,7 @@ def build_nginx_landing_page(stack: StackConfig) -> str:
 
   <p style="font-size:0.85rem;color:#888;">
     Generated by AUDia LLM Gateway &mdash;
-    edit <code>config/local/stack.override.yaml</code> to change hosts and ports.
+    edit <code>config/local/stack.override.yaml</code> or <code>config/local/stack.private.yaml</code> to change hosts and ports.
   </p>
 </body>
 </html>
@@ -2106,14 +2137,21 @@ def build_nginx_landing_page(stack: StackConfig) -> str:
 
 
 def _read_local_env_var(stack: StackConfig, var_name: str) -> str:
-    """Read a variable from config/local/env (KEY=value format). Returns empty string if not found."""
-    env_path = stack.root / "config" / "local" / "env"
-    if not env_path.exists():
-        return ""
-    for line in env_path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if line.startswith(f"{var_name}="):
-            return line[len(var_name) + 1:].strip()
+    """Read a variable from config/local/env or config/local/env.private."""
+    env_paths = [
+        stack.root / "config" / "local" / "env",
+        stack.root / "config" / "local" / "env.private",
+    ]
+    value = ""
+    for env_path in env_paths:
+        if not env_path.exists():
+            continue
+        for line in env_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line.startswith(f"{var_name}="):
+                value = line[len(var_name) + 1:].strip()
+    if value:
+        return value
     return ""
 
 
@@ -2466,8 +2504,10 @@ def write_llama_swap_config(root: str | Path) -> Path:
     payload = build_llama_swap_config(stack)
     header = (
         "# Generated from config/project/models.base.yaml, config/local/models.override.yaml,\n"
-        "# config/project/backend-runtime.base.yaml, config/local/backend-runtime.override.yaml,\n"
-        "# config/project/llama-swap.base.yaml, and config/local/llama-swap.override.yaml.\n"
+        "# optional config/local/models.private.yaml, config/project/backend-runtime.base.yaml,\n"
+        "# config/local/backend-runtime.override.yaml, optional config/local/backend-runtime.private.yaml,\n"
+        "# config/project/llama-swap.base.yaml, config/local/llama-swap.override.yaml,\n"
+        "# and optional config/local/llama-swap.private.yaml.\n"
         "# Regenerate with:\n"
         "#   python -m src.launcher.process_manager generate-configs\n"
     )
@@ -2480,7 +2520,8 @@ def write_litellm_config(root: str | Path) -> Path:
     payload = build_litellm_config(stack)
     header = (
         "# Generated from config/project/models.base.yaml, config/local/models.override.yaml,\n"
-        "# config/project/stack.base.yaml, and config/local/stack.override.yaml.\n"
+        "# optional config/local/models.private.yaml, config/project/stack.base.yaml,\n"
+        "# config/local/stack.override.yaml, and optional config/local/stack.private.yaml.\n"
         "# Regenerate with:\n"
         "#   python -m src.launcher.process_manager generate-configs\n"
     )
@@ -2519,7 +2560,8 @@ def write_nginx_config(root: str | Path) -> Path:
     output_path = stack.root / str(stack.reverse_proxy.get("nginx", {}).get("config_path", "config/generated/nginx/nginx.conf"))
     output_path.parent.mkdir(parents=True, exist_ok=True)
     header = (
-        "# Generated from config/project/stack.base.yaml and config/local/stack.override.yaml.\n"
+        "# Generated from config/project/stack.base.yaml, config/local/stack.override.yaml,\n"
+        "# and optional config/local/stack.private.yaml.\n"
         "# Hosts and ports are resolved from the central network section.\n"
         "# Regenerate with:\n"
         "#   python -m src.launcher.process_manager generate-configs\n\n"
@@ -2537,7 +2579,8 @@ def write_systemd_config(root: str | Path) -> Path | None:
     output_path = stack.root / "config" / "generated" / "systemd" / f"{stack.systemd.service_name}.service"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     header = (
-        "# Generated from config/project/stack.base.yaml and config/local/stack.override.yaml.\n"
+        "# Generated from config/project/stack.base.yaml, config/local/stack.override.yaml,\n"
+        "# and optional config/local/stack.private.yaml.\n"
         "# Regenerate with:\n"
         "#   python -m src.launcher.process_manager generate-configs\n\n"
     )
