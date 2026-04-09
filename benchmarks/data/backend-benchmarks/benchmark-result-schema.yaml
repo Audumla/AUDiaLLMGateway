@@ -1,0 +1,249 @@
+version: 1
+title: Benchmark Result Schema (Spec-803)
+description: >
+  Canonical format for recording benchmark results. All benchmark runs MUST produce
+  a JSON file conforming to this schema. The schema formalizes the existing ad-hoc
+  result format and adds measurement uncertainty tracking.
+
+$schema: http://json-schema.org/draft-07/schema#
+
+type: object
+required:
+  - version
+  - backend
+  - channel
+  - pinned_version
+  - model
+  - gpus
+  - date
+  - runs
+  - summary
+
+properties:
+  version:
+    type: integer
+    description: "Schema version. Current: 1"
+    enum: [1]
+
+  backend:
+    type: string
+    description: "Backend identifier (e.g. llama-cpp-vulkan, llama-cpp-rocm, vllm, ollama)"
+    examples:
+      - "llama-cpp-vulkan"
+      - "llama-cpp-rocm"
+      - "vllm-rocm"
+      - "ollama"
+
+  channel:
+    type: string
+    description: "Source channel (spec-801). Qualifies the version number."
+    enum:
+      - "ggml-org"
+      - "lemonade-sdk"
+      - "rocm-official"
+      - "lychee-tech"
+      - "vllm-official"
+      - "ollama-official"
+      - "zinc-source"
+      - "unsloth"
+
+  pinned_version:
+    type: string
+    description: >
+      The version identifier. Format depends on channel:
+      - ggml-org: bXXXX (e.g. b8661)
+      - lemonade-sdk: bXXXX (e.g. b1224) — independent counter
+      - rocm-official: git ref with date (e.g. master@2026-03-30)
+      - vllm: docker tag (e.g. v0.18.1)
+      - lychee-tech: bXXXX
+    examples:
+      - "b8661"
+      - "b1224"
+      - "master@2026-03-30"
+      - "v0.18.1"
+
+  model:
+    type: string
+    description: "Model name and quantization format"
+    examples:
+      - "Qwen3.5-27B-Q6_K"
+      - "Qwen3.5-27B-AWQ"
+      - "Qwen3-0.6B-BF16"
+
+  model_context_window:
+    type: integer
+    description: "Context window size used in this benchmark (tokens)"
+    minimum: 128
+    examples: [131072, 32768, 8192]
+
+  gpus:
+    type: array
+    description: "Which GPU(s) were used"
+    items:
+      type: string
+      examples: ["Vulkan1", "Vulkan2", "ROCm0", "ROCm1"]
+    minItems: 1
+
+  gpu_vram_total:
+    type: integer
+    description: "Total VRAM across all GPUs used (GB)"
+    examples: [48, 16, 24]
+
+  date:
+    type: string
+    description: "UTC date when benchmark was run (ISO 8601)"
+    format: date
+    examples: ["2026-04-02"]
+
+  session_id:
+    type: string
+    description: "Unique identifier for this benchmark session (for grouping related runs)"
+    examples: ["20260402-vulkan-run-1", "session-20260402-001"]
+
+  runs:
+    type: array
+    description: >
+      Array of individual benchmark runs. First is cold-start (discarded for comparison),
+      subsequent are warm-start (used for metrics).
+    minItems: 4  # At minimum: 1 cold + 3 warm
+    items:
+      type: object
+      required:
+        - run_number
+        - run_type
+        - elapsed_seconds
+        - tokens_generated
+        - tok_s
+        - used_for_comparison
+      properties:
+        run_number:
+          type: integer
+          description: "0-indexed run number within this session"
+          minimum: 0
+
+        run_type:
+          type: string
+          enum: ["cold", "warm"]
+          description: >
+            cold: First run after fresh binary start (JIT overhead, not compared)
+            warm: Subsequent runs (GPU kernels already compiled, comparable)
+
+        elapsed_seconds:
+          type: number
+          description: "Time to generate tokens (seconds)"
+          minimum: 0.1
+          exclusiveMinimum: true
+
+        tokens_generated:
+          type: integer
+          description: "Number of completion tokens generated"
+          examples: [300]
+
+        tok_s:
+          type: number
+          description: "Throughput: tokens_generated / elapsed_seconds"
+          minimum: 0.1
+          exclusiveMinimum: true
+
+        used_for_comparison:
+          type: boolean
+          description: >
+            true: This run is included in the median calculation (warm runs only)
+            false: This run is excluded (cold runs, outliers, or errors)
+
+        notes:
+          type: string
+          description: "Optional notes (e.g., 'JIT compilation overhead', 'outlier due to GPU frequency spike')"
+
+  summary:
+    type: object
+    required:
+      - median_tok_s
+      - variance_percent
+      - confidence
+      - num_runs_compared
+    properties:
+      median_tok_s:
+        type: number
+        description: "Median tok/s across warm runs (the reported metric)"
+        minimum: 0.1
+        exclusiveMinimum: true
+
+      variance_percent:
+        type: number
+        description: "(max - min) / median * 100 within this session"
+        minimum: 0
+        exclusiveMaximum: 100
+
+      confidence:
+        type: string
+        enum: ["low", "uncertain", "validated"]
+        description: >
+          low: 1 warm run, or method unknown, or cold-start included
+          uncertain: 2 warm runs with >10% variance, or <5% cross-session variance but <2 sessions
+          validated: 3+ warm runs, <5% variance within session, 2+ sessions with <5% cross-session variance
+
+      num_runs_compared:
+        type: integer
+        description: "Number of warm runs used in median (always ≥1)"
+        minimum: 1
+
+      cold_run_outlier:
+        type: boolean
+        description: "true if cold run was significantly slower (indicates JIT overhead)"
+
+      notes:
+        type: array
+        items:
+          type: string
+        description: >
+          Observations about this benchmark session
+          (e.g., "GPU thermals stable", "high OS activity during run 2", "variance due to frequency scaling")
+
+examples:
+  - version: 1
+    backend: "llama-cpp-vulkan"
+    channel: "ggml-org"
+    pinned_version: "b8661"
+    model: "Qwen3.5-27B-Q6_K"
+    model_context_window: 131072
+    gpus: ["Vulkan1", "Vulkan2"]
+    gpu_vram_total: 48
+    date: "2026-04-02"
+    session_id: "20260402-vulkan-run-1"
+    runs:
+      - run_number: 0
+        run_type: "cold"
+        elapsed_seconds: 21.5
+        tokens_generated: 300
+        tok_s: 13.95
+        used_for_comparison: false
+        notes: "JIT compilation overhead"
+      - run_number: 1
+        run_type: "warm"
+        elapsed_seconds: 11.40
+        tokens_generated: 300
+        tok_s: 26.32
+        used_for_comparison: true
+      - run_number: 2
+        run_type: "warm"
+        elapsed_seconds: 11.38
+        tokens_generated: 300
+        tok_s: 26.35
+        used_for_comparison: true
+      - run_number: 3
+        run_type: "warm"
+        elapsed_seconds: 11.42
+        tokens_generated: 300
+        tok_s: 26.26
+        used_for_comparison: true
+    summary:
+      median_tok_s: 26.32
+      variance_percent: 0.35
+      confidence: "validated"
+      num_runs_compared: 3
+      cold_run_outlier: true
+      notes:
+        - "GPU thermals stable throughout"
+        - "No OS activity during runs"
+        - "Cold run JIT overhead: 7.5 second penalty vs warm average"

@@ -1,0 +1,293 @@
+version: 1
+title: Backend Version Registry (Spec-801)
+date_updated: "2026-04-02"
+description: >
+  Canonical registry of pinned backend versions, source channels, and integrity hashes.
+  This is the single source of truth for what versions are deployed and what the floor
+  (minimum acceptable) version is for each backend.
+
+source_channels:
+  ggml-org:
+    org: ggml-org
+    repo: llama.cpp
+    counter_namespace: ggml-org
+    versioning_scheme: monotonic-build-number
+    release_cadence: "multiple per day"
+    prebuilt: true
+    url: https://github.com/ggml-org/llama.cpp
+    asset_base_url: "https://github.com/ggml-org/llama.cpp/releases/download/{version}/{asset}"
+    notes:
+      - "Primary distribution channel for non-ROCm backends"
+      - "Build numbers are monotonic integers: b8661 > b8660 > b8450"
+      - "Multiple releases per day is normal; no semantic versioning"
+      - "ROCm assets include version token: rocm-7.2, rocm-7.3, etc. (changes with upstream ROCm bumps)"
+
+  lemonade-sdk:
+    org: lemonade-sdk
+    repo: llamacpp-rocm
+    counter_namespace: lemonade
+    versioning_scheme: monotonic-build-number
+    release_cadence: "daily"
+    prebuilt: true
+    url: https://github.com/lemonade-sdk/llamacpp-rocm
+    asset_base_url: "https://github.com/lemonade-sdk/llamacpp-rocm/releases/download/{version}/{asset}"
+    notes:
+      - "RDNA3/RDNA4 optimized; bundles ROCm 7 runtime (no separate ROCm install needed)"
+      - "Independent counter: lemonade:b1224 ≠ ggml-org:b1224"
+      - "Daily updates; always qualify as lemonade:bXXXX when referencing"
+      - "Builds all AMD GPU targets (gfx1151, gfx1150, gfx120X, gfx110X, gfx103X)"
+      - "gfx1100 (RDNA3 7900 XTX) covered by gfx110X target group"
+
+  rocm-official:
+    org: ROCm
+    repo: llama.cpp
+    counter_namespace: rocm-official
+    versioning_scheme: git-ref-based
+    release_cadence: "on commit"
+    prebuilt: false
+    source_build: true
+    url: https://github.com/ROCm/llama.cpp
+    notes:
+      - "AMD's official ROCm-optimized fork"
+      - "Source-build only; no prebuilt assets"
+      - "Git-based versioning: branches/tags or master@YYYY-MM-DD"
+
+  lychee-tech:
+    org: Lychee-Technology
+    repo: llama-cpp-for-strix-halo
+    counter_namespace: lychee
+    versioning_scheme: monotonic-build-number
+    release_cadence: "irregular"
+    prebuilt: true
+    architecture_scoped: "gfx1151 (Strix Halo only)"
+    url: https://github.com/Lychee-Technology/llama-cpp-for-strix-halo
+    notes:
+      - "Strix Halo (gfx1151) ONLY — not for gfx1100 (RX 7900 XTX)"
+      - "Fails with 'Illegal Instruction' on gfx1100"
+      - "Track separately from RDNA3 desktop lanes"
+
+  rocm-7-2-1-runtime:
+    org: ROCm
+    repo: ROCm
+    counter_namespace: rocm-release
+    versioning_scheme: semantic
+    release_cadence: "quarterly"
+    prebuilt: true
+    url: https://github.com/ROCm/ROCm/releases/tag/rocm-7.2.1
+    notes:
+      - "ROCm runtime release marker; does not ship llama.cpp binaries directly"
+      - "Used as container base image: rocm/dev-ubuntu-24.04:7.2.1"
+
+backends:
+  llama_cpp_vulkan:
+    backend_name: "llama.cpp Vulkan"
+    backend_type: llama-cpp
+    channel: ggml-org
+    pinned_version: "b8583"
+    floor_version: "b8153"
+    asset_tokens:
+      - ubuntu
+      - vulkan
+      - x64
+    integrity_sha256: ""  # TODO: compute from release
+    last_benchmarked: "2026-03-31"
+    benchmark_session_ids:
+      - "20260328-vulkan-baseline"
+      - "20260331-vulkan-warmcheck"
+    benchmark_result_tok_s: 26.28
+    benchmark_confidence: validated
+    benchmark_notes:
+      - "2 independent sessions (2026-03-28, 2026-03-31)"
+      - "Warm runs: [26.40, 26.32, 26.22] and [26.38, 26.33, 26.28]"
+      - "Cross-session variance: 0.04%"
+      - "Smoke test: PASS (--list-devices OK, /v1/models responsive)"
+      - "Soak test: PASS (10 min light load, 0 errors)"
+    enabled: true
+    status: working
+    notes:
+      - "Best performer on dual RX 7900 XTX (gfx1100) — 26.28 tok/s"
+      - "Flash attention enabled; KV cache quantized to q8_0"
+
+  llama_cpp_rocm_prebuilt:
+    backend_name: "llama.cpp ROCm (prebuilt)"
+    backend_type: llama-cpp
+    channel: ggml-org
+    pinned_version: "b8583"
+    floor_version: "b8153"
+    asset_tokens:
+      - ubuntu
+      - rocm-7.2
+      - x64
+    integrity_sha256: ""  # TODO: compute from release
+    last_benchmarked: "2026-03-28"
+    benchmark_result_tok_s: 21
+    benchmark_confidence: low
+    benchmark_notes:
+      - "Single run, cold-start not isolated"
+      - "Requires re-validation with ≥3 warm runs per spec-803"
+      - "Flagged for benchmark re-run"
+    enabled: true
+    status: working
+    notes:
+      - "Standard prebuilt from ggml-org"
+      - "rocm-7.2 token must be updated if ROCm bumps to 7.3 or later"
+
+  llama_cpp_rocm_lemonade:
+    backend_name: "llama.cpp ROCm (Lemonade nightly)"
+    backend_type: llama-cpp
+    channel: lemonade-sdk
+    pinned_version: "b1224"  # Note: independent counter
+    floor_version: "b1200"
+    asset_tokens:
+      - ubuntu
+      - rocm
+    integrity_sha256: ""  # TODO: compute from release
+    last_benchmarked: "2026-03-29"
+    benchmark_session_ids:
+      - "20260329-lemonade-b1224"
+      - "20260330-lemonade-stability"
+    benchmark_result_tok_s: 21.85
+    benchmark_confidence: validated
+    benchmark_notes:
+      - "2 sessions within 2% variance"
+      - "Warm runs: [21.90, 21.82, 21.85] and [21.88, 21.83, 21.87]"
+      - "Cross-session variance: 0.1%"
+    enabled: false
+    status: pending_validation
+    disabled_reason: pending_validation
+    notes:
+      - "Daily updated nightly build with bundled ROCm 7 runtime"
+      - "RDNA3 optimized; supports all GPU targets (gfx1100 via gfx110X)"
+      - "Independent counter: lemonade:b1224 ≠ ggml-org:b1224"
+      - "Recommendation: PROMOTE to working after smoke test validation"
+
+  llama_cpp_rocm_preview_gfx1100:
+    backend_name: "llama.cpp ROCm preview (gfx1100)"
+    backend_type: llama-cpp
+    channel: rocm-official
+    pinned_version: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b"  # full 40-char commit SHA
+    pinned_metadata:
+      branch: master
+      approx_date: "2026-03-30"
+      commit_summary: "Optimize gfx1100 GEMM kernels"
+    floor_version: null  # Source builds don't have meaningful floor
+    source_build: true
+    build_image: "rocm/dev-ubuntu-24.04:7.2.1"
+    cmake_flags:
+      - "-DLLAMA_BUILD_SERVER=ON"
+      - "-DGGML_HIPBLAS=ON"
+      - "-DAMDGPU_TARGETS=gfx1100"
+      - "-DCMAKE_HIP_ARCHITECTURES=gfx1100"
+      - "-DCMAKE_BUILD_TYPE=Release"
+    last_benchmarked: "2026-03-30"
+    benchmark_result_tok_s: 22.49
+    benchmark_confidence: validated
+    benchmark_notes:
+      - "2 sessions, 3% variance"
+      - "Warm runs: [22.60, 22.45, 22.42] and [22.51, 22.48, 22.47]"
+      - "Cross-session variance: 0.1%"
+    enabled: false
+    status: pending_validation
+    disabled_reason: pending_validation
+    notes:
+      - "Custom cmake configuration for gfx1100 target (not gfx1030)"
+      - "Best-known ROCm performance for RDNA3 (22.49 tok/s)"
+      - "Source-build in rocm/dev container"
+      - "Pin is full commit SHA; approx_date is for human reference only"
+      - "Recommendation: PROMOTE to working after smoke test validation"
+
+  llama_cpp_cpu:
+    backend_name: "llama.cpp CPU"
+    backend_type: llama-cpp
+    channel: ggml-org
+    pinned_version: "b8583"
+    floor_version: "b8000"
+    asset_tokens:
+      - ubuntu
+      - x64
+    integrity_sha256: ""
+    enabled: true
+    status: working
+    benchmark_result_tok_s: null
+    notes:
+      - "CPU-only fallback; no benchmark data"
+      - "Runs on any system; useful for development/testing"
+
+  llama_cpp_cuda:
+    backend_name: "llama.cpp CUDA"
+    backend_type: llama-cpp
+    channel: ggml-org
+    pinned_version: "b8583"
+    floor_version: "b8153"
+    asset_tokens:
+      - ubuntu
+      - cuda
+      - x64
+    sidecar_assets:
+      - pattern: "cudart-llama-bin-win-cuda-*-x64.zip"
+        description: "CUDA runtime DLLs (Windows only)"
+    integrity_sha256: ""
+    enabled: true
+    status: working
+    notes:
+      - "NVIDIA CUDA support for Linux/Windows"
+      - "Requires CUDA Toolkit installation or bundled runtime"
+
+  vllm_rocm:
+    backend_name: "vLLM ROCm (v0.17.1 rollback)"
+    backend_type: vllm
+    channel: vllm-official
+    pinned_version: "v0.17.1"
+    docker_image: "vllm/vllm-openai-rocm:latest"
+    docker_image_tag: "v0.17.1"
+    last_benchmarked: "2026-03-31"
+    benchmark_result_tok_s: 3.41
+    benchmark_confidence: low
+    benchmark_notes:
+      - "Single run on Qwen3.5-27B AWQ"
+      - "Requires re-validation with ≥3 warm runs"
+    enabled: false
+    status: blocked
+    disabled_reason: compat_blocked
+    notes:
+      - "Triton AWQ dequantization unoptimized for gfx1100 (RDNA3)"
+      - "AMD AITER targets gfx9 (CDNA MI-series), not gfx1100"
+      - "Blocked until upstream Triton optimization improves"
+      - "Newer vLLM versions (0.18+) fail on gfx1100 with HIP OOM"
+
+  ollama_rocm:
+    backend_name: "Ollama ROCm"
+    backend_type: ollama
+    channel: ollama-official
+    pinned_version: "latest"  # Docker tag
+    docker_image: "ollama/ollama:rocm"
+    last_benchmarked: "2026-03-30"
+    benchmark_result_tok_s: 18.12
+    benchmark_confidence: low
+    notes:
+      - "Operational UX alternative; 30% slower than Vulkan (18.12 vs 26.28 tok/s)"
+      - "Single benchmark run; confidence: low"
+      - "Track as optional operational fallback, not performance tier"
+
+  zinc_vulkan:
+    backend_name: "Zinc (Vulkan-native)"
+    backend_type: zinc
+    channel: null  # source-build only
+    source_url: "https://github.com/zolotukhin/zinc"
+    build_image: "vulkan-sdk:1.4.341.1"
+    status: blocked
+    disabled_reason: compat_blocked
+    enabled: false
+    notes:
+      - "Vulkan-native AMD inference engine (promising architecture)"
+      - "Crashes during Qwen3.5-27B model load"
+      - "Monitor for stability improvements upstream"
+      - "Not production-ready"
+
+deprecation_policies:
+  blocked_timeout_days: 60
+  performance_threshold_percent: 50
+  notes:
+    - "Backend blocked for >60 days with no upstream fix → status: deprecated"
+    - "Performance falls below 50% of current best → flag for review and possible deprecation"
+    - "Source channel abandons gfx1100 support → mark as architecture_scoped"

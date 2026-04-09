@@ -746,4 +746,9 @@
 - Scrubbed tracked local config samples and deployment docs so host-specific values move into ignored overlays.
 - Added regression coverage for private overlay merges and private env precedence, then reran targeted config-generation tests.
 
+### Scrubbed sensitive repo history locally and restored sample-safe deployment/private-overlay changes. (Configuration Cleanup)
+- Removed reachable personal host, path, secret, and GitHub namespace references from local branch/tag history and cleaned stale stash/origin tracking refs.
+- Restored anonymized config/docs/code changes, including private overlay loading and sample compose guidance, after the history rewrite.
+- Re-ran py_compile, targeted pytest suites, and strict separation checks; bash -n still fails on this Windows host because /bin/bash is unavailable.
+
 ---

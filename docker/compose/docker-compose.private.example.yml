@@ -1,0 +1,7 @@
+services:
+  llm-server-llamacpp:
+    volumes:
+      # Example: mount an external GGUF store directly at the path used by
+      # llama.cpp inside the container. Copy this file to
+      # docker/compose/docker-compose.private.yml and edit the host path.
+      - ${PRIVATE_GGUF_ROOT:-/srv/llm-models/gguf}:/app/models/gguf:ro

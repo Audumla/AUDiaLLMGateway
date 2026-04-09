@@ -2558,5 +2558,22 @@
       "Scrubbed tracked local config samples and deployment docs so host-specific values move into ignored overlays.",
       "Added regression coverage for private overlay merges and private env precedence, then reran targeted config-generation tests."
     ]
+  },
+  {
+    "id": "CHG-094c1248",
+    "agent": "codex",
+    "change_group": "history-scrub-restore",
+    "plugin_version": "unreleased",
+    "date": "2026-04-09",
+    "recorded_at": "2026-04-09T12:33:13.325770Z",
+    "summary_tags": [
+      "Configuration Cleanup"
+    ],
+    "summary": "Scrubbed sensitive repo history locally and restored sample-safe deployment/private-overlay changes.",
+    "details": [
+      "Removed reachable personal host, path, secret, and GitHub namespace references from local branch/tag history and cleaned stale stash/origin tracking refs.",
+      "Restored anonymized config/docs/code changes, including private overlay loading and sample compose guidance, after the history rewrite.",
+      "Re-ran py_compile, targeted pytest suites, and strict separation checks; bash -n still fails on this Windows host because /bin/bash is unavailable."
+    ]
   }
 ]
