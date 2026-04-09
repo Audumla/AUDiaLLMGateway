@@ -217,6 +217,12 @@ the scaffold and merge targets used by the local catalog. The catalog holds:
 The config generator translates the catalog into backend-specific config at
 generation time. Machine-specific additions go in `config/local/models.override.yaml`.
 
+When running via Docker, edits to `config/local/models.override.yaml` only
+reach llama-swap and LiteLLM after the generated configs are refreshed. Run
+`python -m src.launcher.process_manager --root . generate-configs` or keep the
+`llm-config-watcher` service running. Restarting the gateway alone does not
+rebuild stale generated config.
+
 ### Backend runtime catalog
 
 Backend binary download/build sources are configured independently from model

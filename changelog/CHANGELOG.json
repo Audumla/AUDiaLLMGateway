@@ -1898,5 +1898,22 @@
       "Phase 6: All nginx proxy routes PASS",
       "Phase 7: 7 issues documented including vLLM bugs and missing Prometheus LLM metrics"
     ]
+  },
+  {
+    "id": "CHG-a553cdd6",
+    "agent": "codex",
+    "change_group": "main-cleanup-and-branch-prune",
+    "plugin_version": "unreleased",
+    "date": "2026-04-09",
+    "recorded_at": "2026-04-09T13:03:02.216577Z",
+    "summary_tags": [
+      "Configuration Cleanup"
+    ],
+    "summary": "Applied the final generated-config warning on main and prepared the repo for dangling-branch pruning.",
+    "details": [
+      "Updated main so Docker startup warns when config/local is newer than generated config and clarified watcher versus generate-configs requirements in the compose/docs surfaces.",
+      "Validated the main-branch change with sh -n for docker/gateway-entrypoint.sh and reran test_config_loading.py successfully.",
+      "Prepared to delete merged feature/docs branches plus the release-please branch so only clean reachable refs remain."
+    ]
   }
 ]
