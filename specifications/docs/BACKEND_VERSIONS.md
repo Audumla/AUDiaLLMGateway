@@ -2,9 +2,18 @@
 
 ## Overview
 
-The AUDia LLM Gateway supports **8 different llama.cpp backend configurations** across 4 main inference platforms. Of these:
-- **4 backends are actively enabled** by default
-- **4 specialized variants are available** but disabled to reduce boot time
+The AUDia LLM Gateway ships primary `llama.cpp` backends from `ggml-org/llama.cpp`
+GitHub releases and also supports optional source-build variants for targeted ROCm
+and Vulkan experiments.
+
+In practice:
+- the primary `cpu`, `cuda`, `rocm`, and `vulkan` lanes come from GitHub releases
+- optional ROCm architecture-specific and forked source-build lanes stay opt-in
+- experimental forks should be pinned to explicit tags instead of unpinned branch heads
+
+For managed rollout state, lane ownership, and the standard add/update workflow,
+use [BACKEND_REGISTRY.md](BACKEND_REGISTRY.md). This document stays focused on the
+version/reference view.
 
 ---
 
@@ -73,11 +82,9 @@ Runtime: ubuntu-vulkan.*x64
 **Requirements:** Vulkan-compatible GPU + drivers
 **Asset Pattern:** `ubuntu-vulkan.*x64.(tar.gz|zip)`
 
-**Currently Running:** ✅ Active on gpu-host.example (AMD Radeon)
-
 ---
 
-## Specialized Variants (Disabled by Default)
+## Specialized Variants And Source-Build Lanes
 
 These are custom-built variants for specific GPU architectures. They are **disabled** because they require complex build processes during startup and have caused reliability issues.
 
@@ -86,7 +93,7 @@ These are custom-built variants for specific GPU architectures. They are **disab
 ```yaml
 Backend:      rocm-gfx1100-official-current
 Source:       github.com/ROCm/llama.cpp (git clone)
-Branch:       main
+Branch:       master
 GPU Targets:  gfx1030, gfx1100
 Build:        Custom CMake with GGML_HIPBLAS
 Status:       ❌ DISABLED (boot failures)
@@ -117,7 +124,7 @@ Status:       ❌ DISABLED (boot failures)
 ```yaml
 Backend:      rocm-gfx1030-official-current
 Source:       github.com/ROCm/llama.cpp (git clone)
-Branch:       main
+Branch:       master
 GPU Targets:  gfx1030, gfx1100
 Build:        Custom CMake with GGML_HIPBLAS
 Status:       ❌ DISABLED (boot failures)
@@ -139,6 +146,42 @@ Status:       ❌ DISABLED (CMake failures)
 ```
 
 **Why Disabled:** Repository clone fails, CMake configuration errors prevent compilation
+
+---
+
+### Experimental Vulkan Fork Example
+
+```yaml
+profiles:
+  source-turboquant-git:
+    source_type: git
+    git_url: https://github.com/TheTom/llama-cpp-turboquant.git
+    git_ref: tqp-v0.1.0
+    version: tqp-v0.1.0
+
+  build-vulkan-git:
+    backend: vulkan
+    configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_VULKAN=ON -DCMAKE_BUILD_TYPE=Release
+    build_command: cmake --build build --config Release --parallel
+    binary_glob: build/bin/llama-server
+    library_glob: build/bin/*.so*
+    apt_packages:
+      - git
+      - cmake
+      - build-essential
+      - pkg-config
+
+variants:
+  vulkan-turboquant:
+    profiles: [source-turboquant-git, build-vulkan-git]
+    macro: llama-server-vulkan-turboquant
+    runtime_subdir: vulkan/turboquant
+    enabled: false
+```
+
+This style of forked backend lane is meant for local benchmarking and smoke testing.
+Keep it disabled in checked-in samples, then enable it in your machine-local
+override when you are ready to provision and compare it.
 
 ---
 
@@ -308,6 +351,5 @@ LLAMA_BACKEND=cpu       # Force CPU
 
 ---
 
-**Last Updated:** 2026-03-25
-**Status:** All active backends verified operational
-**Server gpu-host.example:** Running Vulkan backend ✅
+**Last Updated:** 2026-04-09
+**Status:** Primary backends and sample source-build lanes documented

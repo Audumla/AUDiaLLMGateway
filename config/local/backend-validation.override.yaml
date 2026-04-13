@@ -1,0 +1,21 @@
+version: 1
+
+defaults:
+  validation_profile: quick
+
+targets:
+  docker-cpu:
+    enabled: true
+  docker-vulkan:
+    enabled: true
+  native-cpu:
+    enabled: true
+  native-cuda:
+    enabled: true
+  native-rocm:
+    enabled: true
+  native-vulkan:
+    enabled: true
+  native-vulkan-turboquant:
+    enabled: true
+    experimental: true

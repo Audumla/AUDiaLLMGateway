@@ -25,6 +25,7 @@
 - backend runtime catalog must support reusable profile composition so source policy and build policy can be defined once and reused across variants
 - profile composition must support inheritance (`extends`) and per-variant override
 - runtime catalog must be able to express explicit AMD ROCm build targets (for example `gfx1030` and `gfx1100`) across multiple upstream repos
+- runtime catalog must be able to express experimental forked `llama.cpp` variants pinned to explicit git tags or refs (for example a Vulkan-focused fork lane)
 
 ## Configuration
 

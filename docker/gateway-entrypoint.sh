@@ -16,6 +16,14 @@ $CONFIG/local/models.override.yaml
 $CONFIG/local/models.private.yaml
 $CONFIG/local/backend-runtime.override.yaml
 $CONFIG/local/backend-runtime.private.yaml
+$CONFIG/local/backend-support.override.yaml
+$CONFIG/local/backend-support.private.yaml
+$CONFIG/local/llama-swap.override.yaml
+$CONFIG/local/llama-swap.private.yaml
+$CONFIG/local/mcp.override.yaml
+$CONFIG/local/mcp.private.yaml
+$CONFIG/local/env
+$CONFIG/local/env.private
 "
     generated_files="
 $CONFIG/generated/llama-swap/llama-swap.generated.yaml
@@ -46,6 +54,19 @@ $CONFIG/generated/llama-swap/backend-runtime.catalog.json
     fi
 }
 
+read_env_override() {
+    var_name="$1"
+    for env_file in "$CONFIG/local/env.private" "$CONFIG/local/env"; do
+        [ -f "$env_file" ] || continue
+        value="$(grep "^${var_name}=" "$env_file" | tail -n 1 | cut -d= -f2-)"
+        if [ -n "$value" ]; then
+            printf '%s' "$value"
+            return 0
+        fi
+    done
+    return 1
+}
+
 # --- Seed config/local/ on first run ---
 mkdir -p "$CONFIG/local"
 
@@ -60,10 +81,13 @@ LITELLM_MASTER_KEY=sk-local-dev
 EOF
 fi
 
-if [ -z "${LITELLM_MASTER_KEY:-}" ] && [ -f "$CONFIG/local/env" ]; then
+if [ -z "${LITELLM_MASTER_KEY:-}" ]; then
     # Reuse the seeded first-run key unless Compose or the host already provided one.
-    LITELLM_MASTER_KEY="$(grep '^LITELLM_MASTER_KEY=' "$CONFIG/local/env" | tail -n 1 | cut -d= -f2-)"
-    export LITELLM_MASTER_KEY
+    # env.private wins over env when both exist.
+    LITELLM_MASTER_KEY="$(read_env_override LITELLM_MASTER_KEY || true)"
+    if [ -n "$LITELLM_MASTER_KEY" ]; then
+        export LITELLM_MASTER_KEY
+    fi
 fi
 
 if [ ! -f "$CONFIG/local/stack.override.yaml" ]; then

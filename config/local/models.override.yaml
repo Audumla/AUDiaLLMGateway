@@ -1,374 +1,85 @@
-frameworks:
-  llama_cpp:
-    type: llama_cpp
-    supports:
-      - llama-swap
-      - litellm
-    llama_swap:
-      executable_macro: llama-server-cpu
-      server_args_macro: server-args
-      model_path_macro: model-path
-      mmproj_path_macro: mmproj-path
-      context_macro_name_template: context-{alias}-args
-      context_arg_template: --ctx-size {tokens}
-  vllm:
-    type: vllm
-    supports:
-      - litellm
-presets:
-  contexts:
-    32k:
-      tokens: 32768
-    64k:
-      tokens: 65536
-    96k:
-      tokens: 98304
-    256k:
-      tokens: 262144
-  deployment_profiles:
-    llamacpp_vulkan_single_gpu1:
-      framework: llama_cpp
-      transport: llama-swap
-      executable_macro: llama-server-vulkan
-      llama_cpp_options:
-        device: Vulkan0
-        split_mode: none
-        parallel: 1
-        gpu_layers: all
-        metrics: true
-    llamacpp_vulkan_split_gpu2:
-      framework: llama_cpp
-      transport: llama-swap
-      executable_macro: llama-server-vulkan
-      llama_cpp_options:
-        device:
-          - Vulkan0
-          - Vulkan2
-        split_mode: layer
-        tensor_split:
-          - 1
-          - 1
-        gpu_layers: 99
-        parallel: 1
-        metrics: true
-    llamacpp_vulkan_balanced_gpu3:
-      framework: llama_cpp
-      transport: llama-swap
-      executable_macro: llama-server-vulkan
-      llama_cpp_options:
-        device:
-          - Vulkan0
-          - Vulkan1
-          - Vulkan2
-        split_mode: layer
-        tensor_split:
-          - 23.8
-          - 15.9
-          - 24.4
-        parallel: 1
-        gpu_layers: all
-        metrics: true
-    llamacpp_rocm_single_gpu1:
-      framework: llama_cpp
-      transport: llama-swap
-      executable_macro: llama-server-rocm
-      llama_cpp_options:
-        device: ROCm0
-        split_mode: none
-        parallel: 1
-        gpu_layers: all
-        metrics: true
-    vllm_rocm_single_gpu1:
-      framework: vllm
-      transport: direct
-      vllm_backend: rocm
-      vllm:
-        tensor_parallel_size: 1
-        pipeline_parallel_size: 1
-        metrics: true  # ← Required for Prometheus /metrics endpoint
-    vllm_rocm_tensor_parallel_2:
-      framework: vllm
-      transport: direct
-      vllm_backend: rocm
-      vllm:
-        tensor_parallel_size: 2
-        pipeline_parallel_size: 1
-        gpu_memory_utilization: 0.90
-        max_model_len: 8192
-        metrics: true  # ← Required for Prometheus /metrics endpoint
-  runtime_profiles:
-    jinja:
-      llama_swap_macro: jinja-args
-      llama_cpp_options:
-        jinja: true
-    nothink:
-      llama_swap_macro: nothink-args
-      llama_cpp_options:
-        reasoning_budget: 0
-        reasoning_format: none
-    qwen_nothink:
-      llama_swap_macro: qwen-nothink-args
-      llama_cpp_options:
-        reasoning_budget: 0
-        reasoning_format: none
-        chat_template_kwargs:
-          enable_thinking: false
-    coder:
-      llama_swap_macro: coder_args
-      llama_cpp_options:
-        jinja: true
-        flash_attn: on
-        temp: 0
-        top_p: 0.9
-        top_k: 20
-        min_p: 0.0
-        presence_penalty: 0.0
-        repeat_penalty: 1.0
-        seed: 42
-        frequency_penalty: 0
-        mirostat: 0
-        dynatemp_range: 0
-        cache_reuse: 128
-    vision:
-      llama_swap_macro: vision-args
-      llama_cpp_options:
-        image_min_tokens: 1024
-    batch:
-      llama_swap_macro: batch-args
-      llama_cpp_options:
-        threads: 8
-        threads_batch: 24
-        batch_size: 512
-        ubatch_size: 512
-        flash_attn: on
-    cache_q8:
-      llama_swap_macro: cache-q8-args
-      llama_cpp_options:
-        cache_type_k: q8_0
-        cache_type_v: q8_0
-    flash_off:
-      llama_swap_macro: flash-off-args
-      llama_cpp_options:
-        flash_attn: off
-    interpret:
-      llama_swap_macro: interpret-args
-      llama_cpp_options:
-        temp: 0
-        top_k: 1
-        top_p: 1
-        min_p: 0
-        seed: 42
-        repeat_penalty: 1.0
-        presence_penalty: 0
-        frequency_penalty: 0
-        mirostat: 0
-        dynatemp_range: 0
-        cache_reuse: 128
 model_profiles:
   qwen27_fast:
-    mode: chat
-    family: qwen3.5
-    purpose: Fast coding, repo work, and tool-heavy local workflows
-    defaults:
-      context_preset: 96k
-      runtime_presets:
-        - jinja
-        - nothink
-        - coder
-    artifacts:
-      model_file: qwen3.5-27B/Qwen3.5-27B-Q6_K.gguf
-      revision: main
-      source_page_url: https://huggingface.co/mradermacher/Qwen3.5-27B-GGUF
-      model_filename: Qwen3.5-27B.Q6_K.gguf
-      model_url: https://huggingface.co/mradermacher/Qwen3.5-27B-GGUF/resolve/main/Qwen3.5-27B.Q6_K.gguf?download=true
     deployments:
       llamacpp_vulkan:
         label: local/qwen27_fast
-        profile: llamacpp_vulkan_split_gpu2
+        template: llamacpp_vulkan_split_validation
         llama_swap_model: qwen3.5-27b-(96k-Q6)
         backend_model_name: qwen3.5-27b-(96k-Q6)
   qwen122_smart:
-    mode: chat
-    family: qwen3.5
-    purpose: Harder reasoning and larger-context local work
-    defaults:
-      context_preset: 32k
-      concurrency_limit: 1
-      runtime_presets:
-        - jinja
-        - batch
-        - cache_q8
-    artifacts:
-      model_file: qwen3.5-122B-a10b/Qwen3.5-122B-A10B-UD-IQ4_XS-00001-of-00003.gguf
-      revision: main
-      source_page_url: https://huggingface.co/unsloth/Qwen3.5-122B-A10B-GGUF/tree/main/UD-IQ4_XS
-      model_filename: Qwen3.5-122B-A10B-UD-IQ4_XS-00001-of-00003.gguf
-      model_url: https://huggingface.co/unsloth/Qwen3.5-122B-A10B-GGUF/resolve/main/UD-IQ4_XS/Qwen3.5-122B-A10B-UD-IQ4_XS-00001-of-00003.gguf?download=true
-      additional_model_urls:
-        - https://huggingface.co/unsloth/Qwen3.5-122B-A10B-GGUF/resolve/main/UD-IQ4_XS/Qwen3.5-122B-A10B-UD-IQ4_XS-00002-of-00003.gguf?download=true
-        - https://huggingface.co/unsloth/Qwen3.5-122B-A10B-GGUF/resolve/main/UD-IQ4_XS/Qwen3.5-122B-A10B-UD-IQ4_XS-00003-of-00003.gguf?download=true
     deployments:
       llamacpp_vulkan:
         label: local/qwen122_smart
-        profile: llamacpp_vulkan_balanced_gpu3
+        template: llamacpp_vulkan_balanced_validation
         llama_swap_model: qwen3.5-122b
         backend_model_name: qwen3.5-122b
   qwen4b_vision:
-    mode: chat
-    family: qwen3.5
-    purpose: Small vision-capable model exposed through llama-swap
-    defaults:
-      context_preset: 64k
-      concurrency_limit: 1
-      runtime_presets:
-        - vision
-        - nothink
-    artifacts:
-      model_file: Qwen3.5-4B/Qwen3.5-4B-UD-Q5_K_XL.gguf
-      mmproj_file: Qwen3.5-4B/mmproj-F16.gguf
-      revision: main
-      source_page_url: https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/tree/main
-      model_filename: Qwen3.5-4B-UD-Q5_K_XL.gguf
-      model_url: https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-UD-Q5_K_XL.gguf?download=true
-      mmproj_filename: mmproj-F16.gguf
-      mmproj_url: https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/mmproj-F16.gguf?download=true
     deployments:
       llamacpp_vulkan:
         label: local/qwen4b_vision
-        profile: llamacpp_vulkan_single_gpu1
+        template: llamacpp_vulkan_single_validation
         llama_swap_model: qwen3-5-4b-ud-q5-k-xl-vision
         backend_model_name: qwen3-5-4b-ud-q5-k-xl-vision
+  qwen4b_validation:
+    deployments:
+      llamacpp_vulkan:
+        label: local/qwen4b_validation_vulkan
+        template: llamacpp_vulkan_single_validation
+        llama_swap_model: qwen3-5-4b-q8-validation-vulkan
+        backend_model_name: qwen3-5-4b-q8-validation-vulkan
+      llamacpp_rocm:
+        label: local/qwen4b_validation_rocm
+        template: llamacpp_rocm_single_validation
+        llama_swap_model: qwen3-5-4b-q8-validation-rocm
+        backend_model_name: qwen3-5-4b-q8-validation-rocm
+      llamacpp_cpu:
+        label: local/qwen4b_validation_cpu
+        template: llamacpp_cpu_validation
+        llama_swap_model: qwen3-5-4b-q8-validation-cpu
+        backend_model_name: qwen3-5-4b-q8-validation-cpu
+  qwen2b_validation:
+    deployments:
+      llamacpp_vulkan:
+        label: local/qwen2b_validation_vulkan
+        template: llamacpp_vulkan_single_validation
+        llama_swap_model: qwen3-5-2b-q4-validation-vulkan
+        backend_model_name: qwen3-5-2b-q4-validation-vulkan
+      llamacpp_rocm:
+        label: local/qwen2b_validation_rocm
+        template: llamacpp_rocm_single_validation
+        llama_swap_model: qwen3-5-2b-q4-validation-rocm
+        backend_model_name: qwen3-5-2b-q4-validation-rocm
+      llamacpp_cpu:
+        label: local/qwen2b_validation_cpu
+        template: llamacpp_cpu_validation
+        llama_swap_model: qwen3-5-2b-q4-validation-cpu
+        backend_model_name: qwen3-5-2b-q4-validation-cpu
   ministral3b_vision:
-    mode: chat
-    family: ministral
-    purpose: Small 3B vision-capable model for quick tests and lightweight tasks
-    defaults:
-      context_preset: 64k
-      concurrency_limit: 1
-      runtime_presets:
-        - vision
-        - nothink
-    artifacts:
-      model_file: Ministral-3-3B/Ministral-3B-Instruct-Q4_K_M.gguf
-      mmproj_file: Ministral-3-3B/Ministral-3B-Instruct-Q4_K_M-mmproj-f16.gguf
-      revision: main
-      source_page_url: https://huggingface.co/mistralai/Ministral-3B-Instruct
-      model_filename: Ministral-3B-Instruct-Q4_K_M.gguf
-      model_url: https://huggingface.co/bartowski/Ministral-3B-Instruct-GGUF/resolve/main/Ministral-3B-Instruct-Q4_K_M.gguf?download=true
-      mmproj_filename: Ministral-3B-Instruct-Q4_K_M-mmproj-f16.gguf
-      mmproj_url: https://huggingface.co/second-state/Ministral-3B-Instruct-GGUF/resolve/main/Ministral-3B-Instruct-Q4_K_M-mmproj-f16.gguf?download=true
     deployments:
       llamacpp_vulkan:
         label: local/ministral3b_vision
-        profile: llamacpp_vulkan_single_gpu1
+        template: llamacpp_vulkan_single_validation
         llama_swap_model: ministral3b-vision
         backend_model_name: ministral3b-vision
   vllm_default:
-    mode: chat
-    family: qwen2.5
-    purpose: Lightweight persistent model served by optional vLLM backend
-    defaults:
-      context_preset: 32k
-    artifacts:
-      revision: main
-      source_page_url: https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct
-      model_filename: Qwen2.5-0.5B-Instruct
-      model_url: https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct
     deployments:
       vllm_single_gpu:
         label: local/vllm_default
-        profile: vllm_rocm_single_gpu1
+        template: vllm_rocm_single_validation
         backend_model_name: Qwen2.5-0.5B-Instruct
   vllm_qwen72b_distributed:
-    mode: chat
-    family: qwen2.5
-    purpose: High-performance 72B model using tensor parallelism across 2 AMD 7900 XTX GPUs
-    defaults:
-      context_preset: 32k
-    artifacts:
-      revision: main
-      source_page_url: https://huggingface.co/Qwen/Qwen2.5-72B-Instruct
-      model_filename: Qwen2.5-72B-Instruct
-      model_url: https://huggingface.co/Qwen/Qwen2.5-72B-Instruct
     deployments:
       vllm_distributed:
-        # Disabled by default — enable explicitly when 2x AMD 7900 XTX GPUs are available
         enabled: false
         label: local/vllm_qwen72b_distributed
-        profile: vllm_rocm_tensor_parallel_2
+        template: vllm_rocm_tensor_parallel_2_validation
         backend_model_name: Qwen2.5-72B-Instruct
         vllm:
           visible_devices: "0,1"
   tiny_qwen25_test:
-    mode: chat
-    family: qwen2.5
-    purpose: Tiny test model routed through explicit ROCm llama.cpp macros
-    defaults:
-      context_preset: 32k
-      runtime_presets:
-        - jinja
-        - nothink
-    artifacts:
-      model_file: Qwen2.5-0.5B-Instruct/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf
-      revision: main
-      source_page_url: https://huggingface.co/bartowski/Qwen2.5-0.5B-Instruct-GGUF
-      model_filename: Qwen2.5-0.5B-Instruct-Q4_K_M.gguf
-      model_url: https://huggingface.co/bartowski/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf?download=true
     deployments:
       llamacpp_rocm:
         label: local/tiny_qwen25_test
-        profile: llamacpp_rocm_single_gpu1
+        template: llamacpp_rocm_single_validation
         llama_swap_model: tiny-qwen25-test
         backend_model_name: tiny-qwen25-test
-load_groups:
-  coding_active:
-    purpose: Keep the fast coding model loaded during agent and repo workflows
-    activities:
-      - coding
-      - agent
-      - repo
-    persistent: true
-    swap: false
-    exclusive: false
-    members:
-      - local/qwen27_fast
-  reasoning_active:
-    purpose: Prefer the larger reasoning model when deeper analysis is the active task
-    activities:
-      - reasoning
-      - analysis
-    persistent: false
-    swap: true
-    exclusive: false
-    members:
-      - local/qwen122_smart
-  vision_active:
-    purpose: Keep the small vision-capable model available for image tasks
-    activities:
-      - vision
-      - multimodal
-    persistent: false
-    swap: true
-    exclusive: true
-    members:
-      - local/qwen4b_vision
-  ministral_active:
-    purpose: Lightweight vision model for quick test inference and small tasks
-    activities:
-      - vision
-      - test
-    persistent: false
-    swap: true
-    exclusive: false
-    members:
-      - local/ministral3b_vision
-  tiny_test_active:
-    purpose: Keep a tiny ROCm-backed model available for smoke tests
-    activities:
-      - test
-      - smoke
-    persistent: false
-    swap: true
-    exclusive: false
-    members:
-      - local/tiny_qwen25_test

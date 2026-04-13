@@ -19,8 +19,8 @@ def test_llama_swap_command_uses_serve_and_addr() -> None:
 
     command = llama_swap_command(root, runtime)
 
-    assert command == [
-        "llama-swap",
+    assert Path(command[0]).name.lower() in {"llama-swap", "llama-swap.exe"}
+    assert command[1:] == [
         "-config",
         str((root / runtime.generated_config_path).resolve()),
         "-listen",

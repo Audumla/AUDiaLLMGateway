@@ -14,7 +14,8 @@ Complete guide to all project documentation, organized by use case and reader ty
 ### I want to understand what's supported
 1. **Features overview:** [SUPPORTED_FEATURES.md](SUPPORTED_FEATURES.md) — All 6 backends, versions, capabilities
 2. **Backend reference:** [BACKEND_VERSIONS.md](BACKEND_VERSIONS.md) — Complete version matrix and compatibility
-3. **Performance details:** [PREBUILT_BINARIES_STRATEGY.md](PREBUILT_BINARIES_STRATEGY.md) — Boot times and caching
+3. **Backend registry:** [BACKEND_REGISTRY.md](BACKEND_REGISTRY.md) — Managed lanes, rollout states, and update workflow
+4. **Performance details:** [PREBUILT_BINARIES_STRATEGY.md](PREBUILT_BINARIES_STRATEGY.md) — Boot times and caching
 
 ### I want to deploy to production
 1. **Docker deployment:** [docker.md](docker.md) — Production profiles and configurations
@@ -29,8 +30,18 @@ Complete guide to all project documentation, organized by use case and reader ty
 
 ### I want to test the system
 1. **Manual testing:** [MANUAL_TESTING_INSTRUCTIONS.md](MANUAL_TESTING_INSTRUCTIONS.md) — Step-by-step testing procedures
-2. **Testing framework:** [TEST_AUTOSTART.md](TEST_AUTOSTART.md) — 4-phase validation approach
-3. **Docker auto-start:** [DOCKER_AUTOSTART.md](DOCKER_AUTOSTART.md) — Testing Docker-specific behavior
+2. **Validation framework:** [TEST_AUTOSTART.md](TEST_AUTOSTART.md) — 4-phase validation approach
+3. **Docker validation:** [DOCKER_AUTOSTART.md](DOCKER_AUTOSTART.md) — Docker-specific validation behavior
+
+### I want to benchmark the gateway
+1. **Benchmark capability:** [RUNNING_TESTS.md](RUNNING_TESTS.md) — Validation runs and benchmark workflow
+2. **Performance notes:** [llm-backend-performance.md](llm-backend-performance.md) — Historical backend optimization notes
+3. **Backend registry:** [BACKEND_REGISTRY.md](BACKEND_REGISTRY.md) — Lanes, rollout states, and benchmark promotion workflow
+
+### I am an AI agent
+1. **Agent primer:** [AGENT_PRIMER.md](AGENT_PRIMER.md) — Shortest useful starting point for new agents
+2. **Core docs:** [README.md](../../README.md) and [runbook.md](runbook.md) — deployment and config orientation
+3. **Validation and benchmark workflow:** [RUNNING_TESTS.md](RUNNING_TESTS.md) — separate validation and benchmark entry points
 
 ---
 
@@ -50,6 +61,8 @@ Complete guide to all project documentation, organized by use case and reader ty
 | -------- | ------- | -------- |
 | [PREBUILT_BINARIES_STRATEGY.md](PREBUILT_BINARIES_STRATEGY.md) | Prebuilt binary distribution, smart caching (500+ lines) | Performance optimization, understanding boot times |
 | [BACKEND_VERSIONS.md](BACKEND_VERSIONS.md) | Complete backend version reference (300+ lines) | Compatibility checks, version selection |
+| [BACKEND_REGISTRY.md](BACKEND_REGISTRY.md) | Backend lane registry and management workflow | Adding lanes, promotions, private rollout management |
+| [hardware-detection-deep-dive.md](hardware-detection-deep-dive.md) | Deep dive into GPU/CPU detection logic | Understanding how the system identifies hardware |
 | [FAILING_BUILDS_INVESTIGATION.md](FAILING_BUILDS_INVESTIGATION.md) | Root cause analysis of build failures (400+ lines) | Understanding why certain builds failed, alternative solutions |
 
 ### Deployment & Setup
@@ -74,8 +87,9 @@ Complete guide to all project documentation, organized by use case and reader ty
 
 | Document | Purpose | Best For |
 | -------- | ------- | -------- |
+| [RUNNING_TESTS.md](RUNNING_TESTS.md) | Guide to unit tests, validation runs, and benchmarks | Developers, validation and benchmarking |
 | [MANUAL_TESTING_INSTRUCTIONS.md](MANUAL_TESTING_INSTRUCTIONS.md) | 4-phase testing procedures (200+ lines) | Manual QA, validation testing |
-| [TEST_AUTOSTART.md](TEST_AUTOSTART.md) | Comprehensive testing framework (400+ lines) | Full system validation, boot testing |
+| [TEST_AUTOSTART.md](TEST_AUTOSTART.md) | Comprehensive validation framework (400+ lines) | Full system validation, boot testing |
 | [SETUP_AUTOSTART.md](SETUP_AUTOSTART.md) — Testing section | Auto-start verification steps | Validating auto-start setup |
 
 ### Diagnostics & Monitoring
@@ -93,6 +107,7 @@ Complete guide to all project documentation, organized by use case and reader ty
 | [CLAUDE.md](CLAUDE.md) | Claude AI agent instructions | Claude Code integration |
 | [AGENT.md](AGENT.md) | Agent framework instructions | Agent-based automation |
 | [AGENTS.md](AGENTS.md) | Multi-agent coordination | Distributed agent setups |
+| [AGENT_PRIMER.md](AGENT_PRIMER.md) | Short starting point for AI agents | Fast repo orientation |
 | [GEMINI.md](GEMINI.md) | Gemini-specific instructions | Gemini AI integration |
 
 ### Specifications (Detailed Design)
@@ -156,6 +171,7 @@ Technical specifications in `specifications/` directory:
 - Understanding architecture → [architecture.md](architecture.md)
 - Looking for backend details → [PREBUILT_BINARIES_STRATEGY.md](PREBUILT_BINARIES_STRATEGY.md)
 - Checking versions → [BACKEND_VERSIONS.md](BACKEND_VERSIONS.md)
+- Managing backend lanes → [BACKEND_REGISTRY.md](BACKEND_REGISTRY.md)
 
 ---
 

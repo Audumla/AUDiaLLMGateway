@@ -32,7 +32,7 @@ GENERATED_PATHS = {
     "systemd": "config/generated/systemd/audia-gateway.service",
 }
 WATCHED_SUFFIXES = {".yaml", ".yml", ".json"}
-WATCHED_FILENAMES = {"env"}
+WATCHED_FILENAMES = {"env", "env.private"}
 
 
 def _file_hash(path: Path) -> str:
@@ -157,9 +157,10 @@ class ConfigChangeHandler(FileSystemEventHandler):
 
         changed_names = {Path(path).name for path in changed_paths}
         should_reload_nginx = bool({"nginx", "nginx_index"} & changed_outputs)
-        should_restart_gateway = "litellm" in changed_outputs or "env" in changed_names
-        should_restart_vllm = "vllm" in changed_outputs or "env" in changed_names
-        should_restart_llamacpp = "backend_runtime_catalog" in changed_outputs or "env" in changed_names
+        env_changed = bool({"env", "env.private"} & changed_names)
+        should_restart_gateway = "litellm" in changed_outputs or env_changed
+        should_restart_vllm = "vllm" in changed_outputs or env_changed
+        should_restart_llamacpp = "backend_runtime_catalog" in changed_outputs or env_changed
         if should_reload_nginx:
             self._safe_action("reload nginx", lambda: self.docker.signal_container("audia-nginx", "HUP"))
         if should_restart_gateway:

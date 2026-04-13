@@ -1,5 +1,9 @@
 # LLM Backend Performance & Optimization
 
+> **Benchmarking capability.** This document tracks gateway benchmark sessions
+> and backend tuning history. Benchmarking is a separate operational capability,
+> not a unit or integration test.
+
 > **Progressive document.** Append a new dated session entry each time benchmarks are run or tuning is attempted. Keep the Summary Table updated so agents and contributors can find the current best-known configuration at a glance.
 
 ---

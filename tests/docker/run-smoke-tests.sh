@@ -12,7 +12,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-# Default set excludes integration (requires model download ~100MB)
+# Default set excludes integration (requires a real Qwen download)
 DEFAULT_TARGETS=(tumbleweed ubuntu debian fedora rocky e2e)
 
 # Expand 'all' shortcut
@@ -44,7 +44,7 @@ for target in "${TARGETS[@]}"; do
         integration)
             image="audia-integration"
             label="integration test (real inference)"
-            # Mount a model cache dir so the model isn't re-downloaded each run
+            # Mount a model cache dir so the Qwen test model isn't re-downloaded each run
             MODEL_CACHE="${AUDIA_MODEL_CACHE:-$ROOT_DIR/test-work/models}"
             mkdir -p "$MODEL_CACHE"
             run_args="--rm -v ${MODEL_CACHE}:/models -e MODEL_DIR=/models -e LITELLM_MASTER_KEY=sk-test"
@@ -61,8 +61,14 @@ for target in "${TARGETS[@]}"; do
     echo " Building + running $label"
     echo "=========================================="
 
+    build_args=()
+    if [ "$target" = "integration" ]; then
+        [ -n "${AUDIA_LLAMA_VERSION:-}" ] && build_args+=(--build-arg "LLAMA_VERSION=${AUDIA_LLAMA_VERSION}")
+        [ -n "${AUDIA_LLAMA_VARIANT:-}" ] && build_args+=(--build-arg "LLAMA_VARIANT=${AUDIA_LLAMA_VARIANT}")
+    fi
+
     # shellcheck disable=SC2086
-    if docker build --network=host -f "$dockerfile" -t "$image" "$ROOT_DIR" && \
+    if docker build --network=host "${build_args[@]}" -f "$dockerfile" -t "$image" "$ROOT_DIR" && \
        docker run $run_args "$image"; then
         echo "RESULT: $target PASSED"
         PASS=$((PASS+1))

@@ -64,7 +64,17 @@ header "Hardware Detection"
 
 HAS_NVIDIA=false
 HAS_AMD=false
+HAS_METAL=false
 HAS_VULKAN=false
+
+# macOS via system_profiler
+if [ "$(uname -s)" = "Darwin" ]; then
+    MAC_GPU=$(system_profiler SPDisplaysDataType 2>/dev/null | awk -F': ' '/Chipset Model/ {print $2}' | head -1 | xargs)
+    if [ -n "$MAC_GPU" ]; then
+        HAS_METAL=true
+        ok "macOS GPU (Metal) detected: $MAC_GPU"
+    fi
+fi
 
 if command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1; then
     HAS_NVIDIA=true
@@ -82,9 +92,55 @@ fi
 if command -v vulkaninfo >/dev/null 2>&1 && vulkaninfo --summary >/dev/null 2>&1; then
     HAS_VULKAN=true
     ok "Vulkan runtime detected"
-elif lspci 2>/dev/null | grep -qiE 'vga|display|3d'; then
+elif command -v lspci >/dev/null 2>&1 && lspci 2>/dev/null | grep -qiE 'vga|display|3d'; then
     HAS_VULKAN=true
     ok "Display adapter detected; Vulkan may be available"
+fi
+
+# AMD GFX Detection
+AUDIA_DETECTED_GFX=""
+if $HAS_AMD || $HAS_VULKAN; then
+    # 1. Try vulkaninfo --summary
+    if command -v vulkaninfo >/dev/null 2>&1; then
+        VULKAN_SUMMARY=$(vulkaninfo --summary 2>/dev/null || echo "")
+        if [[ "$VULKAN_SUMMARY" == *"vendorID"*"0x1002"* ]]; then
+            DEVICE_ID=$(echo "$VULKAN_SUMMARY" | grep -A 10 "vendorID.*0x1002" | grep "deviceID" | head -1 | grep -oP '0x[0-9a-fA-F]+' | tr '[:upper:]' '[:lower:]' || echo "")
+            case "$DEVICE_ID" in
+                "0x744c") AUDIA_DETECTED_GFX="gfx1100" ;;
+                "0x7440"|"0x7441") AUDIA_DETECTED_GFX="gfx1101" ;;
+                "0x7460"|"0x7461") AUDIA_DETECTED_GFX="gfx1102" ;;
+                "0x15bf") AUDIA_DETECTED_GFX="gfx1103" ;;
+                "0x1586") AUDIA_DETECTED_GFX="gfx1151" ;;
+                "0x75a3") AUDIA_DETECTED_GFX="gfx950" ;;
+                "0x73af"|"0x73bf") AUDIA_DETECTED_GFX="gfx1030" ;;
+                "0x73df") AUDIA_DETECTED_GFX="gfx1031" ;;
+                "0x73ff") AUDIA_DETECTED_GFX="gfx1032" ;;
+                "0x742f"|"0x743f") AUDIA_DETECTED_GFX="gfx1034" ;;
+            esac
+        fi
+    fi
+
+    # 2. Try rocm-smi fallback if GFX still unknown
+    if [ -z "$AUDIA_DETECTED_GFX" ] && command -v rocm-smi >/dev/null 2>&1; then
+        ROCM_PRODUCT=$(rocm-smi --showproductname 2>/dev/null | tr '[:upper:]' '[:lower:]' || echo "")
+        if [[ "$ROCM_PRODUCT" == *"7900"* ]]; then
+            AUDIA_DETECTED_GFX="gfx1100"
+        elif [[ "$ROCM_PRODUCT" == *"7800"* ]] || [[ "$ROCM_PRODUCT" == *"7700"* ]]; then
+            AUDIA_DETECTED_GFX="gfx1101"
+        elif [[ "$ROCM_PRODUCT" == *"6900"* ]] || [[ "$ROCM_PRODUCT" == *"6800"* ]]; then
+            AUDIA_DETECTED_GFX="gfx1030"
+        elif [[ "$ROCM_PRODUCT" == *"6700"* ]]; then
+            AUDIA_DETECTED_GFX="gfx1031"
+        elif [[ "$ROCM_PRODUCT" == *"8060"* ]]; then
+            AUDIA_DETECTED_GFX="gfx1151"
+        elif [[ "$ROCM_PRODUCT" == *"mi350"* ]]; then
+            AUDIA_DETECTED_GFX="gfx950"
+        fi
+    fi
+
+    if [ -n "$AUDIA_DETECTED_GFX" ]; then
+        ok "AMD GFX architecture detected: $AUDIA_DETECTED_GFX"
+    fi
 fi
 
 DEFAULT_BACKEND="cpu"
@@ -100,6 +156,8 @@ elif $HAS_AMD; then
     DEFAULT_ENABLE_VLLM="true"
     DEFAULT_VLLM_IMAGE="vllm/vllm-openai-rocm:latest"
     DEFAULT_LLAMA_VERSION="b8429"
+elif $HAS_METAL; then
+    DEFAULT_BACKEND="metal"
 elif $HAS_VULKAN; then
     DEFAULT_BACKEND="vulkan"
 fi
@@ -142,6 +200,9 @@ set_env_value "POSTGRES_DB" "$POSTGRES_DB"
 set_env_value "DATABASE_URL" "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@llm-db-postgres:5432/${POSTGRES_DB}"
 set_env_value "LLAMA_BACKEND" "$BACKEND"
 set_env_value "LLAMA_VERSION" "$LLAMA_VERSION"
+if [ -n "$AUDIA_DETECTED_GFX" ]; then
+    set_env_value "AUDIA_DETECTED_GFX" "$AUDIA_DETECTED_GFX"
+fi
 set_env_value "AUDIA_ENABLE_VLLM" "$ENABLE_VLLM"
 set_env_value "VLLM_IMAGE" "$VLLM_IMAGE"
 set_env_value "VLLM_MODEL" "$VLLM_MODEL"

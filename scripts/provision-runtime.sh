@@ -310,7 +310,18 @@ else
     echo "  Vulkan:                 $HAS_VULKAN"
 fi
 
-CURRENT_SIG_PREFIX="VERSION=${LLAMA_VERSION:-latest}|NV=$HAS_NVIDIA|AMD=$HAS_AMD|VK=$HAS_VULKAN"
+# Detect all GFX versions for Multi-GPU targeting
+ALL_GFX=""
+if $HAS_AMD; then
+    # We rely on the env var populated by the host-side detect-hardware.sh
+    # or the Python config loader.
+    ALL_GFX="${AUDIA_DETECTED_GFX:-}"
+    if [ -n "$ALL_GFX" ]; then
+        echo "  AMD GFX Architectures: $ALL_GFX"
+    fi
+fi
+
+CURRENT_SIG_PREFIX="VERSION=${LLAMA_VERSION:-latest}|NV=$HAS_NVIDIA|AMD=$HAS_AMD|VK=$HAS_VULKAN|GFX_ALL=$ALL_GFX"
 
 # ---------------------------------------------------------------------------
 # 1a. Ensure container-level runtime packages are present on every start.

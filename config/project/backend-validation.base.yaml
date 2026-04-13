@@ -1,0 +1,499 @@
+version: 1
+
+defaults:
+  validation_profile: quick
+  benchmark:
+    prompt: Reply with one short sentence confirming this request was handled.
+    max_tokens: 48
+    request_profile: medium_mix
+    accelerations: auto
+  benchmark_settings_profile: default
+
+benchmark_request_profiles:
+  medium_mix:
+    description: Four sustained timed requests sized to keep even fast backends busy for several seconds.
+    requests:
+      - label: medium-1
+        max_tokens: 384
+      - label: medium-2
+        max_tokens: 512
+      - label: large-1
+        max_tokens: 640
+      - label: large-2
+        max_tokens: 768
+
+benchmark_settings_profiles:
+  default:
+    description: Baseline llama.cpp settings from the model catalog.
+    native:
+      runtime_presets_add: []
+
+  batch:
+    description: Add the batch runtime preset to favor throughput.
+    native:
+      runtime_presets_add:
+        - batch
+
+  batch_flash_off:
+    description: Add a combined batch profile while disabling flash attention.
+    native:
+      runtime_presets_add:
+        - batch_flash_off
+
+  cpu_throughput:
+    description: CPU-focused tuning with explicit thread counts and smaller batches.
+    native:
+      runtime_presets_add:
+        - cpu_throughput
+
+  large_context:
+    description: Expand the context window for larger prompt workloads.
+    native:
+      context_preset: 96k
+
+  cache_q8:
+    description: Use q8 cache settings to reduce cache bandwidth pressure.
+    native:
+      runtime_presets_add:
+        - cache_q8
+
+  batch_16k:
+    description: Qwen-card-aligned 16k context with the project's batch tuning preset.
+    native:
+      context_preset: 16k
+      runtime_presets_add:
+        - batch_16k
+
+  batch_cache_q8:
+    description: Batch tuning with q8 cache enabled to reduce KV bandwidth pressure.
+    native:
+      runtime_presets_add:
+        - batch_cache_q8
+
+  gpu_throughput:
+    description: GPU-focused tuning with larger batches, smaller ubatches, and q8 KV cache.
+    native:
+      runtime_presets_add:
+        - gpu_throughput
+
+profiles:
+  quick:
+    description: Fast default Qwen3.5 2B Q4 smoke model
+    docker:
+      model_name: Qwen3.5-2B-Q4_K_M.gguf
+      model_url: https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q4_K_M.gguf?download=true
+      min_size_bytes: 1000000000
+    native_models:
+      cpu: local/qwen2b_validation_cpu
+      cuda: local/qwen2b_validation_cpu
+      rocm: local/qwen2b_validation_rocm
+      vulkan: local/qwen2b_validation_vulkan
+
+  full:
+    description: Heavier Qwen3.5 4B Q8 validation model
+    docker:
+      model_name: Qwen3.5-4B-Q8_0.gguf
+      model_url: https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q8_0.gguf?download=true
+      min_size_bytes: 3000000000
+    native_models:
+      cpu: local/qwen4b_validation_cpu
+      cuda: local/qwen4b_validation_cpu
+      rocm: local/qwen4b_validation_rocm
+      vulkan: local/qwen4b_validation_vulkan
+
+targets:
+  docker-cpu:
+    enabled: true
+    transport: docker
+    backend: cpu
+    platforms:
+      - windows
+      - linux
+      - macos
+    host_accelerations:
+      - cpu
+      - cuda
+      - rocm
+      - vulkan
+
+  docker-vulkan:
+    enabled: true
+    transport: docker
+    backend: vulkan
+    platforms:
+      - linux
+    host_accelerations:
+      - vulkan
+
+  native-cpu:
+    enabled: true
+    transport: native
+    backend: cpu
+    platforms:
+      - windows
+      - linux
+      - macos
+    host_accelerations:
+      - cpu
+      - cuda
+      - rocm
+      - vulkan
+    llama_cpp_profiles:
+      windows: windows-cpu
+      linux: linux-cpu
+      macos: macos-cpu
+    fallback_targets: []
+
+  native-cuda:
+    enabled: true
+    transport: native
+    backend: cuda
+    platforms:
+      - linux
+    host_accelerations:
+      - cuda
+    llama_cpp_profiles:
+      linux: linux-cuda
+    fallback_targets: []
+
+  native-hip:
+    enabled: true
+    transport: native
+    backend: rocm
+    platforms:
+      - windows
+    host_accelerations:
+      - rocm
+    llama_cpp_profiles:
+      windows: windows-hip
+    fallback_targets:
+      - native-hip-official
+
+  native-rocm:
+    enabled: true
+    transport: native
+    backend: rocm
+    platforms:
+      - linux
+    host_accelerations:
+      - rocm
+    llama_cpp_profiles:
+      linux: linux-rocm
+    fallback_targets:
+      - native-rocm-official
+
+  native-vulkan:
+    enabled: true
+    transport: native
+    backend: vulkan
+    platforms:
+      - windows
+      - linux
+    host_accelerations:
+      - vulkan
+    llama_cpp_profiles:
+      windows: windows-vulkan
+      linux: linux-vulkan
+    fallback_targets:
+      - native-vulkan-upstream-head
+
+  native-vulkan-turboquant:
+    enabled: true
+    experimental: true
+    transport: native
+    backend: vulkan
+    platforms:
+      - windows
+      - linux
+    host_accelerations:
+      - vulkan
+    llama_cpp_profiles:
+      windows: windows-vulkan-turboquant
+      linux: linux-vulkan-turboquant
+    fallback_targets:
+      - native-vulkan-upstream-head
+
+  native-hip-turboquant:
+    enabled: true
+    experimental: true
+    transport: native
+    backend: rocm
+    platforms:
+      - windows
+    host_accelerations:
+      - rocm
+    llama_cpp_profiles:
+      windows: windows-hip-turboquant
+    fallback_targets:
+      - native-hip-official
+
+  native-rocm-turboquant:
+    enabled: true
+    experimental: true
+    transport: native
+    backend: rocm
+    platforms:
+      - linux
+    host_accelerations:
+      - rocm
+    llama_cpp_profiles:
+      linux: linux-rocm-turboquant
+    fallback_targets:
+      - native-rocm-official
+
+  native-hip-official:
+    enabled: true
+    experimental: true
+    transport: native
+    backend: rocm
+    platforms:
+      - windows
+    host_accelerations:
+      - rocm
+    llama_cpp_profiles:
+      windows: windows-hip-official
+    fallback_targets: []
+
+  native-rocm-official:
+    enabled: true
+    experimental: true
+    transport: native
+    backend: rocm
+    platforms:
+      - linux
+    host_accelerations:
+      - rocm
+    llama_cpp_profiles:
+      linux: linux-rocm-official
+    fallback_targets: []
+
+  docker-rocm-amd-full:
+    enabled: true
+    experimental: true
+    transport: docker
+    backend: rocm
+    docker_image: rocm/llama.cpp:llama.cpp-b6652.amd0_rocm7.0.0_ubuntu24.04_full
+    docker_run_mode: external-llama-server
+    platforms:
+      - linux
+    host_accelerations:
+      - rocm
+
+  docker-rocm-amd-server:
+    enabled: true
+    experimental: true
+    transport: docker
+    backend: rocm
+    docker_image: rocm/llama.cpp:llama.cpp-b6652.amd0_rocm7.0.0_ubuntu24.04_server
+    docker_run_mode: external-llama-server
+    platforms:
+      - linux
+    host_accelerations:
+      - rocm
+
+  docker-rocm-amd-light:
+    enabled: true
+    experimental: true
+    transport: docker
+    backend: rocm
+    docker_image: rocm/llama.cpp:llama.cpp-b6652.amd0_rocm7.0.0_ubuntu24.04_light
+    docker_run_mode: external-llama-server
+    platforms:
+      - linux
+    host_accelerations:
+      - rocm
+
+  native-vulkan-upstream-head:
+    enabled: true
+    experimental: true
+    transport: native
+    backend: vulkan
+    llama_version: ff5ef8278615a2462b79b50abdf3cc95cfb31c6f
+    platforms:
+      - windows
+      - linux
+    host_accelerations:
+      - vulkan
+    llama_cpp_profiles:
+      windows: windows-vulkan-upstream-head
+      linux: linux-vulkan-upstream-head
+    fallback_targets: []
+
+  native-hip-amd-validated-binary:
+    enabled: true
+    experimental: true
+    transport: native
+    backend: rocm
+    platforms:
+      - windows
+    host_accelerations:
+      - rocm
+    llama_cpp_profiles:
+      windows: windows-hip-amd-validated-binary
+    fallback_targets:
+      - native-hip-official
+
+  native-rocm-amd-validated-binary:
+    enabled: true
+    experimental: true
+    transport: native
+    backend: rocm
+    platforms:
+      - linux
+    host_accelerations:
+      - rocm
+    llama_cpp_profiles:
+      linux: linux-rocm-amd-validated-binary
+    fallback_targets:
+      - native-rocm-official
+
+  native-hip-lemonade-release:
+    enabled: true
+    experimental: true
+    transport: native
+    backend: rocm
+    platforms:
+      - windows
+    host_accelerations:
+      - rocm
+    llama_cpp_profiles:
+      windows: windows-hip-lemonade-release
+    fallback_targets:
+      - native-hip-lemonade-head
+
+  native-rocm-lemonade-release:
+    enabled: true
+    experimental: true
+    transport: native
+    backend: rocm
+    platforms:
+      - linux
+    host_accelerations:
+      - rocm
+    llama_cpp_profiles:
+      linux: linux-rocm-lemonade-release
+    fallback_targets:
+      - native-rocm-lemonade-head
+
+  native-hip-lemonade-head:
+    enabled: true
+    experimental: true
+    transport: native
+    backend: rocm
+    platforms:
+      - windows
+    host_accelerations:
+      - rocm
+    llama_cpp_profiles:
+      windows: windows-hip-lemonade-head
+    fallback_targets: []
+
+  native-rocm-lemonade-head:
+    enabled: true
+    experimental: true
+    transport: native
+    backend: rocm
+    platforms:
+      - linux
+    host_accelerations:
+      - rocm
+    llama_cpp_profiles:
+      linux: linux-rocm-lemonade-head
+    fallback_targets: []
+
+  native-hip-thetom-master:
+    enabled: true
+    experimental: true
+    transport: native
+    backend: rocm
+    platforms:
+      - windows
+    host_accelerations:
+      - rocm
+    llama_cpp_profiles:
+      windows: windows-hip-thetom-master
+    fallback_targets: []
+
+  native-rocm-domvox-integrated:
+    enabled: true
+    experimental: true
+    transport: native
+    backend: rocm
+    platforms:
+      - linux
+    host_accelerations:
+      - rocm
+    llama_cpp_profiles:
+      linux: linux-rocm-domvox-integrated
+
+  native-rocm-unixsysdev-head:
+    enabled: true
+    experimental: true
+    transport: native
+    backend: rocm
+    platforms:
+      - linux
+    host_accelerations:
+      - rocm
+    llama_cpp_profiles:
+      linux: linux-rocm-unixsysdev-head
+
+  native-rocm-unixsysdev-tq3:
+    enabled: true
+    experimental: true
+    transport: native
+    backend: rocm
+    platforms:
+      - linux
+    host_accelerations:
+      - rocm
+    llama_cpp_profiles:
+      linux: linux-rocm-unixsysdev-tq3
+
+  native-hip-carlosfundora-head:
+    enabled: true
+    experimental: true
+    transport: native
+    backend: rocm
+    platforms:
+      - windows
+    host_accelerations:
+      - rocm
+    llama_cpp_profiles:
+      windows: windows-hip-carlosfundora-head
+
+  native-vulkan-ik-release:
+    enabled: true
+    experimental: true
+    transport: native
+    backend: vulkan
+    platforms:
+      - linux
+    host_accelerations:
+      - vulkan
+    llama_cpp_profiles:
+      linux: linux-vulkan-ik-release
+
+  native-vulkan-ik-head:
+    enabled: true
+    experimental: true
+    transport: native
+    backend: vulkan
+    platforms:
+      - linux
+    host_accelerations:
+      - vulkan
+    llama_cpp_profiles:
+      linux: linux-vulkan-ik-head
+
+  native-rocm-sirmo-head:
+    enabled: true
+    experimental: true
+    transport: native
+    backend: rocm
+    platforms:
+      - linux
+    host_accelerations:
+      - rocm
+    llama_cpp_profiles:
+      linux: linux-rocm-sirmo-head

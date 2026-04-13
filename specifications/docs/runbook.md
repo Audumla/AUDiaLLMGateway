@@ -123,6 +123,34 @@ variants:
     runtime_subdir: rocm/gfx1030/lemonade
 ```
 
+Experimental Vulkan fork example (`llama-cpp-turboquant`, pinned to upstream tag `tqp-v0.1.0` published on April 8, 2026):
+
+```yaml
+profiles:
+  source-turboquant-git:
+    source_type: git
+    git_url: https://github.com/TheTom/llama-cpp-turboquant.git
+    git_ref: tqp-v0.1.0
+    version: tqp-v0.1.0
+
+  build-vulkan-git:
+    backend: vulkan
+    configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_VULKAN=ON -DCMAKE_BUILD_TYPE=Release
+    build_command: cmake --build build --config Release --parallel
+    binary_glob: build/bin/llama-server
+    library_glob: build/bin/*.so*
+    apt_packages: [git, cmake, build-essential, pkg-config]
+
+variants:
+  vulkan-turboquant:
+    profiles: [source-turboquant-git, build-vulkan-git]
+    macro: llama-server-vulkan-turboquant
+    runtime_subdir: vulkan/turboquant
+    enabled: false
+```
+
+Keep this style of forked backend variant disabled in checked-in defaults. Enable it only in your local override once you are ready to benchmark or smoke-test it on a host with working Vulkan drivers.
+
 Context presets should use human-friendly aliases like `32k`, `64k`, or `96k`. The generator can synthesize the backend context macro from the numeric token value instead of requiring an explicit `llama-swap` macro entry for every size.
 
 GPU and runtime presets should also be expressed in the catalog as structured `llama.cpp` option maps. The generator translates those into `llama-swap` macros, so the backend substrate does not own the preset semantics.
@@ -151,6 +179,36 @@ load groups, and translated preset macros are generated from the merged catalog
 rather than shipped in a separate `llama-swap` inventory.
 
 Load groups should also be defined in the shared catalog. That allows an activity-oriented grouping such as `coding_active` or `reasoning_active` to be translated into backend-specific group mechanics like `llama-swap` persistence and swap behavior.
+
+## Benchmarking capability
+
+Benchmarking is separate from validation. Validation answers whether the stack
+starts and routes correctly; benchmarking answers how a specific build, backend,
+and settings profile performs under a controlled prompt suite.
+
+Benchmark runs use the same shared model catalog and config overlays as the
+gateway, but they write their own additive history under
+`test-work/version-benchmarks/`.
+
+Common benchmark entry points:
+
+```powershell
+python scripts/run_version_benchmarks.py
+python scripts/run_backend_validation_matrix.py
+```
+
+The benchmark runner records:
+
+- lane source and exact ref
+- build profile and backend device
+- toolchain/runtime version
+- executable or package identity
+- host hardware context
+- backend/device- and route-level throughput
+
+Keep benchmark settings in `config/project/backend-validation.base.yaml` and
+model/deployment definitions in the shared model catalog. Use local overrides
+only for machine-specific deployment choices or experimental lanes.
 
 ## llama.cpp install profiles
 

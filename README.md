@@ -49,6 +49,27 @@ The root [`docker-compose.yml`](docker-compose.yml) is deployment-oriented and
 pulls published images only, so a remote host can stay a clean Docker Compose
 install without a git checkout.
 
+For a real machine, keep host-specific mounts and active deployment choices in
+ignored private overlays instead of editing tracked samples directly:
+
+```bash
+cp docker-compose.private.example.yml docker-compose.private.yml
+# create any of:
+#   config/local/stack.private.yaml
+#   config/local/models.private.yaml
+#   config/local/backend-runtime.private.yaml
+#   config/local/backend-support.private.yaml
+#   config/local/llama-swap.private.yaml
+#   config/local/mcp.private.yaml
+#   config/local/env.private
+docker compose -f docker-compose.yml -f docker-compose.private.yml config
+```
+
+The config generator automatically merges `*.private.yaml` after the tracked
+`*.override.yaml` files, and `config/local/env.private` overrides values from
+`config/local/env` when both exist. Those private files are git-ignored so the
+repo can stay sample-safe while still reproducing a real deployment.
+
 Compose service names follow the deployment naming convention:
 `llm-gateway`, `llm-server-llamacpp`, `llm-server-vllm`, and
 `llm-config-watcher`. The Docker `container_name` values remain the shorter
@@ -75,6 +96,74 @@ For local source-based Docker development, use:
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 ```
+
+For an end-to-end validation with a fast default `Qwen3.5-2B-Q4_K_M` GGUF model, run:
+
+```bash
+python scripts/run_local_backend_validation.py
+```
+
+That helper detects host acceleration, validates Docker with CPU fallback when a
+safe in-container GPU path is unavailable, and can also drive a native smoke run
+through `scripts/smoke_runner.py`. Use `--mode native` for the host backend only
+or `--mode all` to run both Docker and native validation in sequence. By default
+it uses the lighter `quick` profile (`Qwen3.5-2B-Q4_K_M`); pass
+`--validation-profile full` to switch to the heavier `Qwen3.5-4B-Q8_0` path. The
+Docker path caches the model under `test-work/models`; the native path seeds an
+isolated workspace under `test-work/native-backend-validation` and selects a
+matching `llama.cpp` installer profile automatically.
+
+### Benchmarking capability
+
+Benchmarking is a separate operational capability of the gateway, not a unit or
+integration test. It measures request throughput, route behavior, and backend
+device behavior for the current build or deployment profile, while preserving
+history so results can be compared across versions, settings profiles, and
+lanes.
+
+Run the config-driven benchmark matrix across every target that matches the
+current platform with:
+
+```bash
+python scripts/run_backend_validation_matrix.py
+```
+
+Add `--include-experimental` to include forked lanes such as
+`native-vulkan-turboquant`. The matrix writes one benchmark JSON file per target
+under `test-work/backend-validation-matrix/` plus an aggregate
+`matrix-summary.json`.
+
+Run the reusable version benchmark surface with:
+
+```bash
+python scripts/run_version_benchmarks.py
+```
+
+That benchmark surface records the exact lane source, repo/artifact, ref, build
+profile, backend device, toolchain version, and executable/package used for
+each run. The summary reports live in
+`test-work/version-benchmarks/benchmark_metrics.md` and
+`test-work/version-benchmarks/benchmark_metrics.json`, with historic snapshots
+kept alongside them.
+
+TurboQuant native validation is wired in as an experimental Vulkan target. On
+Windows, that source-build path currently needs a Vulkan SDK installation so
+CMake can find `Vulkan_LIBRARY`, `Vulkan_INCLUDE_DIR`, and `glslc`; the
+standard prebuilt Vulkan validation lane does not need that extra SDK setup.
+
+To keep that dependency sandboxed, seed a workspace-local SDK cache first:
+
+```bash
+python scripts/bootstrap_vulkan_sdk.py --source-dir "C:/VulkanSDK/1.4.x"
+```
+
+That copies the headers, libs, and `glslc` into `toolchains/vulkan-sdk/` under
+the current workspace. TurboQuant source builds then use the local cache rather
+than relying on a machine-wide SDK path.
+
+The same pattern applies to ROCm/HIP source builds: if a valid ROCm install is
+available on the machine, the benchmark/build flow copies the needed HIP
+toolchain files into `toolchains/rocm-sdk/` and reuses that cache on later runs.
 
 **Smart Binary Caching:** Backend binaries use prebuilt releases from ggml-org with smart caching — binaries are downloaded once per version change and reused on subsequent restarts. See [PREBUILT_BINARIES_STRATEGY.md](specifications/docs/PREBUILT_BINARIES_STRATEGY.md) for details.
 
@@ -112,6 +201,7 @@ Services auto-start on next logon (PostgreSQL, llama-cpp, gateway, nginx). See [
 ## Documentation
 
 **[📖 Full Documentation Index →](specifications/docs/DOCUMENTATION_INDEX.md)** — Comprehensive guide to all docs organized by use case and reader type.
+If you are an AI agent starting fresh, use [specifications/docs/AGENT_PRIMER.md](specifications/docs/AGENT_PRIMER.md) first.
 
 ### Core Docs
 
@@ -131,6 +221,7 @@ Services auto-start on next logon (PostgreSQL, llama-cpp, gateway, nginx). See [
 | [SUPPORTED_FEATURES.md](specifications/docs/SUPPORTED_FEATURES.md) | All supported backends (6 variants), versions, features, and status |
 | [PREBUILT_BINARIES_STRATEGY.md](specifications/docs/PREBUILT_BINARIES_STRATEGY.md) | Prebuilt binary distribution with smart caching (45-90s boot time) |
 | [BACKEND_VERSIONS.md](specifications/docs/BACKEND_VERSIONS.md) | Complete backend version reference and compatibility |
+| [BACKEND_REGISTRY.md](specifications/docs/BACKEND_REGISTRY.md) | Backend lane registry, rollout states, and add/update workflow |
 | [FAILING_BUILDS_INVESTIGATION.md](specifications/docs/FAILING_BUILDS_INVESTIGATION.md) | Root cause analysis and solutions for previously failing builds |
 
 ### Setup & Testing
@@ -191,6 +282,16 @@ Local override files:
 - `config/local/backend-runtime.override.yaml`
 - `config/local/llama-swap.override.yaml`
 - `config/local/mcp.override.yaml`
+
+Optional ignored private overlays:
+
+- `config/local/stack.private.yaml`
+- `config/local/models.private.yaml`
+- `config/local/backend-runtime.private.yaml`
+- `config/local/backend-support.private.yaml`
+- `config/local/llama-swap.private.yaml`
+- `config/local/mcp.private.yaml`
+- `config/local/env.private`
 
 Generated outputs:
 

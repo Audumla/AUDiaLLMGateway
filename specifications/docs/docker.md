@@ -55,6 +55,28 @@ Edit `.env` at the repo root (copy from `config/env.example` if it doesn't exist
 cp config/env.example .env
 ```
 
+For machine-specific paths or host-only mounts, keep a separate ignored compose
+overlay and ignored private config overlays instead of editing tracked samples
+directly:
+
+```bash
+cp docker-compose.private.example.yml docker-compose.private.yml
+docker compose -f docker-compose.yml -f docker-compose.private.yml config
+```
+
+Supported private config overlays under `config/local/`:
+
+- `stack.private.yaml`
+- `models.private.yaml`
+- `backend-runtime.private.yaml`
+- `backend-support.private.yaml`
+- `llama-swap.private.yaml`
+- `mcp.private.yaml`
+- `env.private`
+
+Each `*.private.yaml` file is merged after the matching tracked
+`*.override.yaml`, and `env.private` overrides keys from `env`.
+
 Set at minimum:
 
 ```dotenv
@@ -140,7 +162,8 @@ commented template files if they do not already exist:
 Then it generates `config/generated/` from `config/project/` + `config/local/` and
 starts LiteLLM. If `LITELLM_MASTER_KEY` is not already present in the container
 environment, the gateway reuses the seeded value from `config/local/env` on first
-run. Subsequent restarts skip the seed step — your edits are never overwritten.
+run. If `config/local/env.private` exists, it takes precedence over `config/local/env`.
+Subsequent restarts skip the seed step — your edits are never overwritten.
 
 To customise after first start, edit any file under `config/local/` and restart the
 gateway:
@@ -154,6 +177,106 @@ To force regeneration without restarting the full stack:
 ```bash
 ./scripts/AUDiaLLMGateway.sh generate
 ```
+
+### Local Docker Validation
+
+For a real-inference smoke test against the repo itself, use:
+
+```bash
+python scripts/run_local_backend_validation.py
+```
+
+That helper builds [`tests/docker/Dockerfile.integration`](../tests/docker/Dockerfile.integration),
+runs the default `quick` validation model `Qwen3.5-2B-Q4_K_M.gguf` in Docker, and validates:
+
+- direct `llama-server` inference
+- `llama-swap` model activation
+- LiteLLM routing through `/v1/chat/completions`
+
+Host acceleration is detected automatically. Linux hosts with `/dev/dri` can
+select the Vulkan validation image; other environments, including this Windows
+workspace, intentionally fall back to CPU for the container run. The model is
+cached under `test-work/models` so the download only happens once per workspace.
+
+To switch to the heavier 4B Q8 validation path, run:
+
+```bash
+python scripts/run_local_backend_validation.py --validation-profile full
+```
+
+For native host validation on the detected backend lane, run:
+
+```bash
+python scripts/run_local_backend_validation.py --mode native
+```
+
+For both paths in sequence, run:
+
+```bash
+python scripts/run_local_backend_validation.py --mode all
+```
+
+### Benchmarking capability
+
+Benchmarking is a gateway capability, not a test suite. It measures throughput
+and route behavior for a given build, backend, and settings profile while
+preserving historical results.
+
+For the config-driven matrix that runs every validation target matching the
+current host platform and writes benchmark JSON for each run:
+
+```bash
+python scripts/run_backend_validation_matrix.py
+```
+
+To include experimental targets such as `native-vulkan-turboquant`:
+
+```bash
+python scripts/run_backend_validation_matrix.py --include-experimental
+```
+
+Native mode seeds `test-work/native-backend-validation`, writes a temporary
+`config/local/stack.private.yaml` that selects the appropriate installer profile
+such as `windows-vulkan` or `windows-cpu`, and then drives
+[`scripts/smoke_runner.py`](../scripts/smoke_runner.py) against the sample
+validation model labels for the chosen profile:
+
+- default `quick`: `local/qwen2b_validation_vulkan` or `local/qwen2b_validation_cpu`
+- optional `full`: `local/qwen4b_validation_vulkan` or `local/qwen4b_validation_cpu`
+
+The matrix runner resolves its targets from
+`config/project/backend-validation.base.yaml` plus
+`config/local/backend-validation.override.yaml`, so adding or removing a smoke
+lane is a config change rather than a script rewrite. Successful runs emit
+per-target benchmark JSON and an aggregate `matrix-summary.json` under
+`test-work/backend-validation-matrix/`.
+
+For the reusable version benchmark catalog with explicit lane source, ref,
+backend device, toolchain version, and executable/package tracking, run:
+
+```bash
+python scripts/run_version_benchmarks.py
+```
+
+The benchmark reports live in `test-work/version-benchmarks/benchmark_metrics.md`
+and `test-work/version-benchmarks/benchmark_metrics.json`, with historic copies
+kept alongside them.
+
+TurboQuant is included as an experimental native Vulkan target. On Windows,
+that source-build path needs a Vulkan SDK installation with headers, libraries,
+and `glslc` available to CMake. Without that SDK, the target will fail during
+configure even though the normal prebuilt Vulkan validation lane works.
+
+To keep the dependency isolated, bootstrap a workspace-local SDK cache first:
+
+```bash
+python scripts/bootstrap_vulkan_sdk.py --source-dir "C:/VulkanSDK/1.4.x"
+```
+
+That writes a local copy under `toolchains/vulkan-sdk/` inside the validation
+workspace. The TurboQuant git profile uses that local cache via
+`AUDIA_VULKAN_SDK_ROOT` / `vulkan_sdk_root` instead of depending on a global SDK
+location during the actual build.
 
 ---
 
@@ -596,7 +719,28 @@ variants:
       - cmake
       - build-essential
     runtime_subdir: rocm/git-main
+
+  vulkan-turboquant:
+    backend: vulkan
+    macro: llama-server-vulkan-turboquant
+    source_type: git
+    git_url: https://github.com/TheTom/llama-cpp-turboquant.git
+    git_ref: tqp-v0.1.0
+    version: tqp-v0.1.0
+    configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_VULKAN=ON -DCMAKE_BUILD_TYPE=Release
+    build_command: cmake --build build --config Release --parallel
+    binary_glob: build/bin/llama-server
+    library_glob: build/bin/*.so*
+    apt_packages:
+      - git
+      - cmake
+      - build-essential
+      - pkg-config
+    runtime_subdir: vulkan/turboquant
+    enabled: false
 ```
+
+The `vulkan-turboquant` example above is intentionally disabled and pinned to a specific upstream tag. As of April 8, 2026, the current public TurboQuant tag is `tqp-v0.1.0`; update the tag deliberately when you want to retest the fork rather than leaving it on an unpinned branch tip.
 
 Bind a model deployment to the new variant:
 

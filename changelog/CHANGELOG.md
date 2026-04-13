@@ -565,4 +565,283 @@
 - Validated the main-branch change with sh -n for docker/gateway-entrypoint.sh and reran test_config_loading.py successfully.
 - Prepared to delete merged feature/docs branches plus the release-please branch so only clean reachable refs remain.
 
+### Add a sample pinned turboquant backend runtime lane for experimental Vulkan benchmarking. (New Feature)
+- Added reusable backend-runtime profiles for a pinned turboquant git source and a generic Vulkan source-build path.
+- Documented the disabled sample variant in backend runtime docs and the local override template.
+
+### Add real private overlay support for local config and document Docker-based private deployment workflow. (Configuration Cleanup)
+- Config loading now merges *.private.yaml overlays and env.private after tracked override files.
+- Added regression tests plus Docker Compose validation for sample private deployment overlays.
+
+### Create ignored private deployment overlays for the production-style Docker mount and pinned primary backends. (Configuration Cleanup)
+- Added docker-compose.private.yml to bind the external GGUF store into /app/models/gguf.
+- Added backend-runtime.private.yaml to pin primary ggml release versions and keep extra ROCm comparison lanes disabled.
+
+### Add a managed backend registry document with rollout states, ownership rules, and add/update workflow. (Documentation Update)
+- Created BACKEND_REGISTRY.md as the canonical lane-management document for backend sources, pins, and promotion state.
+- Linked the registry from README, DOCUMENTATION_INDEX, and BACKEND_VERSIONS.
+
+### Added a tiny Docker backend validation flow with GPU-aware CPU fallback and refreshed integration assets. (Documentation Update)
+- Added src/launcher/local_backend_validation.py and scripts/run_local_backend_validation.py for host detection and local Docker validation.
+- Updated the integration Docker image and entrypoint to work with current llama.cpp release bundles and installed llama-swap.
+- Documented the tiny validation flow in README.md and specifications/docs/docker.md, and added unit coverage in tests/test_local_backend_validation.py.
+
+### Switched the local Docker validation model to Qwen3.5-4B Q8_0 and validated the full CPU-fallback path. (Documentation Update)
+- Updated the integration Docker harness and docs to use Qwen3.5-4B-Q8_0.gguf from unsloth/Qwen3.5-4B-GGUF.
+- Adjusted readiness and response assertions so the larger Qwen validation run passes reliably while still checking token generation through llama-server, llama-swap, and LiteLLM.
+- Validated with python -m pytest tests -q and python scripts/run_local_backend_validation.py on a Vulkan-capable Windows host using CPU container fallback.
+
+### Added aggregate Docker/native local backend validation with a shared Qwen 4B Q8 smoke model. (Test Update)
+- Added native backend selection helpers plus a Qwen3.5-4B-Q8_0 validation model with CPU and Vulkan sample deployments.
+- Extended run_local_backend_validation.py to seed a native smoke workspace, install first, derive the real executable from install-state.json, and run Windows Vulkan smoke successfully.
+- Validated with python -m pytest tests -q, strict separation, and a passing native smoke run on the AMD Radeon RX 7900 GRE.
+
+### Switched local backend validation to a lighter default Qwen 2B Q4 profile while keeping the 4B Q8 path switchable. (Test Update)
+- Added tracked qwen2b_validation CPU and Vulkan sample deployments and made them the default native smoke targets.
+- Parameterized Docker validation model selection so quick and full profiles can switch between Qwen3.5-2B Q4 and Qwen3.5-4B Q8.
+- Validated with python -m pytest tests -q, shell syntax checks, strict separation, a passing quick native Vulkan smoke run, and a full-profile dry-run.
+
+### Added a config-driven backend validation matrix with benchmarked Docker/native smoke runs and experimental TurboQuant coverage. (New Feature)
+- Added backend-validation catalog files plus a matrix runner that resolves platform-appropriate validation targets and aggregates benchmark JSON outputs.
+- Extended native llama.cpp installation to support git-backed profiles so experimental Vulkan forks like TheTom TurboQuant can be exercised locally.
+- Validated the Windows Vulkan host matrix: docker-cpu and native-vulkan passed, native-cpu returned a 502 during inference, and TurboQuant failed at CMake configure because the Vulkan SDK components were not installed.
+
+### Added a sandboxed local Vulkan SDK bootstrap flow for TurboQuant source builds. (Build / Packaging)
+- Added scripts/bootstrap_vulkan_sdk.py to copy a validated Vulkan SDK subset into a workspace-local toolchain cache.
+- Updated the git-backed llama.cpp installer to consume only the local Vulkan SDK cache for profiles marked requires_vulkan_sdk, with explicit env injection for headers, library, and glslc.
+- Documented the new bootstrap workflow for TurboQuant validation and kept the repo validation green with 103 passing tests.
+
+### Added native direct llama.cpp benchmarking to compare stock Vulkan and TurboQuant without gateway overhead. (Performance Improvement, Test Update)
+- Extended scripts/smoke_runner.py to resolve the generated llama-swap command, warm a direct llama-server instance, and record a direct-llama-server benchmark row.
+- Added tests/test_smoke_runner.py and validated the native stock Vulkan and TurboQuant quick runs on Windows with Qwen3.5-2B-Q4_K_M.
+
+### Warmed the native gateway benchmark path so routed Vulkan measurements are comparable to direct llama.cpp runs. (Performance Improvement, Test Update)
+- Updated scripts/smoke_runner.py to issue a warm-up request before timed LiteLLM benchmarking and to mark benchmark rows as warm runs.
+- Validated updated stock Vulkan and TurboQuant native quick benchmarks on Windows with Qwen3.5-2B-Q4_K_M and added regression coverage in tests/test_smoke_runner.py.
+
+### Captured direct llama-swap timings in the native benchmark harness alongside gateway and direct llama.cpp measurements. (Performance Improvement, Test Update)
+- Extended scripts/smoke_runner.py to record direct-llama-swap benchmark rows and preserve upstream timings returned in the OpenAI response body.
+- Validated a live Windows Vulkan run showing llama-swap timings align with warmed wall-clock measurements and added regression coverage in tests/test_smoke_runner.py.
+
+### Implement automatic AMD GPU GFX detection for build profiles. (New Feature)
+- Added _detect_local_gfx_version helper using vulkaninfo and rocm-smi fallback.
+- Updated _collect_backend_runtime_variants to populate AUDIA_DETECTED_GFX environment variable.
+- Enhanced _substitute_env to support shell-style default value syntax \.
+- Updated rocm-gfx build profile in backend-runtime.base.yaml to use detected GFX version with fallback.
+
+### Unified AMD GPU GFX detection across setup scripts and documented the backend build strategy. (Documentation Update)
+- Ported AMD GFX detection logic (vulkaninfo/rocm-smi) to detect-hardware.sh and docker-setup.sh.
+- Updated setup scripts to populate AUDIA_DETECTED_GFX in .env for native rocm-gfx builds.
+- Created specifications/docs/llm-backend-builds.md covering the multi-tier build and hardware detection strategy.
+
+### Enhanced hardware detection for macOS (Metal) and documented the end-to-end logic. (Documentation Update)
+- Added macOS GPU detection using system_profiler in detect-hardware.sh and docker-setup.sh.
+- Improved NVIDIA and AMD detection robustness across platforms.
+- Created specifications/docs/hardware-detection-deep-dive.md for future reference.
+
+### Added Intel (SYCL, OpenVINO) and RPC profiles for future hardware support. (Documentation Update)
+- Included windows-sycl, linux-openvino, and rpc profiles in stack.base.yaml for future reference.
+- Documented Intel and distributed inference (RPC) capabilities in hardware-detection-deep-dive.md.
+- Maintained Tier 1 focus on AMD/NVIDIA/Metal while expanding Tier 2 visibility.
+
+### Updated AMD hardware matrix with RDNA 4, CDNA 4, and UMA-optimized APU profiles. (Documentation Update)
+- Included gfx1151, gfx950, and gfx1103 architecture IDs in detect-hardware.sh and docker-setup.sh.
+- Added linux-rocm-gfx1151, linux-rocm-gfx950, and linux-rocm-uma-apu profiles to stack.base.yaml.
+- Updated hardware-detection-deep-dive.md with latest AMD architecture mappings and APU optimization notes.
+
+### Automated Multi-GPU provisioning and targeting for AMD architectures. (Documentation Update)
+- Updated detect-hardware.sh to collect all AMD GFX architectures in AUDIA_DETECTED_GFX.
+- Enhanced config_loader.py to generate specific llama-swap macros for each detected GFX version.
+- Updated provision-runtime.sh to auto-provision optimized binaries for all detected architectures.
+- Documented Multi-GPU Auto-Targeting in hardware-detection-deep-dive.md.
+
+### Consolidated Multi-GPU builds into a single optimized 'fat binary'. (Documentation Update)
+- Updated rocm-gfx build profile to target all detected architectures simultaneously using semicolon-separated lists.
+- Simplified provision-runtime.sh to perform a single unified build for multi-GPU systems.
+- Enhanced config_loader.py to provide a unified llama-server-rocm-native macro.
+- Updated hardware-detection-deep-dive.md to document the fat binary optimization strategy.
+
+### Shifted to a 'Source-First' default build strategy for ROCm and Vulkan. (Documentation Update)
+- Configured ROCm and Vulkan variants to build native fat binaries from ggml-git by default.
+- Renamed prebuilt variants to rocm-prebuilt and vulkan-prebuilt as fallbacks.
+- Updated config_loader.py to prioritize native macros in llama-swap generation.
+- Updated hardware-detection-deep-dive.md to document the source-first optimization strategy.
+
+### Created documentation on how to run tests locally and in Docker. (Documentation Update)
+- Created RUNNING_TESTS.md with instructions for pytest, smoke_runner.py, and Docker CI testing.
+- Linked the new guide in DOCUMENTATION_INDEX.md.
+
+### Expanded the backend validation matrix to cover more upstream, AMD, Lemonade, and TurboQuant benchmark lanes. (Performance Improvement)
+- Added new llama.cpp install profiles for upstream head, AMD validated binaries, Lemonade builds, and additional ROCm/Vulkan forks.
+- Extended backend validation target resolution with host capability sets, per-target version/image overrides, direct-url installs, and external Docker llama-server benchmarking.
+- Verified with py_compile plus focused pytest coverage for validation resolution, matrix command generation, local validation, and installer behavior.
+
+### Expanded the benchmark matrix surface with reproducible git commit locking and verified the current Windows AMD default-model matrix live. (New Feature, Bug Fix, Test Update)
+- Added exact git_commit support to git-backed llama.cpp installer profiles so branch fetches can still lock immutable benchmarkable revisions.
+- Updated matrix pins to verified live refs/releases for upstream, TheTom, Lemonade, and carlosfundora lanes and tightened Lemonade release asset matching.
+- Ran live native matrix benchmarks on the current Windows AMD host and recorded a current default-model report with seven passing rows and five concrete host/package failures.
+
+### Fixed ROCm benchmark routing and revalidated failing backend lanes on the Windows AMD host. (Bug Fix, Test Update)
+- Added ROCm-native validation labels so HIP benchmark lanes no longer run CPU deployment args.
+- Live reruns show native-hip and native-hip-lemonade-release now pass on GPU, while remaining failures are host-prerequisite or upstream-artifact issues rather than routing bugs.
+
+### Generalized cached Vulkan SDK prerequisite handling for native Vulkan source-build lanes. (Build / Packaging, Test Update)
+- The backend matrix now forwards the cached Vulkan SDK for any native Vulkan target, not just turboquant lanes.
+- Live verification shows native-vulkan-upstream-head now builds successfully with the cached SDK and only fails later at runtime validation.
+
+### Formalized toolchain requirements for benchmark source builds and preserved skipped ROCm rows in the benchmark matrix. (New Feature)
+- Added required_toolchains metadata and ROCm SDK resolution to git-backed llama.cpp profiles.
+- Updated the backend validation matrix to skip unsupported rows cleanly instead of aborting the whole run.
+- Refreshed benchmark history for the updated versions on supported host paths.
+
+### Flag benchmark runs with suspicious backend spread or model mismatches. (Bug Fix)
+- Added anomaly detection to version benchmark reports.
+- Model-label mismatches are now surfaced for stale CPU/GPU-labelled artifacts.
+- Large route spread within the same backend file is now called out explicitly.
+
+### Record backend throughput separately from gateway transport overhead. (Bug Fix)
+- Gateway benchmark rows now carry backend-reported tok/s alongside client-observed tok/s.
+- Version benchmark reports flag runs where gateway/transport is much slower than the backend timings.
+- This helps distinguish real backend regressions from proxy buffering or routing overhead.
+
+### Capture benchmark host and target metadata in run artifacts. (New Feature)
+- Benchmark outputs now embed host CPU/memory/GPU/platform details.
+- Native and Docker benchmark runs now record the target-specific llama.cpp settings or image profile used.
+- Matrix and version-history summaries preserve the embedded benchmark context.
+
+### Add JSON and Markdown benchmark reports with checkpointed persistence. (New Feature)
+- Benchmark results now emit machine-friendly JSON and readable Markdown tables.
+- Benchmark history and reports are checkpointed during long sweeps so runs can be resumed safely.
+
+### Default smoke and benchmark routing now resolve to the 2B validation model. (Bug Fix)
+- Removed the old qwen4b_vision implicit default from the smoke runner.
+- Benchmark and smoke defaults now resolve to the profile-specific Qwen3.5 2B Q4 validation model.
+
+### Reuse matching llama.cpp installs instead of rebuilding every benchmark rerun. (Performance Improvement)
+- Installer now reuses matching install-state.json entries for unchanged llama.cpp profiles.
+- Repeated benchmark runs on the same workspace avoid redundant downloads and rebuilds unless the system or profile inputs change.
+
+### Fixed Vulkan/ROCm validation labels and expanded benchmark reporting. (Bug Fix)
+- Renamed ROCm validation backend IDs so they no longer reuse Vulkan-suffixed model names.
+- Added route-level benchmark metrics to the JSON and Markdown report outputs.
+- Refreshed the version benchmark suite so the current history reflects the corrected configs.
+
+### Auto-bootstrap Vulkan and ROCm SDK caches when available. (Build / Packaging)
+- Added a ROCm SDK bootstrap path that copies a valid source install into the workspace-local cache when hipConfig.cmake is missing.
+- Extended Vulkan SDK discovery to find common machine-local installs automatically before falling back to a manual source directory.
+- Documented the new toolchain bootstrap behavior in the README and backend build docs.
+
+### Auto-bootstrap and cache native SDKs with failure diagnostics. (Build / Packaging)
+- Added automatic ROCm SDK bootstrapping from local installs into the workspace cache when HIP builds need hipConfig.cmake.
+- Extended Vulkan SDK discovery to reuse common machine-local installs and keep the cache sticky across reruns.
+- Captured install cache metadata and failure hints in benchmark context so reruns avoid rebuilding and failed builds explain why.
+
+### Capture the backend GPU/device selection in benchmark artifacts and reports. (Performance Improvement)
+- Recorded resolved llama-swap device selections such as Vulkan0 or ROCm0 in benchmark context.
+- Surfaced backend GPU/device info in the version benchmark route metrics table.
+- Kept older benchmark history readable when device metadata is absent.
+
+### Added combined batch-flash-off benchmark preset, kept benchmark reports additive with current/historic split, and added local-first llama.cpp reuse for pinned release installs so reruns do not re-download when the exact binary is already on disk. (Performance Improvement)
+- Reran the top-3 benchmark sweep and refreshed benchmark_metrics.json/.md plus the historic report companions.
+
+### Added prebuilt-to-source benchmark fallback so failing release/direct-url llama.cpp lanes can retry via their configured source-build counterparts and still record the recovery in the matrix outputs. (Performance Improvement)
+- Added regression coverage for the fallback retry path and reran the top-3 benchmark suite to refresh the additive reports.
+
+### Captured benchmark lane failure evidence and produced a doc-backed report. (Documentation Update)
+- Recorded exact runtime errors for the remaining failing lanes.
+- Added remediation notes referencing official llama.cpp build docs and the Qwen3.5-2B GGUF model card.
+- Stored the report under the machine-local artifact root.
+
+### Made benchmark reports distinguish CPU lanes from GPU lanes and added explicit preload metadata for warmup-before-benchmark runs. (Bug Fix)
+- Route reports now use the matrix target backend as the source of truth for host/stack labels.
+- Benchmark rows can now capture a preload request separately from the timed measurement.
+- Regenerated benchmark report artifacts so the markdown/json summaries reflect the new labeling rules.
+
+### Clarified benchmark throughput reporting so client round-trip rate is distinct from backend-only llama.cpp throughput. (Documentation Update)
+- Route metrics now label the measured request path as Client T/s and Round-trip s.
+- Backend T/s remains the model-only rate reported by llama.cpp timings.
+- CPU rows now render as CPU labels instead of inheriting GPU host labels.
+
+### Expanded the default benchmark request profile so timed samples run long enough to amortize gateway overhead. (Performance Improvement)
+- Increased the medium_mix suite to four sustained samples with larger max_tokens values.
+- The Markdown report remains summary-only; the JSON output still carries per-sample detail.
+- This keeps round-trip measurements closer to the 3s+ range the benchmark surface needs.
+
+### Expanded benchmark settings profiles with finer-grained llama.cpp tuning presets and a model-card-aligned 16k context profile. (Performance Improvement)
+- Added reusable runtime presets for 16k context, batch plus q8 cache, and GPU throughput tuning through the existing config overlay surface.
+- Benchmarks now exercise these settings profiles through the model catalog and config-driven deployment mechanism.
+- The rerun shows meaningful backend-only throughput differences across profiles, while gateway/transport overhead still dominates small round-trip timings.
+
+### Surface exact build identity and experimental lane status in benchmark reports. (Performance Improvement)
+- Benchmark route rows now show a clearer build label that combines the lane family, target build, and stack/version/backend identity.
+- Experimental targets are now persisted into benchmark history and rendered as yes/no in markdown and JSON reports.
+- The refreshed sweep surfaces TheTom and Lemonade-style lanes directly in the report, while the upstream head lane still fails separately during install.
+
+### Split requested model and observed model in benchmark route reporting. (Performance Improvement)
+- Route metrics now distinguish the expected benchmark model from the model string actually returned by the server.
+- This makes direct-llama-server rows easier to interpret because the service label no longer masquerades as the requested model.
+- The change does not alter benchmarking behavior; it only improves report clarity for gateway, llama-swap, and direct-server route comparisons.
+
+### Make benchmark and deployment model sources config-driven with local directory support (New Feature)
+- Added local-path/auto model source handling in the installer so mounted model directories can be copied or reused without a separate sidecar model system.
+- Added a dual-GPU ROCm deployment profile for qwen27_fast and exposed the model source metadata through published model and LiteLLM config generation.
+
+### Keep host-specific benchmark deployments out of shared production model config (Configuration Cleanup)
+- Removed the speculative qwen27 dual-ROCm deployment from the shared model catalog while keeping generic local model source support in the core config surface.
+- Updated config and installer tests to assert capability-driven metadata rather than environment-specific deployment labels.
+
+### Isolated direct-llama-server benchmarking from gateway and llama-swap and corrected its reported model label. (Bug Fix, Test Update)
+- Stopped gateway and llama-swap before launching direct-llama-server so the raw route no longer benchmarks a competing GPU workload.
+- Updated smoke tests and reran focused b8763 rocm benchmarks; native-cpu direct route now tracks much closer to direct llama-swap throughput.
+
+### Exposed exact build identity fields in benchmark reports and moved native validation model selection to config-driven resolution. (Configuration Cleanup, Test Update)
+- Benchmark report JSON and Markdown now include lane source, repo or artifact, exact ref, build profile, backend, toolchain version, and executable path or package.
+- Validation model selection now resolves from backend-validation profile native_models instead of a hardcoded Python mapping, and benchmark reports were regenerated from history.
+
+### Removed Docker-only llama-swap wrappers from the shared local override so native ROCm and Vulkan configs stay native. (Configuration Cleanup)
+- Shared local llama-swap config is now empty instead of hardcoding /app/runtime-root env wrappers.
+- Added a regression test that guards against Docker-only wrapper strings reappearing in config/local/llama-swap.override.yaml.
+- Regenerated the repo config outputs and verified Windows-native generation keeps bare executable macros.
+
+### Shortened benchmark report identity labels and removed noisy absolute paths from the main markdown table. (Configuration Cleanup)
+- Git-based lanes now prefer human refs such as branch or tag names instead of full commit IDs in the report.
+- Executable/package labels are compacted for readability while the full path remains available in structured benchmark data.
+- Regenerated benchmark report artifacts so the cleaned labels are visible in benchmark_metrics.md and benchmark_metrics.json.
+
+### Benchmark reports now prefer the actual Hugging Face source model name and keep observed server aliases separate. (Configuration Cleanup)
+- Resolved native model labels from the source catalog when possible.
+- Preserved the server-echoed model name as observed_model for debugging.
+
+### Benchmark matrix now defaults to host-capability accelerations instead of forcing rocm and vulkan everywhere. (Configuration Cleanup)
+- Added config-driven benchmark accelerations with auto resolving to supported host capabilities.
+- Kept explicit --accels overrides for remote or special-case runs.
+
+### Shared benchmark model definitions now live in the project model catalog, with local overrides reserved for deployments. (Configuration Cleanup)
+- Moved the canonical Qwen and vision model definitions into config/project/models.base.yaml.
+- Kept config/local/models.override.yaml as the deployment overlay for run-specific bindings.
+
+### Shared model catalog data and deployment presets now live in the project schema while local model overrides stay deployment-only. (Configuration Cleanup)
+- Moved framework, preset, load-group, and shared model definitions into config/project/models.base.yaml.
+- Reduced config/local/models.override.yaml to deployment bindings and run-specific deltas.
+
+### Renamed backend report label and added a CPU throughput benchmark profile (Configuration Cleanup)
+- Changed the Route Metrics column from Backend GPU to Backend Device.
+- Added a cpu_throughput runtime preset and benchmark settings profile with explicit threads and batch tuning.
+- Kept the config split slim and config-driven, with the shared runtime preset living in the project catalog.
+
+### Replaced repeated deployment blocks with reusable deployment templates (Configuration Cleanup)
+- Added deployment_templates to the shared model catalog so deployment profiles can be reused declaratively.
+- Converted local deployment overrides to template-based references instead of repeating backend shape in each block.
+- Kept the template/profile split config-driven and validated the new inheritance path with regression tests.
+
+### Separated gateway deployment docs from benchmarking capability docs (Documentation Update)
+- Updated the README, runbook, Docker guide, and doc index so benchmarking is described as a standalone gateway capability.
+- Clarified that validation smoke runs and benchmark runs are different workflows with different outputs and history.
+- Kept the shared model and deployment config guidance aligned with the config-driven setup.
+
+### Added a slim AI agent primer for faster repo orientation (Documentation Update)
+- Created specifications/docs/AGENT_PRIMER.md as the first-stop guide for new agents.
+- Linked the primer from the README and documentation index so it is easy to find.
+- Kept the primer focused on deployment, validation, benchmarking, and the small set of source files agents should read next.
+
 ---

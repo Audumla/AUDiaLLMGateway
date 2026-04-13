@@ -7,8 +7,6 @@ defaults:
   version: ${LLAMA_VERSION}
   enabled: true
   # SMART CACHING: Only build if version changes
-  # always: false means: don't rebuild on every start
-  # Rebuild triggers: version change detected, binary missing, or version mismatch
   always: false
   base_backends:
     - cpu
@@ -16,49 +14,46 @@ defaults:
     - rocm
     - vulkan
 
-profiles:
+sources:
   # === PREBUILT RELEASES (Primary - Fast & Reliable) ===
-  # These download pre-compiled binaries from GitHub releases
-  # No compilation needed - instant availability
-
-  source-ggml-release:
-    # Primary source for all standard backends
+  ggml-release:
     source_type: github_release
     repo_owner: ggml-org
     repo_name: llama.cpp
-    # Auto-selects version: llama-b*-bin-ubuntu-{backend}-x64.tar.gz
 
-  # === ALTERNATIVE GIT SOURCES (Fallback - Only if needed) ===
-  # These are available if custom builds are needed
-  # Note: Only rebuild when version changes (always: false in defaults)
-
-  source-ggml-git:
+  # === ALTERNATIVE GIT SOURCES ===
+  ggml-git:
     source_type: git
     git_url: https://github.com/ggml-org/llama.cpp.git
-    git_ref: master
-    # Fallback: compile from source if prebuilt unavailable
+    git_ref: ${LLAMA_VERSION:-master}
 
-  source-rocm-official-fixed:
-    # FIXED: Changed from 'main' (doesn't exist) to 'master'
+  turboquant-git:
+    source_type: git
+    git_url: https://github.com/TheTom/llama-cpp-turboquant.git
+    git_ref: ${TURBOQUANT_VERSION:-master}
+    version: ${TURBOQUANT_VERSION:-master}
+
+  rocm-official-fixed:
     source_type: git
     git_url: https://github.com/ROCm/llama.cpp.git
-    git_ref: master
-    # Only builds if explicitly enabled + version changed
-    # Smart cache: skips rebuild if binary exists and matches version
+    git_ref: ${ROCM_OFFICIAL_VERSION:-master}
+    version: ${ROCM_OFFICIAL_VERSION:-master}
 
-  source-rocm-official-preview:
-    # FIXED: Using explicit preview ref with smart caching
+  rocm-official-preview:
     source_type: git
     git_url: https://github.com/ROCm/llama.cpp.git
     git_ref: ${ROCM_LLAMA_CPP_PREVIEW_REF}
-    # Only builds if explicitly enabled + version changed
 
-  # === BUILD CONFIGURATION ===
-  # Only executes if: (1) explicitly enabled, (2) no cached binary, or (3) version changed
-
-  build-rocm-gfx:
+builds:
+  # === BUILD STRATEGIES ===
+  rocm-gfx:
     backend: rocm
-    configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_HIPBLAS=ON -DAMDGPU_TARGETS=gfx1030;gfx1100 -DCMAKE_HIP_ARCHITECTURES=gfx1030;gfx1100 -DCMAKE_BUILD_TYPE=Release
+    # Convert comma-separated AUDIA_DETECTED_GFX to semicolon-separated for CMake
+    configure_command: >-
+      cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_HIP=ON
+      -DAMDGPU_TARGETS="$(echo ${AUDIA_DETECTED_GFX:-gfx1030;gfx1100} | sed 's/,/;/g')"
+      -DCMAKE_HIP_ARCHITECTURES="$(echo ${AUDIA_DETECTED_GFX:-gfx1030;gfx1100} | sed 's/,/;/g')"
+      -DCMAKE_BUILD_TYPE=Release
     build_command: cmake --build build --config Release --parallel
     binary_glob: build/bin/llama-server
     library_glob: build/bin/*.so*
@@ -67,13 +62,60 @@ profiles:
       - cmake
       - build-essential
       - pkg-config
-variants:
-  # === PRIMARY BACKENDS (Prebuilt) ===
-  # These use ggml-org prebuilt binaries
-  # Fast, reliable, always available
-  # Smart caching: only re-download if version changes
 
+  vulkan-standard:
+    backend: vulkan
+    configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_VULKAN=ON -DCMAKE_BUILD_TYPE=Release
+    build_command: cmake --build build --config Release --parallel
+    binary_glob: build/bin/llama-server
+    library_glob: build/bin/*.so*
+    apt_packages:
+      - git
+      - cmake
+      - build-essential
+      - pkg-config
+
+variants:
+  # === PRIMARY BACKENDS (Source-First Native) ===
+  rocm:
+    source: ggml-git
+    build: rocm-gfx
+    macro: llama-server-rocm-native
+    runtime_subdir: rocm/native
+    enabled: true
+
+  vulkan:
+    source: ggml-git
+    build: vulkan-standard
+    macro: llama-server-vulkan-native
+    runtime_subdir: vulkan/native
+    enabled: true
+
+  # === OPTIMIZED FORKS (Source-First Native) ===
+  rocm-turboquant:
+    source: turboquant-git
+    build: rocm-gfx
+    macro: llama-server-rocm-turboquant-native
+    runtime_subdir: rocm/turboquant/native
+    enabled: true
+
+  vulkan-turboquant:
+    source: turboquant-git
+    build: vulkan-standard
+    macro: llama-server-vulkan-turboquant-native
+    runtime_subdir: vulkan/turboquant/native
+    enabled: true
+
+  rocm-official:
+    source: rocm-official-fixed
+    build: rocm-gfx
+    macro: llama-server-rocm-official-native
+    runtime_subdir: rocm/official/native
+    enabled: true
+
+  # === PREBUILT FALLBACKS ===
   cpu:
+    source: ggml-release
     backend: cpu
     macro: llama-server-cpu
     runtime_subdir: cpu
@@ -81,80 +123,25 @@ variants:
     enabled: true
 
   cuda:
+    source: ggml-release
     backend: cuda
     macro: llama-server-cuda
     runtime_subdir: cuda
     asset_pattern: ubuntu-x64\.(tar\.gz|zip)$
     enabled: true
 
-  rocm:
+  rocm-prebuilt:
+    source: ggml-release
     backend: rocm
     macro: llama-server-rocm
     runtime_subdir: rocm
     asset_pattern: ubuntu-rocm.*x64\.(tar\.gz|zip)$
     enabled: true
 
-  vulkan:
+  vulkan-prebuilt:
+    source: ggml-release
     backend: vulkan
     macro: llama-server-vulkan
     runtime_subdir: vulkan
     asset_pattern: ubuntu-vulkan.*x64\.(tar\.gz|zip)$
     enabled: true
-
-  # === SPECIALIZED ROCm VARIANTS (Now Using Prebuilt) ===
-  # These are enabled using ggml-org prebuilt binaries
-  # Uses smart caching: only downloads when version changes
-  # Fallback to Git builds available if needed (disabled by default)
-
-  rocm-gfx1100-prebuilt:
-    # Uses prebuilt ggml-org release (fast, reliable)
-    profiles:
-      - source-ggml-release  # Prebuilt releases
-    backend: rocm
-    macro: llama-server-rocm-gfx1100
-    runtime_subdir: rocm/gfx1100
-    asset_pattern: ubuntu-rocm.*x64\.(tar\.gz|zip)$
-    enabled: true  # ✅ ENABLED - Uses prebuilt
-
-  rocm-gfx1100-official-custom:
-    # Custom build from ROCm official (fallback only)
-    profiles:
-      - source-rocm-official-fixed  # Fixed: uses 'master' instead of 'main'
-      - build-rocm-gfx
-    macro: llama-server-rocm-gfx1100-official
-    runtime_subdir: rocm/gfx1100/official
-    enabled: false  # Disabled: use prebuilt instead
-    # To enable: Set enabled: true
-    # Smart cache: builds only if version changes (not every restart)
-
-  rocm-gfx1100-official-preview:
-    # Uses ggml-org prebuilt with preview ref detection
-    profiles:
-      - source-ggml-release  # Prebuilt releases
-    backend: rocm
-    macro: llama-server-rocm-gfx1100-preview
-    runtime_subdir: rocm/gfx1100/preview
-    asset_pattern: ubuntu-rocm.*x64\.(tar\.gz|zip)$
-    enabled: false  # Optional: prebuilt available
-    # Note: ROCM_LLAMA_CPP_PREVIEW_REF only applies to custom Git builds
-
-  rocm-gfx1030-prebuilt:
-    # Uses prebuilt ggml-org release (fast, reliable)
-    profiles:
-      - source-ggml-release  # Prebuilt releases
-    backend: rocm
-    macro: llama-server-rocm-gfx1030
-    runtime_subdir: rocm/gfx1030
-    asset_pattern: ubuntu-rocm.*x64\.(tar\.gz|zip)$
-    enabled: true  # ✅ ENABLED - Uses prebuilt
-
-  rocm-gfx1030-official-custom:
-    # Custom build from ROCm official (fallback only)
-    profiles:
-      - source-rocm-official-fixed  # Fixed: uses 'master' instead of 'main'
-      - build-rocm-gfx
-    macro: llama-server-rocm-gfx1030-official
-    runtime_subdir: rocm/gfx1030/official
-    enabled: false  # Disabled: use prebuilt instead
-    # To enable: Set enabled: true
-    # Smart cache: builds only if version changes (not every restart)

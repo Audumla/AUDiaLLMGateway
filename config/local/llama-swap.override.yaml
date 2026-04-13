@@ -1,7 +1,7 @@
-macros:
-  llama-server-rocm: "env LD_LIBRARY_PATH=/app/runtime-root/rocm/lib:/opt/rocm/lib ROCBLAS_TENSILE_LIBPATH=/opt/rocm/lib/rocblas/library /app/runtime-root/rocm/bin/llama-server-rocm"
-  llama-server-vulkan: "env VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/radeon_icd.json LD_LIBRARY_PATH=/app/runtime-root/vulkan/lib /app/runtime-root/vulkan/bin/llama-server-vulkan"
-  model-path: "--model /app/models/gguf"
-  mmproj-path: "--mmproj /app/models/gguf"
+# Machine-local overrides only.
+# Docker backend wrappers and model-path macros are synthesized from the
+# runtime catalog when AUDIA_DOCKER=true, so keep this file empty unless you
+# need a truly local custom override.
+macros: {}
 models: {}
 groups: {}

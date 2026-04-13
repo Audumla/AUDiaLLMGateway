@@ -36,10 +36,21 @@ header "GPU Detection"
 
 HAS_NVIDIA=false
 HAS_AMD=false
+HAS_METAL=false
 HAS_VULKAN=false
 HAS_INTEL_GPU=false
 GPU_NAMES=()
 VRAM_MB=0
+
+# macOS via system_profiler
+if [ "$(uname -s)" = "Darwin" ]; then
+    MAC_GPU=$(system_profiler SPDisplaysDataType 2>/dev/null | awk -F': ' '/Chipset Model/ {print $2}' | head -1 | xargs)
+    if [ -n "$MAC_GPU" ]; then
+        HAS_METAL=true
+        ok "macOS GPU (Metal): $MAC_GPU"
+        GPU_NAMES+=("$MAC_GPU")
+    fi
+fi
 
 # NVIDIA via nvidia-smi
 if command -v nvidia-smi >/dev/null 2>&1; then
@@ -77,13 +88,17 @@ if command -v rocm-smi >/dev/null 2>&1; then
     fi
 elif [ -e /dev/kfd ]; then
     HAS_AMD=true
-    AMD_PCI=$(lspci 2>/dev/null | grep -iE 'AMD|Radeon' || echo "")
-    if [ -n "$AMD_PCI" ]; then
-        gpu_name=$(echo "$AMD_PCI" | head -1 | sed 's/.*: //')
-        ok "AMD GPU (via /dev/kfd): $gpu_name"
-        GPU_NAMES+=("$gpu_name")
+    if command -v lspci >/dev/null 2>&1; then
+        AMD_PCI=$(lspci 2>/dev/null | grep -iE 'AMD|Radeon' || echo "")
+        if [ -n "$AMD_PCI" ]; then
+            gpu_name=$(echo "$AMD_PCI" | head -1 | sed 's/.*: //')
+            ok "AMD GPU (via /dev/kfd): $gpu_name"
+            GPU_NAMES+=("$gpu_name")
+        else
+            ok "AMD GPU (via /dev/kfd — name unknown)"
+        fi
     else
-        ok "AMD GPU (via /dev/kfd — name unknown)"
+        ok "AMD GPU (via /dev/kfd)"
     fi
 fi
 
@@ -96,10 +111,10 @@ if command -v vulkaninfo >/dev/null 2>&1; then
             ok "Vulkan device: $vk_gpu"
         done <<< "$VULKAN_GPUS"
     fi
-elif lspci 2>/dev/null | grep -qiE 'vga|display|3d'; then
+elif command -v lspci >/dev/null 2>&1; then
     # Any display adapter detected — Vulkan likely works even without vulkaninfo installed
     OTHER_GPU=$(lspci 2>/dev/null | grep -iE 'vga|display|3d' | head -1 | sed 's/.*: //')
-    if ! $HAS_NVIDIA && ! $HAS_AMD; then
+    if ! $HAS_NVIDIA && ! $HAS_AMD && ! $HAS_METAL; then
         HAS_VULKAN=true
         ok "GPU via lspci (Vulkan candidate): $OTHER_GPU"
         [[ "$OTHER_GPU" == *"Intel"* ]] && HAS_INTEL_GPU=true
@@ -109,7 +124,58 @@ elif lspci 2>/dev/null | grep -qiE 'vga|display|3d'; then
     fi
 fi
 
-if ! $HAS_NVIDIA && ! $HAS_AMD && ! $HAS_VULKAN; then
+# AMD GFX Detection
+AUDIA_DETECTED_GFX=""
+if $HAS_AMD || $HAS_VULKAN; then
+    declare -A GFX_MAP
+    # 1. Try vulkaninfo --summary
+    if command -v vulkaninfo >/dev/null 2>&1; then
+        VULKAN_SUMMARY=$(vulkaninfo --summary 2>/dev/null || echo "")
+        if [[ "$VULKAN_SUMMARY" == *"vendorID"*"0x1002"* ]]; then
+            # Extract all deviceIDs
+            DEVICE_IDS=$(echo "$VULKAN_SUMMARY" | grep -A 10 "vendorID.*0x1002" | grep "deviceID" | grep -oP '0x[0-9a-fA-F]+' | tr '[:upper:]' '[:lower:]' || echo "")
+            for dev_id in $DEVICE_IDS; do
+                case "$dev_id" in
+                    "0x744c") GFX_MAP["gfx1100"]=1 ;;
+                    "0x7440"|"0x7441") GFX_MAP["gfx1101"]=1 ;;
+                    "0x7460"|"0x7461") GFX_MAP["gfx1102"]=1 ;;
+                    "0x15bf") GFX_MAP["gfx1103"]=1 ;;
+                    "0x1586") GFX_MAP["gfx1151"]=1 ;;
+                    "0x75a3") GFX_MAP["gfx950"]=1 ;;
+                    "0x73af"|"0x73bf") GFX_MAP["gfx1030"]=1 ;;
+                    "0x73df") GFX_MAP["gfx1031"]=1 ;;
+                    "0x73ff") GFX_MAP["gfx1032"]=1 ;;
+                    "0x742f"|"0x743f") GFX_MAP["gfx1034"]=1 ;;
+                esac
+            done
+        fi
+    fi
+
+    # 2. Try rocm-smi fallback
+    if command -v rocm-smi >/dev/null 2>&1; then
+        ROCM_PRODUCTS=$(rocm-smi --showproductname 2>/dev/null | tr '[:upper:]' '[:lower:]' || echo "")
+        while IFS= read -r line; do
+            if [[ "$line" == *"7900"* ]]; then GFX_MAP["gfx1100"]=1; fi
+            if [[ "$line" == *"7800"* ]] || [[ "$line" == *"7700"* ]]; then GFX_MAP["gfx1101"]=1; fi
+            if [[ "$line" == *"6900"* ]] || [[ "$line" == *"6800"* ]]; then GFX_MAP["gfx1030"]=1; fi
+            if [[ "$line" == *"6700"* ]]; then GFX_MAP["gfx1031"]=1; fi
+            if [[ "$line" == *"8060"* ]]; then GFX_MAP["gfx1151"]=1; fi
+            if [[ "$line" == *"mi350"* ]]; then GFX_MAP["gfx950"]=1; fi
+        done <<< "$ROCM_PRODUCTS"
+    fi
+
+    if [ ${#GFX_MAP[@]} -gt 0 ]; then
+        AUDIA_DETECTED_GFX=$(echo "${!GFX_MAP[@]}" | tr ' ' ',' | sed 's/^,//;s/,$//')
+        ok "AMD GFX architectures detected: $AUDIA_DETECTED_GFX"
+        for gfx in "${!GFX_MAP[@]}"; do
+            if [[ "$gfx" == "gfx1103" ]] || [[ "$gfx" == "gfx1151" ]]; then
+                info "Detection suggests an AMD APU ($gfx). UMA-optimized backend recommended."
+            fi
+        done
+    fi
+fi
+
+if ! $HAS_NVIDIA && ! $HAS_AMD && ! $HAS_METAL && ! $HAS_VULKAN; then
     warn "No GPU detected — will run on CPU"
 fi
 
@@ -161,6 +227,9 @@ elif $HAS_AMD; then
     RECOMMENDED_BACKEND="rocm"
     info "Primary backend: ${BOLD}rocm${RESET} — AMD GPU with ROCm detected"
     info "Also available:  ${BOLD}vulkan${RESET} — set LLAMA_BACKEND=vulkan in .env to switch"
+elif $HAS_METAL; then
+    RECOMMENDED_BACKEND="metal"
+    info "Primary backend: ${BOLD}metal${RESET} — macOS GPU detected"
 elif $HAS_VULKAN; then
     RECOMMENDED_BACKEND="vulkan"
     info "Primary backend: ${BOLD}vulkan${RESET} — GPU detected, no CUDA/ROCm runtime"
@@ -203,6 +272,16 @@ if $APPLY; then
         echo "LLAMA_BACKEND=$RECOMMENDED_BACKEND" >> "$ENV_FILE"
     fi
     ok "Written LLAMA_BACKEND=$RECOMMENDED_BACKEND to .env"
+
+    if [ -n "$AUDIA_DETECTED_GFX" ]; then
+        if grep -q '^AUDIA_DETECTED_GFX=' "$ENV_FILE" 2>/dev/null; then
+            sed -i "s|^AUDIA_DETECTED_GFX=.*|AUDIA_DETECTED_GFX=$AUDIA_DETECTED_GFX|" "$ENV_FILE"
+        else
+            echo "AUDIA_DETECTED_GFX=$AUDIA_DETECTED_GFX" >> "$ENV_FILE"
+        fi
+        ok "Written AUDIA_DETECTED_GFX=$AUDIA_DETECTED_GFX to .env"
+    fi
+
     info "Restart the stack to apply: docker compose up -d"
 else
     echo

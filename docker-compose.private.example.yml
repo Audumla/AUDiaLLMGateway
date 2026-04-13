@@ -1,0 +1,20 @@
+services:
+  llm-server-llamacpp:
+    volumes:
+      # Example: mount a private GGUF store directly into the path used by model_file entries.
+      # Copy this file to docker-compose.private.yml and point PRIVATE_GGUF_ROOT at your real path.
+      - ${PRIVATE_GGUF_ROOT:-./models}:/app/models/gguf:ro
+      - ./config/generated/llama-swap:/app/config:ro
+      - ${BACKEND_RUNTIME_ROOT:-./config/data/backend-runtime}:/app/runtime-root
+      - ${BACKEND_BUILD_ROOT:-./config/data/backend-build}:/app/runtime-build-root
+
+  llm-gateway:
+    volumes:
+      - ./config/local:/app/config/local:z
+      - ./config/generated:/app/config/generated:z
+
+  llm-config-watcher:
+    volumes:
+      - ./config/local:/app/config/local:z
+      - ./config/generated:/app/config/generated:z
+      - /var/run/docker.sock:/var/run/docker.sock:z

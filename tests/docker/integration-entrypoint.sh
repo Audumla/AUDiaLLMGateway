@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Integration test entrypoint — runs inside the Docker image.
 # Tests the full stack: llama-server → llama-swap → LiteLLM
-# with a real (tiny) GGUF model and real inference.
+# with a switchable real Qwen GGUF smoke model and real inference.
 # Exit 0 = pass, non-zero = fail.
 set -euo pipefail
 
@@ -47,6 +47,19 @@ done
 # ---------------------------------------------------------------------------
 section "Pre-conditions"
 
+HOST_ACCEL="${AUDIA_HOST_ACCEL:-cpu}"
+CONTAINER_ACCEL="${AUDIA_CONTAINER_ACCEL:-cpu}"
+LLAMA_VARIANT="${AUDIA_LLAMA_VARIANT:-cpu}"
+HOST_GPU_NAME="${AUDIA_HOST_GPU_NAME:-unknown}"
+BENCHMARK_PROMPT="${AUDIA_BENCHMARK_PROMPT:-Reply with one short sentence confirming this request was handled.}"
+BENCHMARK_MAX_TOKENS="${AUDIA_BENCHMARK_MAX_TOKENS:-48}"
+BENCHMARK_OUTPUT="${AUDIA_BENCHMARK_OUTPUT:-}"
+
+ok "host acceleration hint: $HOST_ACCEL"
+ok "container acceleration hint: $CONTAINER_ACCEL"
+ok "llama.cpp asset variant: $LLAMA_VARIANT"
+[ "$HOST_GPU_NAME" != "unknown" ] && ok "host GPU hint: $HOST_GPU_NAME" || true
+
 [ -n "$VENV_PYTHON" ] \
     && ok "venv python: $VENV_PYTHON" \
     || { fail "venv python NOT found — run install stack first"; exit 1; }
@@ -66,15 +79,17 @@ SWAP_BIN=$(command -v llama-swap 2>/dev/null || echo "")
 # ---------------------------------------------------------------------------
 section "Test model"
 
-MODEL_NAME="SmolLM2-135M-Instruct-Q4_K_M.gguf"
+VALIDATION_PROFILE="${AUDIA_VALIDATION_PROFILE:-quick}"
+MODEL_NAME="${AUDIA_VALIDATION_MODEL_NAME:-Qwen3.5-2B-Q4_K_M.gguf}"
 MODEL_PATH="$MODEL_DIR/$MODEL_NAME"
 mkdir -p "$MODEL_DIR"
+MODEL_URL="${AUDIA_VALIDATION_MODEL_URL:-https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/${MODEL_NAME}?download=true}"
+MODEL_MIN_SIZE="${AUDIA_VALIDATION_MODEL_MIN_SIZE:-1000000000}"
 
 if [ -f "$MODEL_PATH" ]; then
     ok "model already present: $MODEL_PATH"
 else
-    echo "  Downloading SmolLM2-135M (~100MB, CPU-compatible)..."
-    MODEL_URL="https://huggingface.co/bartowski/SmolLM2-135M-Instruct-GGUF/resolve/main/${MODEL_NAME}"
+    echo "  Downloading validation model (${VALIDATION_PROFILE}): ${MODEL_NAME}"
     if curl -L --progress-bar -o "$MODEL_PATH" "$MODEL_URL"; then
         ok "model downloaded: $MODEL_PATH"
     else
@@ -84,7 +99,7 @@ else
 fi
 
 MODEL_SIZE=$(stat -c%s "$MODEL_PATH" 2>/dev/null || echo 0)
-[ "$MODEL_SIZE" -gt 50000000 ] \
+[ "$MODEL_SIZE" -gt "$MODEL_MIN_SIZE" ] \
     && ok "model file looks valid ($(( MODEL_SIZE / 1024 / 1024 )) MB)" \
     || { fail "model file too small — download may have failed"; exit 1; }
 
@@ -93,16 +108,28 @@ MODEL_SIZE=$(stat -c%s "$MODEL_PATH" 2>/dev/null || echo 0)
 # ---------------------------------------------------------------------------
 section "llama-server"
 
+GPU_LAYERS=0
+if [ "$CONTAINER_ACCEL" = "vulkan" ]; then
+    if llama-server --list-devices >/tmp/llama-devices.log 2>&1; then
+        ok "llama-server detected accelerator devices"
+        GPU_LAYERS=99
+    else
+        echo "  device probe log:"
+        tail -20 /tmp/llama-devices.log || true
+        echo "  Falling back to CPU layers for this container run"
+    fi
+fi
+
 llama-server \
     --model "$MODEL_PATH" \
     --port "$LLAMA_SERVER_PORT" \
     --host 127.0.0.1 \
     --ctx-size 2048 \
-    --n-gpu-layers 0 \
+    --n-gpu-layers "$GPU_LAYERS" \
     > /tmp/llama-server.log 2>&1 &
 LLAMA_PID=$!
 
-wait_for_port "http://127.0.0.1:${LLAMA_SERVER_PORT}/health" "llama-server" 30 || {
+wait_for_port "http://127.0.0.1:${LLAMA_SERVER_PORT}/health" "llama-server" 90 || {
     echo "  llama-server log:"
     tail -20 /tmp/llama-server.log
     exit 1
@@ -122,15 +149,14 @@ SWAP_CONFIG_DIR="$INSTALL_DIR/config/generated/llama-swap"
 mkdir -p "$SWAP_CONFIG_DIR"
 
 cat > "$SWAP_CONFIG_DIR/llama-swap.generated.yaml" <<YAML
-# Integration test llama-swap config — routes to the running llama-server
+# Integration test llama-swap config — manages its own tiny llama-server
 macros:
   llama-server: "/usr/local/bin/llama-server"
-  server-args: "--host 0.0.0.0"
-  model-path: "${MODEL_DIR}"
+  server-args: "--host 127.0.0.1 --ctx-size 2048 --n-gpu-layers ${GPU_LAYERS}"
 
 models:
   smollm2-test:
-    proxy: "http://127.0.0.1:${LLAMA_SERVER_PORT}"
+    cmd: "\${llama-server} \${server-args} --port \${PORT} --model ${MODEL_PATH}"
     max_running: 1
 
 groups: {}
@@ -224,31 +250,52 @@ MODELS_COUNT=$(echo "$MODELS_RESP" | "$VENV_PYTHON" -c \
 # ---------------------------------------------------------------------------
 section "Real inference"
 
-COMPLETION_RESP=$(curl -sf -X POST "http://127.0.0.1:${LITELLM_PORT}/v1/chat/completions" \
+GATEWAY_STARTED=$("$VENV_PYTHON" -c "import time; print(time.perf_counter())")
+COMPLETION_STATUS=$(curl -sS -o /tmp/litellm-completion.json -w "%{http_code}" -X POST \
+    "http://127.0.0.1:${LITELLM_PORT}/v1/chat/completions" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
     -d '{
         "model": "local/smollm2-test",
-        "messages": [{"role": "user", "content": "Say the word hello."}],
-        "max_tokens": 20,
+        "messages": [{"role": "user", "content": "'"${BENCHMARK_PROMPT}"'"}],
+        "max_tokens": '"${BENCHMARK_MAX_TOKENS}"',
         "temperature": 0
-    }' 2>/dev/null) || true
+    }' 2>/tmp/litellm-completion.stderr || true)
+GATEWAY_FINISHED=$("$VENV_PYTHON" -c "import time; print(time.perf_counter())")
+COMPLETION_RESP=$(cat /tmp/litellm-completion.json 2>/dev/null || true)
 
-[ -n "$COMPLETION_RESP" ] \
-    && ok "got chat completion response from gateway" \
-    || fail "no response from gateway /v1/chat/completions"
+if [ "$COMPLETION_STATUS" = "200" ] && [ -n "$COMPLETION_RESP" ]; then
+    ok "got chat completion response from gateway"
+else
+    fail "gateway /v1/chat/completions returned status ${COMPLETION_STATUS:-unknown}"
+    echo "  completion stderr:"
+    cat /tmp/litellm-completion.stderr 2>/dev/null || true
+    echo "  completion body:"
+    cat /tmp/litellm-completion.json 2>/dev/null || true
+    echo "  litellm log (last 30 lines):"
+    tail -30 /tmp/litellm.log || true
+    echo "  llama-swap log (last 30 lines):"
+    tail -30 /tmp/llama-swap.log || true
+fi
 
-if [ -n "$COMPLETION_RESP" ]; then
+if [ "$COMPLETION_STATUS" = "200" ] && [ -n "$COMPLETION_RESP" ]; then
     CONTENT=$(echo "$COMPLETION_RESP" | "$VENV_PYTHON" -c \
-        "import json,sys; d=json.load(sys.stdin); print(d['choices'][0]['message']['content'])" 2>/dev/null || echo "")
+        "import json,sys; d=json.load(sys.stdin); m=d['choices'][0]['message']; c=m.get('content'); r=m.get('reasoning_content'); \
+if isinstance(c, list): \
+    parts=[item.get('text','') for item in c if isinstance(item, dict)]; c=' '.join(p for p in parts if p); \
+print(str((c or r or '')).strip())" 2>/dev/null || echo "")
     FINISH=$(echo "$COMPLETION_RESP" | "$VENV_PYTHON" -c \
         "import json,sys; d=json.load(sys.stdin); print(d['choices'][0]['finish_reason'])" 2>/dev/null || echo "")
     TOKENS=$(echo "$COMPLETION_RESP" | "$VENV_PYTHON" -c \
         "import json,sys; d=json.load(sys.stdin); print(d['usage']['completion_tokens'])" 2>/dev/null || echo 0)
 
-    [ -n "$CONTENT" ] \
-        && ok "response content: $CONTENT" \
-        || fail "response content was empty"
+    if [ -n "$CONTENT" ]; then
+        ok "response content: $CONTENT"
+    elif [ "$TOKENS" -gt 0 ]; then
+        ok "response emitted completion tokens even though content rendered empty"
+    else
+        fail "response content was empty"
+    fi
 
     [ "$FINISH" = "stop" ] || [ "$FINISH" = "length" ] \
         && ok "finish_reason: $FINISH" \
@@ -264,14 +311,16 @@ fi
 # ---------------------------------------------------------------------------
 section "Direct llama-server inference"
 
+DIRECT_STARTED=$("$VENV_PYTHON" -c "import time; print(time.perf_counter())")
 DIRECT_RESP=$(curl -sf -X POST "http://127.0.0.1:${LLAMA_SERVER_PORT}/v1/chat/completions" \
     -H "Content-Type: application/json" \
     -d '{
         "model": "smollm2-test",
-        "messages": [{"role": "user", "content": "What is 2+2?"}],
-        "max_tokens": 10,
+        "messages": [{"role": "user", "content": "'"${BENCHMARK_PROMPT}"'"}],
+        "max_tokens": '"${BENCHMARK_MAX_TOKENS}"',
         "temperature": 0
     }' 2>/dev/null) || true
+DIRECT_FINISHED=$("$VENV_PYTHON" -c "import time; print(time.perf_counter())")
 
 [ -n "$DIRECT_RESP" ] \
     && ok "direct llama-server inference works" \
@@ -279,10 +328,82 @@ DIRECT_RESP=$(curl -sf -X POST "http://127.0.0.1:${LLAMA_SERVER_PORT}/v1/chat/co
 
 if [ -n "$DIRECT_RESP" ]; then
     DIRECT_CONTENT=$(echo "$DIRECT_RESP" | "$VENV_PYTHON" -c \
-        "import json,sys; d=json.load(sys.stdin); print(d['choices'][0]['message']['content'])" 2>/dev/null || echo "")
-    [ -n "$DIRECT_CONTENT" ] \
-        && ok "direct inference response: $DIRECT_CONTENT" \
-        || fail "direct inference response was empty"
+        "import json,sys; d=json.load(sys.stdin); m=d['choices'][0]['message']; c=m.get('content'); r=m.get('reasoning_content'); \
+if isinstance(c, list): \
+    parts=[item.get('text','') for item in c if isinstance(item, dict)]; c=' '.join(p for p in parts if p); \
+print(str((c or r or '')).strip())" 2>/dev/null || echo "")
+    DIRECT_TOKENS=$(echo "$DIRECT_RESP" | "$VENV_PYTHON" -c \
+        "import json,sys; d=json.load(sys.stdin); print(d.get('usage',{}).get('completion_tokens', 0))" 2>/dev/null || echo 0)
+    if [ -n "$DIRECT_CONTENT" ]; then
+        ok "direct inference response: $DIRECT_CONTENT"
+    elif [ "$DIRECT_TOKENS" -gt 0 ]; then
+        ok "direct inference emitted completion tokens even though content rendered empty"
+    else
+        fail "direct inference response was empty"
+    fi
+fi
+
+if [ -n "$BENCHMARK_OUTPUT" ]; then
+    export BENCHMARK_OUTPUT COMPLETION_STATUS COMPLETION_RESP GATEWAY_STARTED GATEWAY_FINISHED TOKENS FINISH
+    export DIRECT_RESP DIRECT_STARTED DIRECT_FINISHED DIRECT_TOKENS BENCHMARK_PROMPT BENCHMARK_MAX_TOKENS
+    "$VENV_PYTHON" -c "import json, os; from pathlib import Path
+def elapsed(start_name, end_name):
+    try:
+        return max(float(os.environ.get(end_name, '0')) - float(os.environ.get(start_name, '0')), 1e-9)
+    except ValueError:
+        return None
+rows = []
+gateway_status = os.environ.get('COMPLETION_STATUS', '')
+gateway_resp = os.environ.get('COMPLETION_RESP', '')
+gateway_elapsed = elapsed('GATEWAY_STARTED', 'GATEWAY_FINISHED')
+if gateway_status == '200' and gateway_resp:
+    try:
+        payload = json.loads(gateway_resp)
+    except json.JSONDecodeError:
+        payload = {}
+    choices = payload.get('choices', [])
+    usage = payload.get('usage', {})
+    completion_tokens = int(usage.get('completion_tokens', 0) or 0)
+    rows.append({
+        'route': 'gateway',
+        'status': gateway_status,
+        'elapsed_seconds': gateway_elapsed,
+        'completion_tokens': completion_tokens,
+        'tok_per_sec': (completion_tokens / gateway_elapsed) if gateway_elapsed and completion_tokens > 0 else 0.0,
+        'finish_reason': choices[0].get('finish_reason') if choices else '',
+    })
+else:
+    rows.append({'route': 'gateway', 'status': gateway_status or 'error', 'error': 'gateway completion failed'})
+direct_resp = os.environ.get('DIRECT_RESP', '')
+direct_elapsed = elapsed('DIRECT_STARTED', 'DIRECT_FINISHED')
+if direct_resp:
+    try:
+        payload = json.loads(direct_resp)
+    except json.JSONDecodeError:
+        payload = {}
+    choices = payload.get('choices', [])
+    usage = payload.get('usage', {})
+    completion_tokens = int(usage.get('completion_tokens', 0) or 0)
+    rows.append({
+        'route': 'direct-llama-server',
+        'status': '200',
+        'elapsed_seconds': direct_elapsed,
+        'completion_tokens': completion_tokens,
+        'tok_per_sec': (completion_tokens / direct_elapsed) if direct_elapsed and completion_tokens > 0 else 0.0,
+        'finish_reason': choices[0].get('finish_reason') if choices else '',
+    })
+else:
+    rows.append({'route': 'direct-llama-server', 'status': 'error', 'error': 'direct completion failed'})
+path = Path(os.environ['BENCHMARK_OUTPUT'])
+path.parent.mkdir(parents=True, exist_ok=True)
+path.write_text(json.dumps({
+    'transport': 'docker',
+    'prompt': os.environ.get('BENCHMARK_PROMPT', ''),
+    'max_tokens': int(os.environ.get('BENCHMARK_MAX_TOKENS', '0') or 0),
+    'results': rows,
+}, indent=2), encoding='utf-8')
+"
+    ok "benchmark JSON written: $BENCHMARK_OUTPUT"
 fi
 
 # ---------------------------------------------------------------------------

@@ -1915,5 +1915,1013 @@
       "Validated the main-branch change with sh -n for docker/gateway-entrypoint.sh and reran test_config_loading.py successfully.",
       "Prepared to delete merged feature/docs branches plus the release-please branch so only clean reachable refs remain."
     ]
+  },
+  {
+    "id": "CHG-da420297",
+    "agent": "codex",
+    "change_group": "turboquant-backend",
+    "plugin_version": "unreleased",
+    "date": "2026-04-09",
+    "recorded_at": "2026-04-09T13:13:51.846400Z",
+    "summary_tags": [
+      "New Feature"
+    ],
+    "summary": "Add a sample pinned turboquant backend runtime lane for experimental Vulkan benchmarking.",
+    "details": [
+      "Added reusable backend-runtime profiles for a pinned turboquant git source and a generic Vulkan source-build path.",
+      "Documented the disabled sample variant in backend runtime docs and the local override template."
+    ]
+  },
+  {
+    "id": "CHG-da420297-1",
+    "agent": "codex",
+    "change_group": "private-overlay-docker-validation",
+    "plugin_version": "unreleased",
+    "date": "2026-04-09",
+    "recorded_at": "2026-04-09T13:32:47.103534Z",
+    "summary_tags": [
+      "Configuration Cleanup"
+    ],
+    "summary": "Add real private overlay support for local config and document Docker-based private deployment workflow.",
+    "details": [
+      "Config loading now merges *.private.yaml overlays and env.private after tracked override files.",
+      "Added regression tests plus Docker Compose validation for sample private deployment overlays."
+    ]
+  },
+  {
+    "id": "CHG-da420297-2",
+    "agent": "codex",
+    "change_group": "prod-private-overlay-files",
+    "plugin_version": "unreleased",
+    "date": "2026-04-09",
+    "recorded_at": "2026-04-09T13:38:06.427359Z",
+    "summary_tags": [
+      "Configuration Cleanup"
+    ],
+    "summary": "Create ignored private deployment overlays for the production-style Docker mount and pinned primary backends.",
+    "details": [
+      "Added docker-compose.private.yml to bind the external GGUF store into /app/models/gguf.",
+      "Added backend-runtime.private.yaml to pin primary ggml release versions and keep extra ROCm comparison lanes disabled."
+    ]
+  },
+  {
+    "id": "CHG-da420297-3",
+    "agent": "codex",
+    "change_group": "backend-registry-doc",
+    "plugin_version": "unreleased",
+    "date": "2026-04-09",
+    "recorded_at": "2026-04-09T13:41:08.604214Z",
+    "summary_tags": [
+      "Documentation Update"
+    ],
+    "summary": "Add a managed backend registry document with rollout states, ownership rules, and add/update workflow.",
+    "details": [
+      "Created BACKEND_REGISTRY.md as the canonical lane-management document for backend sources, pins, and promotion state.",
+      "Linked the registry from README, DOCUMENTATION_INDEX, and BACKEND_VERSIONS."
+    ]
+  },
+  {
+    "id": "CHG-da420297-4",
+    "agent": "codex",
+    "change_group": "local-docker-backend-validation",
+    "plugin_version": "unreleased",
+    "date": "2026-04-10",
+    "recorded_at": "2026-04-09T14:13:09.869614Z",
+    "summary_tags": [
+      "Documentation Update"
+    ],
+    "summary": "Added a tiny Docker backend validation flow with GPU-aware CPU fallback and refreshed integration assets.",
+    "details": [
+      "Added src/launcher/local_backend_validation.py and scripts/run_local_backend_validation.py for host detection and local Docker validation.",
+      "Updated the integration Docker image and entrypoint to work with current llama.cpp release bundles and installed llama-swap.",
+      "Documented the tiny validation flow in README.md and specifications/docs/docker.md, and added unit coverage in tests/test_local_backend_validation.py."
+    ]
+  },
+  {
+    "id": "CHG-da420297-5",
+    "agent": "codex",
+    "change_group": "qwen4b-q8-docker-validation",
+    "plugin_version": "unreleased",
+    "date": "2026-04-10",
+    "recorded_at": "2026-04-09T14:35:32.527072Z",
+    "summary_tags": [
+      "Documentation Update"
+    ],
+    "summary": "Switched the local Docker validation model to Qwen3.5-4B Q8_0 and validated the full CPU-fallback path.",
+    "details": [
+      "Updated the integration Docker harness and docs to use Qwen3.5-4B-Q8_0.gguf from unsloth/Qwen3.5-4B-GGUF.",
+      "Adjusted readiness and response assertions so the larger Qwen validation run passes reliably while still checking token generation through llama-server, llama-swap, and LiteLLM.",
+      "Validated with python -m pytest tests -q and python scripts/run_local_backend_validation.py on a Vulkan-capable Windows host using CPU container fallback."
+    ]
+  },
+  {
+    "id": "CHG-da420297-6",
+    "agent": "codex",
+    "change_group": "local-backend-validation-matrix",
+    "plugin_version": "unreleased",
+    "date": "2026-04-10",
+    "recorded_at": "2026-04-09T15:03:21.857208Z",
+    "summary_tags": [
+      "Test Update"
+    ],
+    "summary": "Added aggregate Docker/native local backend validation with a shared Qwen 4B Q8 smoke model.",
+    "details": [
+      "Added native backend selection helpers plus a Qwen3.5-4B-Q8_0 validation model with CPU and Vulkan sample deployments.",
+      "Extended run_local_backend_validation.py to seed a native smoke workspace, install first, derive the real executable from install-state.json, and run Windows Vulkan smoke successfully.",
+      "Validated with python -m pytest tests -q, strict separation, and a passing native smoke run on the AMD Radeon RX 7900 GRE."
+    ]
+  },
+  {
+    "id": "CHG-da420297-7",
+    "agent": "codex",
+    "change_group": "validation-profile-defaults",
+    "plugin_version": "unreleased",
+    "date": "2026-04-10",
+    "recorded_at": "2026-04-09T15:10:50.243372Z",
+    "summary_tags": [
+      "Test Update"
+    ],
+    "summary": "Switched local backend validation to a lighter default Qwen 2B Q4 profile while keeping the 4B Q8 path switchable.",
+    "details": [
+      "Added tracked qwen2b_validation CPU and Vulkan sample deployments and made them the default native smoke targets.",
+      "Parameterized Docker validation model selection so quick and full profiles can switch between Qwen3.5-2B Q4 and Qwen3.5-4B Q8.",
+      "Validated with python -m pytest tests -q, shell syntax checks, strict separation, a passing quick native Vulkan smoke run, and a full-profile dry-run."
+    ]
+  },
+  {
+    "id": "CHG-da420297-8",
+    "agent": "codex",
+    "change_group": "backend-validation-matrix",
+    "plugin_version": "unreleased",
+    "date": "2026-04-10",
+    "recorded_at": "2026-04-09T15:46:54.320602Z",
+    "summary_tags": [
+      "New Feature"
+    ],
+    "summary": "Added a config-driven backend validation matrix with benchmarked Docker/native smoke runs and experimental TurboQuant coverage.",
+    "details": [
+      "Added backend-validation catalog files plus a matrix runner that resolves platform-appropriate validation targets and aggregates benchmark JSON outputs.",
+      "Extended native llama.cpp installation to support git-backed profiles so experimental Vulkan forks like TheTom TurboQuant can be exercised locally.",
+      "Validated the Windows Vulkan host matrix: docker-cpu and native-vulkan passed, native-cpu returned a 502 during inference, and TurboQuant failed at CMake configure because the Vulkan SDK components were not installed."
+    ]
+  },
+  {
+    "id": "CHG-da420297-9",
+    "agent": "codex",
+    "change_group": "vulkan-sdk-bootstrap",
+    "plugin_version": "unreleased",
+    "date": "2026-04-10",
+    "recorded_at": "2026-04-09T23:30:42.725265Z",
+    "summary_tags": [
+      "Build / Packaging"
+    ],
+    "summary": "Added a sandboxed local Vulkan SDK bootstrap flow for TurboQuant source builds.",
+    "details": [
+      "Added scripts/bootstrap_vulkan_sdk.py to copy a validated Vulkan SDK subset into a workspace-local toolchain cache.",
+      "Updated the git-backed llama.cpp installer to consume only the local Vulkan SDK cache for profiles marked requires_vulkan_sdk, with explicit env injection for headers, library, and glslc.",
+      "Documented the new bootstrap workflow for TurboQuant validation and kept the repo validation green with 103 passing tests."
+    ]
+  },
+  {
+    "id": "CHG-da420297-10",
+    "agent": "codex",
+    "change_group": "backend-direct-benchmark",
+    "plugin_version": "unreleased",
+    "date": "2026-04-10",
+    "recorded_at": "2026-04-10T00:14:55.001787Z",
+    "summary_tags": [
+      "Performance Improvement",
+      "Test Update"
+    ],
+    "summary": "Added native direct llama.cpp benchmarking to compare stock Vulkan and TurboQuant without gateway overhead.",
+    "details": [
+      "Extended scripts/smoke_runner.py to resolve the generated llama-swap command, warm a direct llama-server instance, and record a direct-llama-server benchmark row.",
+      "Added tests/test_smoke_runner.py and validated the native stock Vulkan and TurboQuant quick runs on Windows with Qwen3.5-2B-Q4_K_M."
+    ]
+  },
+  {
+    "id": "CHG-da420297-11",
+    "agent": "codex",
+    "change_group": "backend-warm-gateway-benchmark",
+    "plugin_version": "unreleased",
+    "date": "2026-04-10",
+    "recorded_at": "2026-04-10T00:30:07.332452Z",
+    "summary_tags": [
+      "Performance Improvement",
+      "Test Update"
+    ],
+    "summary": "Warmed the native gateway benchmark path so routed Vulkan measurements are comparable to direct llama.cpp runs.",
+    "details": [
+      "Updated scripts/smoke_runner.py to issue a warm-up request before timed LiteLLM benchmarking and to mark benchmark rows as warm runs.",
+      "Validated updated stock Vulkan and TurboQuant native quick benchmarks on Windows with Qwen3.5-2B-Q4_K_M and added regression coverage in tests/test_smoke_runner.py."
+    ]
+  },
+  {
+    "id": "CHG-da420297-12",
+    "agent": "codex",
+    "change_group": "llamaswap-timings",
+    "plugin_version": "unreleased",
+    "date": "2026-04-10",
+    "recorded_at": "2026-04-10T03:37:34.769973Z",
+    "summary_tags": [
+      "Performance Improvement",
+      "Test Update"
+    ],
+    "summary": "Captured direct llama-swap timings in the native benchmark harness alongside gateway and direct llama.cpp measurements.",
+    "details": [
+      "Extended scripts/smoke_runner.py to record direct-llama-swap benchmark rows and preserve upstream timings returned in the OpenAI response body.",
+      "Validated a live Windows Vulkan run showing llama-swap timings align with warmed wall-clock measurements and added regression coverage in tests/test_smoke_runner.py."
+    ]
+  },
+  {
+    "id": "CHG-da420297-13",
+    "agent": "gemini",
+    "change_group": "detect-gpu-gfx",
+    "plugin_version": "unreleased",
+    "date": "2026-04-10",
+    "recorded_at": "2026-04-10T06:01:54.462286Z",
+    "summary_tags": [
+      "New Feature"
+    ],
+    "summary": "Implement automatic AMD GPU GFX detection for build profiles.",
+    "details": [
+      "Added _detect_local_gfx_version helper using vulkaninfo and rocm-smi fallback.",
+      "Updated _collect_backend_runtime_variants to populate AUDIA_DETECTED_GFX environment variable.",
+      "Enhanced _substitute_env to support shell-style default value syntax \\.",
+      "Updated rocm-gfx build profile in backend-runtime.base.yaml to use detected GFX version with fallback."
+    ]
+  },
+  {
+    "id": "CHG-da420297-14",
+    "agent": "gemini",
+    "change_group": "gpu-detection-builds",
+    "plugin_version": "unreleased",
+    "date": "2026-04-10",
+    "recorded_at": "2026-04-10T07:24:02.719725Z",
+    "summary_tags": [
+      "Documentation Update"
+    ],
+    "summary": "Unified AMD GPU GFX detection across setup scripts and documented the backend build strategy.",
+    "details": [
+      "Ported AMD GFX detection logic (vulkaninfo/rocm-smi) to detect-hardware.sh and docker-setup.sh.",
+      "Updated setup scripts to populate AUDIA_DETECTED_GFX in .env for native rocm-gfx builds.",
+      "Created specifications/docs/llm-backend-builds.md covering the multi-tier build and hardware detection strategy."
+    ]
+  },
+  {
+    "id": "CHG-da420297-15",
+    "agent": "gemini",
+    "change_group": "hardware-detection",
+    "plugin_version": "unreleased",
+    "date": "2026-04-10",
+    "recorded_at": "2026-04-10T09:45:03.107320Z",
+    "summary_tags": [
+      "Documentation Update"
+    ],
+    "summary": "Enhanced hardware detection for macOS (Metal) and documented the end-to-end logic.",
+    "details": [
+      "Added macOS GPU detection using system_profiler in detect-hardware.sh and docker-setup.sh.",
+      "Improved NVIDIA and AMD detection robustness across platforms.",
+      "Created specifications/docs/hardware-detection-deep-dive.md for future reference."
+    ]
+  },
+  {
+    "id": "CHG-da420297-16",
+    "agent": "gemini",
+    "change_group": "hardware-variants",
+    "plugin_version": "unreleased",
+    "date": "2026-04-10",
+    "recorded_at": "2026-04-10T09:58:09.488620Z",
+    "summary_tags": [
+      "Documentation Update"
+    ],
+    "summary": "Added Intel (SYCL, OpenVINO) and RPC profiles for future hardware support.",
+    "details": [
+      "Included windows-sycl, linux-openvino, and rpc profiles in stack.base.yaml for future reference.",
+      "Documented Intel and distributed inference (RPC) capabilities in hardware-detection-deep-dive.md.",
+      "Maintained Tier 1 focus on AMD/NVIDIA/Metal while expanding Tier 2 visibility."
+    ]
+  },
+  {
+    "id": "CHG-da420297-17",
+    "agent": "gemini",
+    "change_group": "hardware-amd-update",
+    "plugin_version": "unreleased",
+    "date": "2026-04-10",
+    "recorded_at": "2026-04-10T10:08:58.845038Z",
+    "summary_tags": [
+      "Documentation Update"
+    ],
+    "summary": "Updated AMD hardware matrix with RDNA 4, CDNA 4, and UMA-optimized APU profiles.",
+    "details": [
+      "Included gfx1151, gfx950, and gfx1103 architecture IDs in detect-hardware.sh and docker-setup.sh.",
+      "Added linux-rocm-gfx1151, linux-rocm-gfx950, and linux-rocm-uma-apu profiles to stack.base.yaml.",
+      "Updated hardware-detection-deep-dive.md with latest AMD architecture mappings and APU optimization notes."
+    ]
+  },
+  {
+    "id": "CHG-da420297-18",
+    "agent": "gemini",
+    "change_group": "hardware-multi-gpu",
+    "plugin_version": "unreleased",
+    "date": "2026-04-10",
+    "recorded_at": "2026-04-10T10:30:30.903278Z",
+    "summary_tags": [
+      "Documentation Update"
+    ],
+    "summary": "Automated Multi-GPU provisioning and targeting for AMD architectures.",
+    "details": [
+      "Updated detect-hardware.sh to collect all AMD GFX architectures in AUDIA_DETECTED_GFX.",
+      "Enhanced config_loader.py to generate specific llama-swap macros for each detected GFX version.",
+      "Updated provision-runtime.sh to auto-provision optimized binaries for all detected architectures.",
+      "Documented Multi-GPU Auto-Targeting in hardware-detection-deep-dive.md."
+    ]
+  },
+  {
+    "id": "CHG-da420297-19",
+    "agent": "gemini",
+    "change_group": "hardware-fat-binary",
+    "plugin_version": "unreleased",
+    "date": "2026-04-10",
+    "recorded_at": "2026-04-10T10:57:52.160436Z",
+    "summary_tags": [
+      "Documentation Update"
+    ],
+    "summary": "Consolidated Multi-GPU builds into a single optimized 'fat binary'.",
+    "details": [
+      "Updated rocm-gfx build profile to target all detected architectures simultaneously using semicolon-separated lists.",
+      "Simplified provision-runtime.sh to perform a single unified build for multi-GPU systems.",
+      "Enhanced config_loader.py to provide a unified llama-server-rocm-native macro.",
+      "Updated hardware-detection-deep-dive.md to document the fat binary optimization strategy."
+    ]
+  },
+  {
+    "id": "CHG-da420297-20",
+    "agent": "gemini",
+    "change_group": "hardware-source-first",
+    "plugin_version": "unreleased",
+    "date": "2026-04-10",
+    "recorded_at": "2026-04-10T13:02:40.557193Z",
+    "summary_tags": [
+      "Documentation Update"
+    ],
+    "summary": "Shifted to a 'Source-First' default build strategy for ROCm and Vulkan.",
+    "details": [
+      "Configured ROCm and Vulkan variants to build native fat binaries from ggml-git by default.",
+      "Renamed prebuilt variants to rocm-prebuilt and vulkan-prebuilt as fallbacks.",
+      "Updated config_loader.py to prioritize native macros in llama-swap generation.",
+      "Updated hardware-detection-deep-dive.md to document the source-first optimization strategy."
+    ]
+  },
+  {
+    "id": "CHG-da420297-21",
+    "agent": "gemini",
+    "change_group": "testing-docs",
+    "plugin_version": "unreleased",
+    "date": "2026-04-11",
+    "recorded_at": "2026-04-10T14:40:14.451125Z",
+    "summary_tags": [
+      "Documentation Update"
+    ],
+    "summary": "Created documentation on how to run tests locally and in Docker.",
+    "details": [
+      "Created RUNNING_TESTS.md with instructions for pytest, smoke_runner.py, and Docker CI testing.",
+      "Linked the new guide in DOCUMENTATION_INDEX.md."
+    ]
+  },
+  {
+    "id": "CHG-da420297-22",
+    "agent": "codex",
+    "change_group": "backend-validation-matrix",
+    "plugin_version": "unreleased",
+    "date": "2026-04-11",
+    "recorded_at": "2026-04-11T12:41:50.790566Z",
+    "summary_tags": [
+      "Performance Improvement"
+    ],
+    "summary": "Expanded the backend validation matrix to cover more upstream, AMD, Lemonade, and TurboQuant benchmark lanes.",
+    "details": [
+      "Added new llama.cpp install profiles for upstream head, AMD validated binaries, Lemonade builds, and additional ROCm/Vulkan forks.",
+      "Extended backend validation target resolution with host capability sets, per-target version/image overrides, direct-url installs, and external Docker llama-server benchmarking.",
+      "Verified with py_compile plus focused pytest coverage for validation resolution, matrix command generation, local validation, and installer behavior."
+    ]
+  },
+  {
+    "id": "CHG-da420297-23",
+    "agent": "codex",
+    "change_group": "benchmark-matrix-surface",
+    "plugin_version": "unreleased",
+    "date": "2026-04-12",
+    "recorded_at": "2026-04-12T01:38:01.604932Z",
+    "summary_tags": [
+      "New Feature",
+      "Bug Fix",
+      "Test Update"
+    ],
+    "summary": "Expanded the benchmark matrix surface with reproducible git commit locking and verified the current Windows AMD default-model matrix live.",
+    "details": [
+      "Added exact git_commit support to git-backed llama.cpp installer profiles so branch fetches can still lock immutable benchmarkable revisions.",
+      "Updated matrix pins to verified live refs/releases for upstream, TheTom, Lemonade, and carlosfundora lanes and tightened Lemonade release asset matching.",
+      "Ran live native matrix benchmarks on the current Windows AMD host and recorded a current default-model report with seven passing rows and five concrete host/package failures."
+    ]
+  },
+  {
+    "id": "CHG-da420297-24",
+    "agent": "codex",
+    "change_group": "backend-lane-triage",
+    "plugin_version": "unreleased",
+    "date": "2026-04-12",
+    "recorded_at": "2026-04-12T02:10:30.130104Z",
+    "summary_tags": [
+      "Bug Fix",
+      "Test Update"
+    ],
+    "summary": "Fixed ROCm benchmark routing and revalidated failing backend lanes on the Windows AMD host.",
+    "details": [
+      "Added ROCm-native validation labels so HIP benchmark lanes no longer run CPU deployment args.",
+      "Live reruns show native-hip and native-hip-lemonade-release now pass on GPU, while remaining failures are host-prerequisite or upstream-artifact issues rather than routing bugs."
+    ]
+  },
+  {
+    "id": "CHG-da420297-25",
+    "agent": "codex",
+    "change_group": "toolchain-prereq-surface",
+    "plugin_version": "unreleased",
+    "date": "2026-04-12",
+    "recorded_at": "2026-04-12T02:19:44.156163Z",
+    "summary_tags": [
+      "Build / Packaging",
+      "Test Update"
+    ],
+    "summary": "Generalized cached Vulkan SDK prerequisite handling for native Vulkan source-build lanes.",
+    "details": [
+      "The backend matrix now forwards the cached Vulkan SDK for any native Vulkan target, not just turboquant lanes.",
+      "Live verification shows native-vulkan-upstream-head now builds successfully with the cached SDK and only fails later at runtime validation."
+    ]
+  },
+  {
+    "id": "CHG-da420297-26",
+    "agent": "codex",
+    "change_group": "benchmark-surface-toolchains",
+    "plugin_version": "unreleased",
+    "date": "2026-04-12",
+    "recorded_at": "2026-04-12T04:29:02.101954Z",
+    "summary_tags": [
+      "New Feature"
+    ],
+    "summary": "Formalized toolchain requirements for benchmark source builds and preserved skipped ROCm rows in the benchmark matrix.",
+    "details": [
+      "Added required_toolchains metadata and ROCm SDK resolution to git-backed llama.cpp profiles.",
+      "Updated the backend validation matrix to skip unsupported rows cleanly instead of aborting the whole run.",
+      "Refreshed benchmark history for the updated versions on supported host paths."
+    ]
+  },
+  {
+    "id": "CHG-da420297-27",
+    "agent": "codex",
+    "change_group": "benchmark-outlier-review",
+    "plugin_version": "unreleased",
+    "date": "2026-04-12",
+    "recorded_at": "2026-04-12T04:32:45.280091Z",
+    "summary_tags": [
+      "Bug Fix"
+    ],
+    "summary": "Flag benchmark runs with suspicious backend spread or model mismatches.",
+    "details": [
+      "Added anomaly detection to version benchmark reports.",
+      "Model-label mismatches are now surfaced for stale CPU/GPU-labelled artifacts.",
+      "Large route spread within the same backend file is now called out explicitly."
+    ]
+  },
+  {
+    "id": "CHG-da420297-28",
+    "agent": "codex",
+    "change_group": "gateway-benchmark-investigation",
+    "plugin_version": "unreleased",
+    "date": "2026-04-12",
+    "recorded_at": "2026-04-12T06:01:57.284713Z",
+    "summary_tags": [
+      "Bug Fix"
+    ],
+    "summary": "Record backend throughput separately from gateway transport overhead.",
+    "details": [
+      "Gateway benchmark rows now carry backend-reported tok/s alongside client-observed tok/s.",
+      "Version benchmark reports flag runs where gateway/transport is much slower than the backend timings.",
+      "This helps distinguish real backend regressions from proxy buffering or routing overhead."
+    ]
+  },
+  {
+    "id": "CHG-da420297-29",
+    "agent": "codex",
+    "change_group": "benchmark-metadata-capture",
+    "plugin_version": "unreleased",
+    "date": "2026-04-12",
+    "recorded_at": "2026-04-12T06:05:25.691230Z",
+    "summary_tags": [
+      "New Feature"
+    ],
+    "summary": "Capture benchmark host and target metadata in run artifacts.",
+    "details": [
+      "Benchmark outputs now embed host CPU/memory/GPU/platform details.",
+      "Native and Docker benchmark runs now record the target-specific llama.cpp settings or image profile used.",
+      "Matrix and version-history summaries preserve the embedded benchmark context."
+    ]
+  },
+  {
+    "id": "CHG-da420297-30",
+    "agent": "codex",
+    "change_group": "benchmark-report",
+    "plugin_version": "unreleased",
+    "date": "2026-04-12",
+    "recorded_at": "2026-04-12T09:04:32.100943Z",
+    "summary_tags": [
+      "New Feature"
+    ],
+    "summary": "Add JSON and Markdown benchmark reports with checkpointed persistence.",
+    "details": [
+      "Benchmark results now emit machine-friendly JSON and readable Markdown tables.",
+      "Benchmark history and reports are checkpointed during long sweeps so runs can be resumed safely."
+    ]
+  },
+  {
+    "id": "CHG-da420297-31",
+    "agent": "codex",
+    "change_group": "benchmark-report",
+    "plugin_version": "unreleased",
+    "date": "2026-04-12",
+    "recorded_at": "2026-04-12T10:06:01.711290Z",
+    "summary_tags": [
+      "Bug Fix"
+    ],
+    "summary": "Default smoke and benchmark routing now resolve to the 2B validation model.",
+    "details": [
+      "Removed the old qwen4b_vision implicit default from the smoke runner.",
+      "Benchmark and smoke defaults now resolve to the profile-specific Qwen3.5 2B Q4 validation model."
+    ]
+  },
+  {
+    "id": "CHG-da420297-32",
+    "agent": "codex",
+    "change_group": "benchmark-report",
+    "plugin_version": "unreleased",
+    "date": "2026-04-12",
+    "recorded_at": "2026-04-12T10:08:51.890240Z",
+    "summary_tags": [
+      "Performance Improvement"
+    ],
+    "summary": "Reuse matching llama.cpp installs instead of rebuilding every benchmark rerun.",
+    "details": [
+      "Installer now reuses matching install-state.json entries for unchanged llama.cpp profiles.",
+      "Repeated benchmark runs on the same workspace avoid redundant downloads and rebuilds unless the system or profile inputs change."
+    ]
+  },
+  {
+    "id": "CHG-da420297-33",
+    "agent": "codex",
+    "change_group": "benchmark",
+    "plugin_version": "unreleased",
+    "date": "2026-04-12",
+    "recorded_at": "2026-04-12T10:23:27.936274Z",
+    "summary_tags": [
+      "Bug Fix"
+    ],
+    "summary": "Fixed Vulkan/ROCm validation labels and expanded benchmark reporting.",
+    "details": [
+      "Renamed ROCm validation backend IDs so they no longer reuse Vulkan-suffixed model names.",
+      "Added route-level benchmark metrics to the JSON and Markdown report outputs.",
+      "Refreshed the version benchmark suite so the current history reflects the corrected configs."
+    ]
+  },
+  {
+    "id": "CHG-da420297-34",
+    "agent": "codex",
+    "change_group": "benchmark",
+    "plugin_version": "unreleased",
+    "date": "2026-04-12",
+    "recorded_at": "2026-04-12T10:28:02.615178Z",
+    "summary_tags": [
+      "Build / Packaging"
+    ],
+    "summary": "Auto-bootstrap Vulkan and ROCm SDK caches when available.",
+    "details": [
+      "Added a ROCm SDK bootstrap path that copies a valid source install into the workspace-local cache when hipConfig.cmake is missing.",
+      "Extended Vulkan SDK discovery to find common machine-local installs automatically before falling back to a manual source directory.",
+      "Documented the new toolchain bootstrap behavior in the README and backend build docs."
+    ]
+  },
+  {
+    "id": "CHG-da420297-35",
+    "agent": "codex",
+    "change_group": "benchmark",
+    "plugin_version": "unreleased",
+    "date": "2026-04-12",
+    "recorded_at": "2026-04-12T10:30:13.784868Z",
+    "summary_tags": [
+      "Build / Packaging"
+    ],
+    "summary": "Auto-bootstrap and cache native SDKs with failure diagnostics.",
+    "details": [
+      "Added automatic ROCm SDK bootstrapping from local installs into the workspace cache when HIP builds need hipConfig.cmake.",
+      "Extended Vulkan SDK discovery to reuse common machine-local installs and keep the cache sticky across reruns.",
+      "Captured install cache metadata and failure hints in benchmark context so reruns avoid rebuilding and failed builds explain why."
+    ]
+  },
+  {
+    "id": "CHG-da420297-36",
+    "agent": "codex",
+    "change_group": "audiallmgateway-benchmark-device-capture",
+    "plugin_version": "unreleased",
+    "date": "2026-04-12",
+    "recorded_at": "2026-04-12T11:02:26.652454Z",
+    "summary_tags": [
+      "Performance Improvement"
+    ],
+    "summary": "Capture the backend GPU/device selection in benchmark artifacts and reports.",
+    "details": [
+      "Recorded resolved llama-swap device selections such as Vulkan0 or ROCm0 in benchmark context.",
+      "Surfaced backend GPU/device info in the version benchmark route metrics table.",
+      "Kept older benchmark history readable when device metadata is absent."
+    ]
+  },
+  {
+    "id": "CHG-da420297-37",
+    "agent": "codex",
+    "change_group": "audiallmgateway-benchmark-settings-cache",
+    "plugin_version": "unreleased",
+    "date": "2026-04-12",
+    "recorded_at": "2026-04-12T12:18:48.027399Z",
+    "summary_tags": [
+      "Performance Improvement"
+    ],
+    "summary": "Added combined batch-flash-off benchmark preset, kept benchmark reports additive with current/historic split, and added local-first llama.cpp reuse for pinned release installs so reruns do not re-download when the exact binary is already on disk.",
+    "details": [
+      "Reran the top-3 benchmark sweep and refreshed benchmark_metrics.json/.md plus the historic report companions."
+    ]
+  },
+  {
+    "id": "CHG-da420297-38",
+    "agent": "codex",
+    "change_group": "audiallmgateway-benchmark-prebuilt-fallb",
+    "plugin_version": "unreleased",
+    "date": "2026-04-12",
+    "recorded_at": "2026-04-12T12:45:12.762339Z",
+    "summary_tags": [
+      "Performance Improvement"
+    ],
+    "summary": "Added prebuilt-to-source benchmark fallback so failing release/direct-url llama.cpp lanes can retry via their configured source-build counterparts and still record the recovery in the matrix outputs.",
+    "details": [
+      "Added regression coverage for the fallback retry path and reran the top-3 benchmark suite to refresh the additive reports."
+    ]
+  },
+  {
+    "id": "CHG-da420297-39",
+    "agent": "codex",
+    "change_group": "lane-failure-investigation",
+    "plugin_version": "unreleased",
+    "date": "2026-04-12",
+    "recorded_at": "2026-04-12T12:52:43.554961Z",
+    "summary_tags": [
+      "Documentation Update"
+    ],
+    "summary": "Captured benchmark lane failure evidence and produced a doc-backed report.",
+    "details": [
+      "Recorded exact runtime errors for the remaining failing lanes.",
+      "Added remediation notes referencing official llama.cpp build docs and the Qwen3.5-2B GGUF model card.",
+      "Stored the report under the machine-local artifact root."
+    ]
+  },
+  {
+    "id": "CHG-da420297-40",
+    "agent": "codex",
+    "change_group": "benchmark-preload-labeling",
+    "plugin_version": "unreleased",
+    "date": "2026-04-13",
+    "recorded_at": "2026-04-12T22:45:34.557909Z",
+    "summary_tags": [
+      "Bug Fix"
+    ],
+    "summary": "Made benchmark reports distinguish CPU lanes from GPU lanes and added explicit preload metadata for warmup-before-benchmark runs.",
+    "details": [
+      "Route reports now use the matrix target backend as the source of truth for host/stack labels.",
+      "Benchmark rows can now capture a preload request separately from the timed measurement.",
+      "Regenerated benchmark report artifacts so the markdown/json summaries reflect the new labeling rules."
+    ]
+  },
+  {
+    "id": "CHG-da420297-41",
+    "agent": "codex",
+    "change_group": "benchmark-throughput-labels",
+    "plugin_version": "unreleased",
+    "date": "2026-04-13",
+    "recorded_at": "2026-04-12T22:46:49.566985Z",
+    "summary_tags": [
+      "Documentation Update"
+    ],
+    "summary": "Clarified benchmark throughput reporting so client round-trip rate is distinct from backend-only llama.cpp throughput.",
+    "details": [
+      "Route metrics now label the measured request path as Client T/s and Round-trip s.",
+      "Backend T/s remains the model-only rate reported by llama.cpp timings.",
+      "CPU rows now render as CPU labels instead of inheriting GPU host labels."
+    ]
+  },
+  {
+    "id": "CHG-da420297-42",
+    "agent": "codex",
+    "change_group": "benchmark-throughput-profiles",
+    "plugin_version": "unreleased",
+    "date": "2026-04-13",
+    "recorded_at": "2026-04-12T23:00:37.403571Z",
+    "summary_tags": [
+      "Performance Improvement"
+    ],
+    "summary": "Expanded the default benchmark request profile so timed samples run long enough to amortize gateway overhead.",
+    "details": [
+      "Increased the medium_mix suite to four sustained samples with larger max_tokens values.",
+      "The Markdown report remains summary-only; the JSON output still carries per-sample detail.",
+      "This keeps round-trip measurements closer to the 3s+ range the benchmark surface needs."
+    ]
+  },
+  {
+    "id": "CHG-da420297-43",
+    "agent": "codex",
+    "change_group": "benchmark-settings-profiles",
+    "plugin_version": "unreleased",
+    "date": "2026-04-13",
+    "recorded_at": "2026-04-12T23:25:05.236060Z",
+    "summary_tags": [
+      "Performance Improvement"
+    ],
+    "summary": "Expanded benchmark settings profiles with finer-grained llama.cpp tuning presets and a model-card-aligned 16k context profile.",
+    "details": [
+      "Added reusable runtime presets for 16k context, batch plus q8 cache, and GPU throughput tuning through the existing config overlay surface.",
+      "Benchmarks now exercise these settings profiles through the model catalog and config-driven deployment mechanism.",
+      "The rerun shows meaningful backend-only throughput differences across profiles, while gateway/transport overhead still dominates small round-trip timings."
+    ]
+  },
+  {
+    "id": "CHG-da420297-44",
+    "agent": "codex",
+    "change_group": "benchmark-settings-profiles",
+    "plugin_version": "unreleased",
+    "date": "2026-04-13",
+    "recorded_at": "2026-04-12T23:45:57.825569Z",
+    "summary_tags": [
+      "Performance Improvement"
+    ],
+    "summary": "Surface exact build identity and experimental lane status in benchmark reports.",
+    "details": [
+      "Benchmark route rows now show a clearer build label that combines the lane family, target build, and stack/version/backend identity.",
+      "Experimental targets are now persisted into benchmark history and rendered as yes/no in markdown and JSON reports.",
+      "The refreshed sweep surfaces TheTom and Lemonade-style lanes directly in the report, while the upstream head lane still fails separately during install."
+    ]
+  },
+  {
+    "id": "CHG-da420297-45",
+    "agent": "codex",
+    "change_group": "benchmark-report-clarity",
+    "plugin_version": "unreleased",
+    "date": "2026-04-13",
+    "recorded_at": "2026-04-12T23:49:11.259073Z",
+    "summary_tags": [
+      "Performance Improvement"
+    ],
+    "summary": "Split requested model and observed model in benchmark route reporting.",
+    "details": [
+      "Route metrics now distinguish the expected benchmark model from the model string actually returned by the server.",
+      "This makes direct-llama-server rows easier to interpret because the service label no longer masquerades as the requested model.",
+      "The change does not alter benchmarking behavior; it only improves report clarity for gateway, llama-swap, and direct-server route comparisons."
+    ]
+  },
+  {
+    "id": "CHG-da420297-46",
+    "agent": "codex",
+    "change_group": "benchmark-standalone-model-sources",
+    "plugin_version": "unreleased",
+    "date": "2026-04-13",
+    "recorded_at": "2026-04-12T23:58:27.138895Z",
+    "summary_tags": [
+      "New Feature"
+    ],
+    "summary": "Make benchmark and deployment model sources config-driven with local directory support",
+    "details": [
+      "Added local-path/auto model source handling in the installer so mounted model directories can be copied or reused without a separate sidecar model system.",
+      "Added a dual-GPU ROCm deployment profile for qwen27_fast and exposed the model source metadata through published model and LiteLLM config generation."
+    ]
+  },
+  {
+    "id": "CHG-da420297-47",
+    "agent": "codex",
+    "change_group": "config-separation-benchmark-models",
+    "plugin_version": "unreleased",
+    "date": "2026-04-13",
+    "recorded_at": "2026-04-13T00:02:08.496828Z",
+    "summary_tags": [
+      "Configuration Cleanup"
+    ],
+    "summary": "Keep host-specific benchmark deployments out of shared production model config",
+    "details": [
+      "Removed the speculative qwen27 dual-ROCm deployment from the shared model catalog while keeping generic local model source support in the core config surface.",
+      "Updated config and installer tests to assert capability-driven metadata rather than environment-specific deployment labels."
+    ]
+  },
+  {
+    "id": "CHG-da420297-48",
+    "agent": "codex",
+    "change_group": "direct-llama-server-route-fix",
+    "plugin_version": "unreleased",
+    "date": "2026-04-13",
+    "recorded_at": "2026-04-13T00:24:29.876064Z",
+    "summary_tags": [
+      "Bug Fix",
+      "Test Update"
+    ],
+    "summary": "Isolated direct-llama-server benchmarking from gateway and llama-swap and corrected its reported model label.",
+    "details": [
+      "Stopped gateway and llama-swap before launching direct-llama-server so the raw route no longer benchmarks a competing GPU workload.",
+      "Updated smoke tests and reran focused b8763 rocm benchmarks; native-cpu direct route now tracks much closer to direct llama-swap throughput."
+    ]
+  },
+  {
+    "id": "CHG-da420297-49",
+    "agent": "codex",
+    "change_group": "benchmark-report-identity-fields",
+    "plugin_version": "unreleased",
+    "date": "2026-04-13",
+    "recorded_at": "2026-04-13T00:40:41.295815Z",
+    "summary_tags": [
+      "Configuration Cleanup",
+      "Test Update"
+    ],
+    "summary": "Exposed exact build identity fields in benchmark reports and moved native validation model selection to config-driven resolution.",
+    "details": [
+      "Benchmark report JSON and Markdown now include lane source, repo or artifact, exact ref, build profile, backend, toolchain version, and executable path or package.",
+      "Validation model selection now resolves from backend-validation profile native_models instead of a hardcoded Python mapping, and benchmark reports were regenerated from history."
+    ]
+  },
+  {
+    "id": "CHG-da420297-50",
+    "agent": "codex",
+    "change_group": "benchmark-surface",
+    "plugin_version": "unreleased",
+    "date": "2026-04-13",
+    "recorded_at": "2026-04-13T01:19:45.337295Z",
+    "summary_tags": [
+      "Configuration Cleanup"
+    ],
+    "summary": "Removed Docker-only llama-swap wrappers from the shared local override so native ROCm and Vulkan configs stay native.",
+    "details": [
+      "Shared local llama-swap config is now empty instead of hardcoding /app/runtime-root env wrappers.",
+      "Added a regression test that guards against Docker-only wrapper strings reappearing in config/local/llama-swap.override.yaml.",
+      "Regenerated the repo config outputs and verified Windows-native generation keeps bare executable macros."
+    ]
+  },
+  {
+    "id": "CHG-da420297-51",
+    "agent": "codex",
+    "change_group": "benchmark-surface",
+    "plugin_version": "unreleased",
+    "date": "2026-04-13",
+    "recorded_at": "2026-04-13T01:22:30.229694Z",
+    "summary_tags": [
+      "Configuration Cleanup"
+    ],
+    "summary": "Shortened benchmark report identity labels and removed noisy absolute paths from the main markdown table.",
+    "details": [
+      "Git-based lanes now prefer human refs such as branch or tag names instead of full commit IDs in the report.",
+      "Executable/package labels are compacted for readability while the full path remains available in structured benchmark data.",
+      "Regenerated benchmark report artifacts so the cleaned labels are visible in benchmark_metrics.md and benchmark_metrics.json."
+    ]
+  },
+  {
+    "id": "CHG-da420297-52",
+    "agent": "codex",
+    "change_group": "audia-llmgateway",
+    "plugin_version": "unreleased",
+    "date": "2026-04-13",
+    "recorded_at": "2026-04-13T01:35:14.235972Z",
+    "summary_tags": [
+      "Configuration Cleanup"
+    ],
+    "summary": "Benchmark reports now prefer the actual Hugging Face source model name and keep observed server aliases separate.",
+    "details": [
+      "Resolved native model labels from the source catalog when possible.",
+      "Preserved the server-echoed model name as observed_model for debugging."
+    ]
+  },
+  {
+    "id": "CHG-da420297-53",
+    "agent": "codex",
+    "change_group": "audia-llmgateway",
+    "plugin_version": "unreleased",
+    "date": "2026-04-13",
+    "recorded_at": "2026-04-13T01:37:07.208713Z",
+    "summary_tags": [
+      "Configuration Cleanup"
+    ],
+    "summary": "Benchmark matrix now defaults to host-capability accelerations instead of forcing rocm and vulkan everywhere.",
+    "details": [
+      "Added config-driven benchmark accelerations with auto resolving to supported host capabilities.",
+      "Kept explicit --accels overrides for remote or special-case runs."
+    ]
+  },
+  {
+    "id": "CHG-da420297-54",
+    "agent": "codex",
+    "change_group": "audia-llmgateway",
+    "plugin_version": "unreleased",
+    "date": "2026-04-13",
+    "recorded_at": "2026-04-13T01:39:17.009222Z",
+    "summary_tags": [
+      "Configuration Cleanup"
+    ],
+    "summary": "Shared benchmark model definitions now live in the project model catalog, with local overrides reserved for deployments.",
+    "details": [
+      "Moved the canonical Qwen and vision model definitions into config/project/models.base.yaml.",
+      "Kept config/local/models.override.yaml as the deployment overlay for run-specific bindings."
+    ]
+  },
+  {
+    "id": "CHG-da420297-55",
+    "agent": "codex",
+    "change_group": "audia-llmgateway",
+    "plugin_version": "unreleased",
+    "date": "2026-04-13",
+    "recorded_at": "2026-04-13T01:50:57.701763Z",
+    "summary_tags": [
+      "Configuration Cleanup"
+    ],
+    "summary": "Shared model catalog data and deployment presets now live in the project schema while local model overrides stay deployment-only.",
+    "details": [
+      "Moved framework, preset, load-group, and shared model definitions into config/project/models.base.yaml.",
+      "Reduced config/local/models.override.yaml to deployment bindings and run-specific deltas."
+    ]
+  },
+  {
+    "id": "CHG-da420297-56",
+    "agent": "codex",
+    "change_group": "da420297",
+    "plugin_version": "unreleased",
+    "date": "2026-04-13",
+    "recorded_at": "2026-04-13T01:57:50.513717Z",
+    "summary_tags": [
+      "Configuration Cleanup"
+    ],
+    "summary": "Renamed backend report label and added a CPU throughput benchmark profile",
+    "details": [
+      "Changed the Route Metrics column from Backend GPU to Backend Device.",
+      "Added a cpu_throughput runtime preset and benchmark settings profile with explicit threads and batch tuning.",
+      "Kept the config split slim and config-driven, with the shared runtime preset living in the project catalog."
+    ]
+  },
+  {
+    "id": "CHG-da420297-57",
+    "agent": "codex",
+    "change_group": "da420297",
+    "plugin_version": "unreleased",
+    "date": "2026-04-13",
+    "recorded_at": "2026-04-13T02:01:18.663175Z",
+    "summary_tags": [
+      "Configuration Cleanup"
+    ],
+    "summary": "Replaced repeated deployment blocks with reusable deployment templates",
+    "details": [
+      "Added deployment_templates to the shared model catalog so deployment profiles can be reused declaratively.",
+      "Converted local deployment overrides to template-based references instead of repeating backend shape in each block.",
+      "Kept the template/profile split config-driven and validated the new inheritance path with regression tests."
+    ]
+  },
+  {
+    "id": "CHG-da420297-58",
+    "agent": "codex",
+    "change_group": "da420297",
+    "plugin_version": "unreleased",
+    "date": "2026-04-13",
+    "recorded_at": "2026-04-13T02:03:32.003647Z",
+    "summary_tags": [
+      "Documentation Update"
+    ],
+    "summary": "Separated gateway deployment docs from benchmarking capability docs",
+    "details": [
+      "Updated the README, runbook, Docker guide, and doc index so benchmarking is described as a standalone gateway capability.",
+      "Clarified that validation smoke runs and benchmark runs are different workflows with different outputs and history.",
+      "Kept the shared model and deployment config guidance aligned with the config-driven setup."
+    ]
+  },
+  {
+    "id": "CHG-da420297-59",
+    "agent": "codex",
+    "change_group": "da420297",
+    "plugin_version": "unreleased",
+    "date": "2026-04-13",
+    "recorded_at": "2026-04-13T02:06:04.843780Z",
+    "summary_tags": [
+      "Documentation Update"
+    ],
+    "summary": "Added a slim AI agent primer for faster repo orientation",
+    "details": [
+      "Created specifications/docs/AGENT_PRIMER.md as the first-stop guide for new agents.",
+      "Linked the primer from the README and documentation index so it is easy to find.",
+      "Kept the primer focused on deployment, validation, benchmarking, and the small set of source files agents should read next."
+    ]
   }
 ]

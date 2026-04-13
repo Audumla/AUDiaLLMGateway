@@ -153,6 +153,536 @@ def run_command(command: list[str], cwd: Path | None = None) -> None:
     subprocess.run(command, cwd=str(cwd) if cwd else None, check=True)
 
 
+def run_shell_command(command: str, cwd: Path | None = None, env: dict[str, str] | None = None) -> None:
+    subprocess.run(
+        command,
+        cwd=str(cwd) if cwd else None,
+        env=env,
+        shell=True,
+        check=True,
+    )
+
+
+def git_checkout_ref(
+    git_executable: str,
+    git_url: str,
+    git_ref: str,
+    destination: Path,
+    git_commit: str | None = None,
+) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    run_command([git_executable, "init", str(destination)])
+    run_command([git_executable, "-C", str(destination), "remote", "add", "origin", git_url])
+    run_command([git_executable, "-C", str(destination), "fetch", "--depth", "1", "origin", git_ref])
+    checkout_target = git_commit.strip() if git_commit and git_commit.strip() else "FETCH_HEAD"
+    run_command([git_executable, "-C", str(destination), "checkout", "--detach", checkout_target])
+
+
+def _glob_matches(root: Path, patterns: str | list[str] | tuple[str, ...] | None) -> list[Path]:
+    if patterns is None:
+        return []
+    if isinstance(patterns, str):
+        pattern_list = [patterns]
+    else:
+        pattern_list = [str(item) for item in patterns]
+    matches: list[Path] = []
+    for pattern in pattern_list:
+        if not pattern:
+            continue
+        matches.extend(path for path in root.glob(pattern) if path.exists())
+    return matches
+
+
+def _resolve_local_artifact_source(source_root: Path, relative_path: str) -> Path | None:
+    """Resolve a local model artifact from a mounted file or directory tree."""
+    if not relative_path:
+        return None
+    if source_root.is_file():
+        return source_root
+    if not source_root.exists():
+        return None
+
+    relative = Path(str(relative_path).replace("\\", "/"))
+    candidates = [
+        source_root / relative,
+        source_root / relative.name,
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    if source_root.is_dir():
+        matches = [path for path in source_root.rglob(relative.name) if path.is_file()]
+        if matches:
+            return matches[0]
+    return None
+
+
+def _copy_artifact_if_needed(source: Path, destination: Path) -> bool:
+    """Copy a file when the destination is missing or older than the source."""
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if destination.exists():
+        try:
+            source_stat = source.stat()
+            dest_stat = destination.stat()
+            if dest_stat.st_size == source_stat.st_size and dest_stat.st_mtime_ns >= source_stat.st_mtime_ns:
+                return False
+        except OSError:
+            pass
+    shutil.copy2(source, destination)
+    return True
+
+
+def _install_state_path(root: Path) -> Path:
+    return root / "state" / "install-state.json"
+
+
+def _load_previous_llama_cpp_variant(root: Path, profile_name: str) -> dict[str, Any] | None:
+    state_path = _install_state_path(root)
+    if not state_path.exists():
+        return None
+    try:
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    component_results = state.get("component_results", {})
+    if not isinstance(component_results, dict):
+        return None
+    llama_cpp = component_results.get("llama_cpp", {})
+    if not isinstance(llama_cpp, dict):
+        return None
+    variants = llama_cpp.get("variants", {})
+    if isinstance(variants, dict):
+        cached = variants.get(profile_name)
+        if isinstance(cached, dict):
+            return cached
+    if str(llama_cpp.get("profile", "")).strip() == profile_name:
+        return llama_cpp
+    return None
+
+
+def _local_llama_cpp_install_result(
+    *,
+    install_dir: Path,
+    executable_name: str,
+    system: str,
+    profile_name: str,
+    source_type: str,
+    backend: str,
+    version: str,
+    sidecar_files: list[str],
+    copy_sidecar_to_binary_dir: bool,
+) -> dict[str, Any] | None:
+    if not install_dir.exists():
+        return None
+    executable_path = install_dir / "bin" / executable_name
+    if not executable_path.exists():
+        fallback = next(install_dir.rglob(executable_name), None)
+        if fallback is None:
+            return None
+        executable_path = fallback
+
+    copied_sidecars: list[str] = []
+    if copy_sidecar_to_binary_dir and sidecar_files:
+        for source_file in sidecar_files:
+            source_path = Path(source_file)
+            if source_path.exists():
+                target_path = executable_path.parent / source_path.name
+                if target_path.exists() or target_path.is_symlink():
+                    copied_sidecars.append(str(target_path))
+                else:
+                    shutil.copy2(source_path, target_path)
+                    copied_sidecars.append(str(target_path))
+
+    result: dict[str, Any] = {
+        "system": system,
+        "provider": "github_release" if source_type == "github_release" else "direct_url",
+        "source_type": source_type,
+        "profile": profile_name,
+        "version": version,
+        "backend": backend,
+        "install_dir": str(install_dir),
+        "asset_name": "local-cache",
+        "executable_path": str(executable_path),
+        "copied_sidecars": copied_sidecars,
+        "cache_hit": True,
+    }
+    if backend == "rocm":
+        result["rocm_executable_path"] = str(executable_path)
+    return result
+
+
+def _llama_cpp_cache_signature(
+    *,
+    root: Path,
+    profile_name: str,
+    profile: dict[str, Any],
+    system: str,
+    source_type: str,
+    version: str,
+    backend: str,
+) -> dict[str, Any]:
+    toolchains = []
+    for requirement in _profile_toolchain_requirements(profile):
+        configured_root = os.environ.get("AUDIA_VULKAN_SDK_ROOT", "").strip() or str(profile.get("vulkan_sdk_root", "")).strip()
+        if requirement == "rocm_sdk":
+            configured_root = (
+                os.environ.get("AUDIA_ROCM_SDK_ROOT", "").strip()
+                or os.environ.get("ROCM_PATH", "").strip()
+                or os.environ.get("HIP_PATH", "").strip()
+                or str(profile.get("rocm_sdk_root", "")).strip()
+            )
+        if configured_root:
+            root_path = Path(configured_root)
+            if not root_path.is_absolute():
+                root_path = root / root_path
+            configured_root = str(root_path)
+        toolchains.append({"kind": requirement, "root": configured_root})
+
+    return {
+        "system": system,
+        "profile": profile_name,
+        "source_type": source_type,
+        "version": version,
+        "backend": backend,
+        "git_url": str(profile.get("git_url", "")).strip(),
+        "git_ref": str(profile.get("git_ref", version)).strip() or version,
+        "git_commit": str(profile.get("git_commit", "")).strip() or None,
+        "download_url": str(profile.get("download_url", "")).strip(),
+        "configure_command": str(profile.get("configure_command", "")).strip(),
+        "build_command": str(profile.get("build_command", "")).strip(),
+        "required_toolchains": _profile_toolchain_requirements(profile),
+        "toolchains": toolchains,
+    }
+
+
+def _llama_cpp_cache_matches(cached: dict[str, Any] | None, signature: dict[str, Any]) -> bool:
+    if not isinstance(cached, dict):
+        return False
+    keys = (
+        "system",
+        "profile",
+        "source_type",
+        "backend",
+        "git_url",
+        "git_ref",
+        "git_commit",
+        "download_url",
+        "configure_command",
+        "build_command",
+        "required_toolchains",
+        "toolchains",
+    )
+    for key in keys:
+        if cached.get(key) != signature.get(key):
+            return False
+    if signature["source_type"] == "git":
+        return cached.get("version") == signature.get("version")
+    if signature["source_type"] in {"github_release", "direct_url"}:
+        return cached.get("version") == signature.get("version")
+    return cached.get("version") == signature.get("version")
+
+
+def _vulkan_sdk_layout(system: str) -> dict[str, str]:
+    if system == "windows":
+        return {
+            "include_dir": "Include",
+            "library_path": "Lib/vulkan-1.lib",
+            "glslc_path": "Bin/glslc.exe",
+            "bin_dir": "Bin",
+        }
+    return {
+        "include_dir": "include",
+        "library_path": "lib/libvulkan.so",
+        "glslc_path": "bin/glslc",
+        "bin_dir": "bin",
+    }
+
+
+def describe_vulkan_sdk(sdk_root: Path, system: str) -> dict[str, Any]:
+    layout = _vulkan_sdk_layout(system)
+    include_dir = sdk_root / layout["include_dir"]
+    library_path = sdk_root / layout["library_path"]
+    glslc_path = sdk_root / layout["glslc_path"]
+    bin_dir = sdk_root / layout["bin_dir"]
+    return {
+        "sdk_root": sdk_root,
+        "include_dir": include_dir,
+        "library_path": library_path,
+        "glslc_path": glslc_path,
+        "bin_dir": bin_dir,
+        "valid": (include_dir / "vulkan" / "vulkan.h").exists() and library_path.exists() and glslc_path.exists(),
+    }
+
+
+def copy_vulkan_sdk_subset(source_root: Path, target_root: Path, system: str) -> dict[str, Any]:
+    layout = _vulkan_sdk_layout(system)
+    source = describe_vulkan_sdk(source_root, system)
+    if not source["valid"]:
+        raise RuntimeError(f"Source Vulkan SDK is incomplete: {source_root}")
+    for rel_path in {layout["include_dir"], Path(layout["library_path"]).parts[0], layout["bin_dir"]}:
+        source_path = source_root / rel_path
+        target_path = target_root / rel_path
+        if target_path.exists():
+            shutil.rmtree(target_path)
+        shutil.copytree(source_path, target_path)
+    copied = describe_vulkan_sdk(target_root, system)
+    if not copied["valid"]:
+        raise RuntimeError(f"Copied Vulkan SDK is incomplete: {target_root}")
+    return copied
+
+
+def _candidate_vulkan_sdk_sources(system: str) -> list[Path]:
+    candidates: list[Path] = []
+    env_candidates = [
+        os.environ.get("AUDIA_VULKAN_SDK_SOURCE", "").strip(),
+        os.environ.get("VULKAN_SDK", "").strip(),
+    ]
+    for candidate in env_candidates:
+        if candidate:
+            candidates.append(Path(candidate))
+
+    if system == "windows":
+        for base in (
+            os.environ.get("ProgramFiles", r"C:\\Program Files"),
+            os.environ.get("ProgramFiles(x86)", r"C:\\Program Files (x86)"),
+        ):
+            base_path = Path(base)
+            if base_path.exists():
+                candidates.extend(sorted(base_path.glob("VulkanSDK/*"), reverse=True))
+    elif system == "linux":
+        candidates.extend(
+            [
+                Path("/opt/vulkan-sdk"),
+                Path("/usr/local/vulkan-sdk"),
+                Path("/usr/share/vulkan-sdk"),
+            ]
+        )
+        for pattern in ("/opt/VulkanSDK/*", "/opt/vulkan-sdk/*"):
+            for match in sorted(Path("/").glob(pattern.lstrip("/")), reverse=True):
+                candidates.append(match)
+
+    deduped: list[Path] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        key = str(candidate.resolve(strict=False)).lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(candidate)
+    return deduped
+
+
+def resolve_vulkan_sdk_source(system: str) -> Path | None:
+    for candidate in _candidate_vulkan_sdk_sources(system):
+        if candidate.exists() and describe_vulkan_sdk(candidate, system)["valid"]:
+            return candidate
+    return None
+
+
+def ensure_local_vulkan_sdk(root: Path, profile: dict[str, Any], system: str) -> dict[str, Any]:
+    configured_root = os.environ.get("AUDIA_VULKAN_SDK_ROOT", "").strip() or str(profile.get("vulkan_sdk_root", "")).strip()
+    if configured_root:
+        target_root = Path(configured_root)
+        if not target_root.is_absolute():
+            target_root = root / target_root
+    else:
+        target_root = root / "toolchains" / "vulkan-sdk" / system
+    details = describe_vulkan_sdk(target_root, system)
+    if details["valid"]:
+        return details
+
+    source_root = resolve_vulkan_sdk_source(system)
+    if source_root is not None:
+        return copy_vulkan_sdk_subset(source_root, target_root, system)
+
+    raise RuntimeError(
+        "Local Vulkan SDK not available. Run 'python scripts/bootstrap_vulkan_sdk.py' "
+        "or set AUDIA_VULKAN_SDK_SOURCE to an existing SDK directory."
+    )
+
+
+def vulkan_sdk_build_env(root: Path, profile: dict[str, Any], system: str) -> tuple[dict[str, str], dict[str, Any]]:
+    details = ensure_local_vulkan_sdk(root, profile, system)
+    env = {
+        "VULKAN_SDK": str(details["sdk_root"]),
+        "VK_SDK_PATH": str(details["sdk_root"]),
+        "Vulkan_INCLUDE_DIR": str(details["include_dir"]),
+        "Vulkan_LIBRARY": str(details["library_path"]),
+        "Vulkan_GLSLC_EXECUTABLE": str(details["glslc_path"]),
+    }
+    current_path = os.environ.get("PATH", "")
+    env["PATH"] = str(details["bin_dir"]) + os.pathsep + current_path if current_path else str(details["bin_dir"])
+    current_prefix = os.environ.get("CMAKE_PREFIX_PATH", "")
+    env["CMAKE_PREFIX_PATH"] = (
+        str(details["sdk_root"]) + os.pathsep + current_prefix if current_prefix else str(details["sdk_root"])
+    )
+    return env, details
+
+
+def describe_rocm_sdk(sdk_root: Path) -> dict[str, Any]:
+    hip_candidates = [
+        *sdk_root.rglob("hipConfig.cmake"),
+        *sdk_root.rglob("hip-config.cmake"),
+    ]
+    hip_config = next((path for path in hip_candidates if path.is_file()), None)
+    hip_config_dir = hip_config.parent if hip_config else None
+    bin_dir = sdk_root / "bin"
+    include_dir = sdk_root / "include"
+    valid = sdk_root.exists() and hip_config is not None
+    return {
+        "sdk_root": sdk_root,
+        "bin_dir": bin_dir,
+        "include_dir": include_dir,
+        "hip_config": hip_config,
+        "hip_config_dir": hip_config_dir,
+        "valid": valid,
+    }
+
+
+def copy_rocm_sdk_subset(source_root: Path, target_root: Path) -> dict[str, Any]:
+    source = describe_rocm_sdk(source_root)
+    if not source["valid"]:
+        raise RuntimeError(f"Source ROCm SDK is incomplete: {source_root}")
+
+    target_root.mkdir(parents=True, exist_ok=True)
+    for rel_name in ("bin", "include", "lib", "lib64", "share"):
+        source_path = source_root / rel_name
+        target_path = target_root / rel_name
+        if source_path.exists():
+            if target_path.exists():
+                shutil.rmtree(target_path)
+            shutil.copytree(source_path, target_path)
+
+    copied = describe_rocm_sdk(target_root)
+    if not copied["valid"]:
+        raise RuntimeError(f"Copied ROCm SDK is incomplete: {target_root}")
+    return copied
+
+
+def _candidate_rocm_sdk_sources(system: str) -> list[Path]:
+    candidates: list[Path] = []
+    env_candidates = [
+        os.environ.get("AUDIA_ROCM_SDK_SOURCE", "").strip(),
+        os.environ.get("ROCM_PATH", "").strip(),
+        os.environ.get("HIP_PATH", "").strip(),
+    ]
+    for candidate in env_candidates:
+        if candidate:
+            candidates.append(Path(candidate))
+
+    if system == "windows":
+        program_dirs = [
+            os.environ.get("ProgramFiles", r"C:\\Program Files"),
+            os.environ.get("ProgramFiles(x86)", r"C:\\Program Files (x86)"),
+        ]
+        for base in program_dirs:
+            base_path = Path(base)
+            candidates.append(base_path / "AMD" / "ROCm")
+            candidates.append(base_path / "ROCm")
+            if base_path.exists():
+                for child in sorted(base_path.glob("AMD/ROCm*"), reverse=True):
+                    candidates.append(child)
+                for child in sorted(base_path.glob("ROCm*"), reverse=True):
+                    candidates.append(child)
+    elif system == "linux":
+        candidates.extend(
+            [
+                Path("/opt/rocm"),
+                Path("/usr/local/rocm"),
+            ]
+        )
+        for pattern in ("/opt/rocm-*", "/usr/local/rocm-*"):
+            for match in sorted(Path("/").glob(pattern.lstrip("/")), reverse=True):
+                candidates.append(match)
+
+    deduped: list[Path] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        key = str(candidate.resolve(strict=False)).lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(candidate)
+    return deduped
+
+
+def resolve_rocm_sdk_source(system: str) -> Path | None:
+    for candidate in _candidate_rocm_sdk_sources(system):
+        if candidate.exists() and describe_rocm_sdk(candidate)["valid"]:
+            return candidate
+    return None
+
+
+def ensure_local_rocm_sdk(root: Path, profile: dict[str, Any], system: str) -> dict[str, Any]:
+    configured_root = str(profile.get("rocm_sdk_root", "")).strip()
+    if configured_root:
+        target_root = Path(configured_root)
+        if not target_root.is_absolute():
+            target_root = root / target_root
+    else:
+        target_root = root / "toolchains" / "rocm-sdk" / system
+
+    details = describe_rocm_sdk(target_root)
+    if not details["valid"]:
+        source_root = resolve_rocm_sdk_source(system)
+        if source_root is not None:
+            if source_root.resolve() != target_root.resolve():
+                details = copy_rocm_sdk_subset(source_root, target_root)
+                if details["valid"]:
+                    return details
+        raise RuntimeError(
+            "Local ROCm SDK not available. Run 'python scripts/bootstrap_rocm_sdk.py' "
+            "or set AUDIA_ROCM_SDK_SOURCE, ROCM_PATH, or HIP_PATH to an existing ROCm install "
+            "that includes hipConfig.cmake."
+        )
+    return details
+
+
+def rocm_sdk_build_env(root: Path, profile: dict[str, Any], system: str) -> tuple[dict[str, str], dict[str, Any]]:
+    details = ensure_local_rocm_sdk(root, profile, system)
+    env = {
+        "ROCM_PATH": str(details["sdk_root"]),
+        "HIP_PATH": str(details["sdk_root"]),
+    }
+    if details.get("hip_config_dir"):
+        env["hip_DIR"] = str(details["hip_config_dir"])
+    current_path = os.environ.get("PATH", "")
+    if details["bin_dir"].exists():
+        env["PATH"] = str(details["bin_dir"]) + os.pathsep + current_path if current_path else str(details["bin_dir"])
+    current_prefix = os.environ.get("CMAKE_PREFIX_PATH", "")
+    env["CMAKE_PREFIX_PATH"] = (
+        str(details["sdk_root"]) + os.pathsep + current_prefix if current_prefix else str(details["sdk_root"])
+    )
+    return env, details
+
+
+def _profile_toolchain_requirements(profile: dict[str, Any]) -> list[str]:
+    requirements = profile.get("required_toolchains", [])
+    if isinstance(requirements, str):
+        requirements = [requirements]
+    if not isinstance(requirements, list):
+        requirements = []
+    normalized = [str(item).strip().lower() for item in requirements if str(item).strip()]
+    if bool(profile.get("requires_vulkan_sdk", False)) and "vulkan_sdk" not in normalized:
+        normalized.append("vulkan_sdk")
+    return normalized
+
+
+def build_toolchain_env(root: Path, profile: dict[str, Any], system: str) -> tuple[dict[str, str], list[dict[str, Any]]]:
+    env: dict[str, str] = {}
+    details: list[dict[str, Any]] = []
+    for requirement in _profile_toolchain_requirements(profile):
+        if requirement == "vulkan_sdk":
+            toolchain_env, toolchain_details = vulkan_sdk_build_env(root, profile, system)
+        elif requirement == "rocm_sdk":
+            toolchain_env, toolchain_details = rocm_sdk_build_env(root, profile, system)
+        else:
+            raise RuntimeError(f"Unsupported llama.cpp toolchain requirement: {requirement}")
+        env.update(toolchain_env)
+        details.append({"kind": requirement, **toolchain_details})
+    return env, details
+
+
 def ensure_python_runtime(root: Path, min_version: str) -> dict[str, Any]:
     system = detect_platform()
     py_exe = root / ".venv" / ("Scripts" if system == "windows" else "bin") / ("python.exe" if system == "windows" else "python3")
@@ -282,67 +812,247 @@ def _install_one_llama_cpp_profile(
     profile: dict[str, Any],
     system: str,
 ) -> dict[str, Any]:
-    """Download, extract, and install a single llama.cpp build profile."""
+    """Install a single llama.cpp profile from a release asset or git source build."""
     backend = str(profile.get("backend", ""))
     version = str(profile.get("version", "latest"))
-    owner = str(settings.get("repo_owner", "ggml-org"))
-    repo = str(settings.get("repo_name", "llama.cpp"))
+    source_type = str(profile.get("source_type", settings.get("provider", "github_release"))).strip() or "github_release"
     install_root = root / str(settings.get("install_root", "tools/llama.cpp"))
-    binary_subdir = str(settings.get("binary_subdir", "bin"))
     executable_names = settings.get("executable_names", {})
     executable_name = str(executable_names.get(system, "llama-server.exe" if system == "windows" else "llama-server"))
-    asset_tokens = [str(item) for item in profile.get("asset_match_tokens", [])]
-    if not asset_tokens:
-        raise RuntimeError(f"No asset-match tokens configured for llama.cpp profile '{profile_name}'")
     sidecar_files = [str(item) for item in profile.get("sidecar_files", [])]
     copy_sidecar_to_binary_dir = bool(settings.get("copy_sidecar_to_binary_dir", True))
+    if source_type in {"github_release", "direct_url"} and version != "latest":
+        local_install_dir = install_root / f"{version}-{backend}"
+        cached_local = _local_llama_cpp_install_result(
+            install_dir=local_install_dir,
+            executable_name=executable_name,
+            system=system,
+            profile_name=profile_name,
+            source_type=source_type,
+            backend=backend,
+            version=version,
+            sidecar_files=sidecar_files,
+            copy_sidecar_to_binary_dir=copy_sidecar_to_binary_dir,
+        )
+        if cached_local is not None:
+            return cached_local
+    signature = _llama_cpp_cache_signature(
+        root=root,
+        profile_name=profile_name,
+        profile=profile,
+        system=system,
+        source_type=source_type,
+        version=version,
+        backend=backend,
+    )
 
-    metadata = get_release_metadata(owner, repo, version)
-    tag = str(metadata.get("tag_name", version))
-    asset = find_release_asset(metadata, asset_tokens)
-    asset_name = str(asset.get("name", "llama.cpp-asset"))
-    browser_url = str(asset.get("browser_download_url", ""))
-    if not browser_url:
-        raise RuntimeError(f"llama.cpp asset '{asset_name}' does not expose browser_download_url")
+    if source_type == "github_release":
+        owner = str(profile.get("repo_owner", settings.get("repo_owner", "ggml-org")))
+        repo = str(profile.get("repo_name", settings.get("repo_name", "llama.cpp")))
+        binary_subdir = str(settings.get("binary_subdir", "bin"))
+        asset_tokens = [str(item) for item in profile.get("asset_match_tokens", [])]
+        if not asset_tokens:
+            raise RuntimeError(f"No asset-match tokens configured for llama.cpp profile '{profile_name}'")
 
-    install_dir = install_root / f"{tag}-{backend}"
-    with tempfile.TemporaryDirectory(prefix="audia-llamacpp-") as tmp_dir:
+        metadata = get_release_metadata(owner, repo, version)
+        tag = str(metadata.get("tag_name", version))
+        current_signature = {**signature, "version": tag}
+        cached = _load_previous_llama_cpp_variant(root, profile_name)
+        if cached and _llama_cpp_cache_matches(cached, current_signature):
+            executable_path = Path(str(cached.get("executable_path", "")))
+            if executable_path.exists():
+                cached = {**cached, "cache_hit": True}
+                return cached
+        asset = find_release_asset(metadata, asset_tokens)
+        asset_name = str(asset.get("name", "llama.cpp-asset"))
+        browser_url = str(asset.get("browser_download_url", ""))
+        if not browser_url:
+            raise RuntimeError(f"llama.cpp asset '{asset_name}' does not expose browser_download_url")
+
+        install_dir = install_root / f"{tag}-{backend}"
+        with tempfile.TemporaryDirectory(prefix="audia-llamacpp-") as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            archive_path = download_file(browser_url, tmp_root / asset_name)
+            extracted_root = extract_component_archive(archive_path, tmp_root / "extract")
+            if install_dir.exists():
+                shutil.rmtree(install_dir)
+            install_dir.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(extracted_root, install_dir)
+
+        executable_path = install_dir / binary_subdir / executable_name
+        if not executable_path.exists():
+            fallback = next(install_dir.rglob(executable_name), None)
+            if fallback is None:
+                raise RuntimeError(f"Installed llama.cpp asset did not contain {executable_name}")
+            executable_path = fallback
+
+        copied_sidecars: list[str] = []
+        if copy_sidecar_to_binary_dir and sidecar_files:
+            for source_file in sidecar_files:
+                source_path = Path(source_file)
+                if source_path.exists():
+                    target_path = executable_path.parent / source_path.name
+                    shutil.copy2(source_path, target_path)
+                    copied_sidecars.append(str(target_path))
+
+        result: dict[str, Any] = {
+            "system": system,
+            "provider": "github_release",
+            "source_type": source_type,
+            "profile": profile_name,
+            "version": tag,
+            "backend": backend,
+            "install_dir": str(install_dir),
+            "asset_name": asset_name,
+            "executable_path": str(executable_path),
+            "copied_sidecars": copied_sidecars,
+        }
+        if backend == "rocm":
+            result["rocm_executable_path"] = str(executable_path)
+        return result
+
+    if source_type == "direct_url":
+        download_url = str(profile.get("download_url", "")).strip()
+        archive_type = str(profile.get("archive_type", "")).strip().lower()
+        if not download_url:
+            raise RuntimeError(f"llama.cpp direct_url profile '{profile_name}' is missing download_url")
+        asset_name = Path(download_url.split("?", 1)[0]).name or f"{profile_name}.{archive_type or 'zip'}"
+        cached = _load_previous_llama_cpp_variant(root, profile_name)
+        if cached and _llama_cpp_cache_matches(cached, signature):
+            executable_path = Path(str(cached.get("executable_path", "")))
+            if executable_path.exists():
+                cached = {**cached, "cache_hit": True}
+                return cached
+        install_dir = install_root / f"{version}-{backend}"
+        with tempfile.TemporaryDirectory(prefix="audia-llamacpp-url-") as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            archive_path = download_file(download_url, tmp_root / asset_name)
+            extracted_root = extract_component_archive(archive_path, tmp_root / "extract")
+            if install_dir.exists():
+                shutil.rmtree(install_dir)
+            install_dir.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(extracted_root, install_dir)
+
+        executable_path = next(install_dir.rglob(executable_name), None)
+        if executable_path is None:
+            raise RuntimeError(f"Installed llama.cpp archive did not contain {executable_name}")
+
+        copied_sidecars: list[str] = []
+        if copy_sidecar_to_binary_dir and sidecar_files:
+            for source_file in sidecar_files:
+                source_path = Path(source_file)
+                if source_path.exists():
+                    target_path = executable_path.parent / source_path.name
+                    shutil.copy2(source_path, target_path)
+                    copied_sidecars.append(str(target_path))
+
+        result = {
+            "system": system,
+            "provider": "direct_url",
+            "source_type": source_type,
+            "profile": profile_name,
+            "version": version,
+            "backend": backend,
+            "install_dir": str(install_dir),
+            "asset_name": asset_name,
+            "download_url": download_url,
+            "executable_path": str(executable_path),
+            "copied_sidecars": copied_sidecars,
+        }
+        if backend == "rocm":
+            result["rocm_executable_path"] = str(executable_path)
+        return result
+
+    if source_type != "git":
+        raise RuntimeError(f"Unsupported llama.cpp source_type: {source_type}")
+
+    git_url = str(profile.get("git_url", "")).strip()
+    git_ref = str(profile.get("git_ref", version)).strip() or version
+    git_commit = str(profile.get("git_commit", "")).strip() or None
+    configure_command = str(profile.get("configure_command", "")).strip()
+    build_command = str(profile.get("build_command", "")).strip()
+    binary_glob = profile.get("binary_glob")
+    library_glob = profile.get("library_glob")
+    build_env = {str(k): str(v) for k, v in dict(profile.get("build_env", {}) or {}).items()}
+    toolchain_details: list[dict[str, Any]] = []
+    if not git_url:
+        raise RuntimeError(f"llama.cpp git profile '{profile_name}' is missing git_url")
+    if not configure_command or not build_command:
+        raise RuntimeError(f"llama.cpp git profile '{profile_name}' must define configure_command and build_command")
+    if not binary_glob:
+        raise RuntimeError(f"llama.cpp git profile '{profile_name}' must define binary_glob")
+    git_executable = shutil.which("git")
+    if not git_executable:
+        raise RuntimeError("git is required to install git-backed llama.cpp profiles")
+
+    install_dir = install_root / f"{version}-{backend}"
+    cached = _load_previous_llama_cpp_variant(root, profile_name)
+    if cached and _llama_cpp_cache_matches(cached, signature):
+        executable_path = Path(str(cached.get("executable_path", "")))
+        if executable_path.exists():
+            cached = {**cached, "cache_hit": True}
+            return cached
+    with tempfile.TemporaryDirectory(prefix="audia-llamacpp-git-") as tmp_dir:
         tmp_root = Path(tmp_dir)
-        archive_path = download_file(browser_url, tmp_root / asset_name)
-        extracted_root = extract_component_archive(archive_path, tmp_root / "extract")
+        source_dir = tmp_root / "source"
+        git_checkout_ref(git_executable, git_url, git_ref, source_dir, git_commit=git_commit)
+        env = os.environ.copy()
+        env.update(build_env)
+        toolchain_env, toolchain_details = build_toolchain_env(root, profile, system)
+        env.update(toolchain_env)
+        run_shell_command(configure_command, cwd=source_dir, env=env)
+        run_shell_command(build_command, cwd=source_dir, env=env)
+
+        binary_matches = [path for path in _glob_matches(source_dir, binary_glob) if path.is_file()]
+        if not binary_matches:
+            raise RuntimeError(f"llama.cpp git profile '{profile_name}' did not produce a binary matching {binary_glob!r}")
+        executable_path = binary_matches[0]
+
         if install_dir.exists():
             shutil.rmtree(install_dir)
-        install_dir.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(extracted_root, install_dir)
+        binary_dir = install_dir / "bin"
+        binary_dir.mkdir(parents=True, exist_ok=True)
+        installed_executable = binary_dir / executable_path.name
+        shutil.copy2(executable_path, installed_executable)
 
-    executable_path = install_dir / binary_subdir / executable_name
-    if not executable_path.exists():
-        fallback = next(install_dir.rglob(executable_name), None)
-        if fallback is None:
-            raise RuntimeError(f"Installed llama.cpp asset did not contain {executable_name}")
-        executable_path = fallback
-
-    copied_sidecars: list[str] = []
-    if copy_sidecar_to_binary_dir and sidecar_files:
-        for source_file in sidecar_files:
-            source_path = Path(source_file)
-            if source_path.exists():
-                target_path = executable_path.parent / source_path.name
+        copied_sidecars: list[str] = []
+        for source_path in _glob_matches(source_dir, library_glob):
+            if source_path.is_file():
+                target_path = binary_dir / source_path.name
                 shutil.copy2(source_path, target_path)
                 copied_sidecars.append(str(target_path))
+        if copy_sidecar_to_binary_dir and sidecar_files:
+            for source_file in sidecar_files:
+                source_path = Path(source_file)
+                if source_path.exists():
+                    target_path = binary_dir / source_path.name
+                    shutil.copy2(source_path, target_path)
+                    copied_sidecars.append(str(target_path))
+        if system != "windows":
+            installed_executable.chmod(installed_executable.stat().st_mode | 0o111)
 
-    result: dict[str, Any] = {
-        "provider": "github_release",
+    result = {
+        "system": system,
+        "provider": "git",
+        "source_type": source_type,
         "profile": profile_name,
-        "version": tag,
+        "version": version,
         "backend": backend,
         "install_dir": str(install_dir),
-        "asset_name": asset_name,
-        "executable_path": str(executable_path),
+        "asset_name": "",
+        "executable_path": str(installed_executable),
         "copied_sidecars": copied_sidecars,
+        "git_url": git_url,
+        "git_ref": git_ref,
+        "git_commit": git_commit,
     }
+    if toolchain_details:
+        result["toolchains"] = [
+            {"kind": item["kind"], "sdk_root": str(item["sdk_root"])} for item in toolchain_details
+        ]
+        result["toolchain_root"] = str(toolchain_details[0]["sdk_root"])
     if backend == "rocm":
-        result["rocm_executable_path"] = str(executable_path)
+        result["rocm_executable_path"] = str(installed_executable)
     return result
 
 
@@ -351,9 +1061,6 @@ def ensure_llama_cpp(root: Path) -> dict[str, Any]:
 
     stack = load_stack_config(root)
     settings = stack.component_settings.get("llama_cpp", {})
-    provider = str(settings.get("provider", "github_release"))
-    if provider != "github_release":
-        raise RuntimeError(f"Unsupported llama.cpp provider: {provider}")
 
     system = detect_platform()
     executable_name = str(settings.get("executable_names", {}).get(
@@ -581,25 +1288,60 @@ def ensure_models(root: Path, model_names: list[str] | None = None) -> dict[str,
             continue
 
         artifacts = profile.get("artifacts", {})
+        source_type = str(artifacts.get("source_type", "download")).strip().lower() or "download"
+        source_path_raw = str(artifacts.get("source_path", "")).strip()
+        source_path = Path(source_path_raw).expanduser()
+        if source_path_raw and not source_path.is_absolute():
+            source_path = (root / source_path).resolve()
+        if source_type == "local_path" and (not source_path_raw or not source_path.exists()):
+            raise RuntimeError("Model profile declares source_type=local_path but source_path is missing or invalid")
+
         model_file = str(artifacts.get("model_file", "")).replace("\\", "/")
         model_url = str(artifacts.get("model_url", ""))
+        additional_model_urls = [str(item) for item in artifacts.get("additional_model_urls", []) if str(item).strip()]
         mmproj_file = str(artifacts.get("mmproj_file", "")).replace("\\", "/")
         mmproj_url = str(artifacts.get("mmproj_url", ""))
 
-        entry: dict[str, Any] = {}
-        if model_url and model_file:
-            dest = models_root / model_file
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            if not dest.exists():
-                download_file(model_url, dest)
-            entry["model_path"] = str(dest)
-        if mmproj_url and mmproj_file:
-            dest = models_root / mmproj_file
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            if not dest.exists():
-                download_file(mmproj_url, dest)
-            entry["mmproj_path"] = str(dest)
-        if entry:
+        entry: dict[str, Any] = {"source_type": source_type}
+        if source_path_raw:
+            entry["source_path"] = str(source_path)
+        materialized = False
+
+        def _materialize_file(relative_path: str, url: str) -> str | None:
+            nonlocal materialized
+            if not relative_path:
+                return None
+            dest = models_root / relative_path
+            local_source = _resolve_local_artifact_source(source_path, relative_path) if source_path_raw else None
+            if source_type in {"local_path", "auto"} and local_source and local_source.exists():
+                _copy_artifact_if_needed(local_source, dest)
+                materialized = True
+                return str(dest)
+            if url:
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                if not dest.exists():
+                    download_file(url, dest)
+                materialized = True
+                return str(dest)
+            if local_source and local_source.exists():
+                _copy_artifact_if_needed(local_source, dest)
+                materialized = True
+                return str(dest)
+            return None
+
+        model_path = _materialize_file(model_file, model_url)
+        if model_path:
+            entry["model_path"] = model_path
+        for extra_url in additional_model_urls:
+            relative_name = Path(extra_url.split("?", 1)[0]).name
+            extra_relative = str(Path(model_file).with_name(relative_name)) if model_file else relative_name
+            extra_path = _materialize_file(extra_relative, extra_url)
+            if extra_path:
+                entry.setdefault("additional_model_paths", []).append(extra_path)
+        mmproj_path = _materialize_file(mmproj_file, mmproj_url)
+        if mmproj_path:
+            entry["mmproj_path"] = mmproj_path
+        if materialized:
             for label in labels:
                 if model_names is None or label in model_names:
                     results[label] = entry

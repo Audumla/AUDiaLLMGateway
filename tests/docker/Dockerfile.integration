@@ -1,5 +1,5 @@
 # Integration test image: builds the gateway stack and runs real inference tests
-# with a tiny GGUF model (SmolLM2-135M) that runs on CPU.
+# with a switchable Qwen GGUF smoke model that runs on CPU by default.
 #
 # Build:
 #   docker build --network=host -f tests/docker/Dockerfile.integration -t audia-integration .
@@ -22,28 +22,34 @@ FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y \
-    curl python3 python3-venv python3-pip wget jq \
+    curl libvulkan1 python3 python3-venv python3-pip wget jq \
     && rm -rf /var/lib/apt/lists/*
 
 # Stub systemctl so postinstall.sh doesn't fail in Docker
 RUN printf '#!/bin/sh\necho "[stub] systemctl $*"\nexit 0\n' > /usr/bin/systemctl && \
     chmod +x /usr/bin/systemctl
 
-# Download llama.cpp CPU binary (small, no GPU needed for integration testing)
-ARG LLAMA_VERSION=b4632
-RUN ASSET="llama-${LLAMA_VERSION}-bin-ubuntu-x64.zip" && \
+# Download llama.cpp binary. CPU is the guaranteed fallback; Vulkan can be
+# selected for Linux hosts that expose /dev/dri into the container.
+ARG LLAMA_VERSION=b8720
+ARG LLAMA_VARIANT=cpu
+RUN case "$LLAMA_VARIANT" in \
+        cpu) ASSET="llama-${LLAMA_VERSION}-bin-ubuntu-x64.tar.gz" ;; \
+        vulkan) ASSET="llama-${LLAMA_VERSION}-bin-ubuntu-vulkan-x64.tar.gz" ;; \
+        *) echo "Unsupported LLAMA_VARIANT=$LLAMA_VARIANT" >&2; exit 1 ;; \
+    esac && \
     echo "Downloading llama.cpp ${LLAMA_VERSION}..." && \
-    curl -L -o /tmp/llama.zip \
+    curl -L -o /tmp/llama.tar.gz \
         "https://github.com/ggml-org/llama.cpp/releases/download/${LLAMA_VERSION}/${ASSET}" && \
-    unzip /tmp/llama.zip -d /tmp/llama && \
-    find /tmp/llama -name "llama-server" -exec cp {} /usr/local/bin/llama-server \; && \
-    chmod +x /usr/local/bin/llama-server && \
-    rm -rf /tmp/llama.zip /tmp/llama
-
-# Download llama-swap
-RUN curl -L -o /usr/local/bin/llama-swap \
-    https://github.com/mostlygeek/llama-swap/releases/latest/download/llama-swap-linux-amd64 && \
-    chmod +x /usr/local/bin/llama-swap
+    mkdir -p /tmp/llama && \
+    tar -xzf /tmp/llama.tar.gz -C /tmp/llama && \
+    SERVER_PATH="$(find /tmp/llama -name 'llama-server' | head -n 1)" && \
+    SERVER_DIR="$(dirname "$SERVER_PATH")" && \
+    mkdir -p /opt/llama-runtime && \
+    cp -R "$SERVER_DIR"/. /opt/llama-runtime/ && \
+    ln -sf /opt/llama-runtime/llama-server /usr/local/bin/llama-server && \
+    chmod +x /opt/llama-runtime/llama-server && \
+    rm -rf /tmp/llama.tar.gz /tmp/llama
 
 # Stub nvidia-related commands to prevent detection failures
 RUN printf '#!/bin/sh\necho "[stub] nvidia-smi $*"\nexit 1\n' > /usr/bin/nvidia-smi && \
@@ -52,6 +58,7 @@ RUN printf '#!/bin/sh\necho "[stub] nvidia-smi $*"\nexit 1\n' > /usr/bin/nvidia-
 # Install the gateway package
 COPY --from=builder /audia-llm-gateway.deb /tmp/audia-llm-gateway.deb
 RUN apt-get install -y /tmp/audia-llm-gateway.deb
+RUN ln -sf /opt/AUDiaLLMGateway/tools/llama-swap/bin/llama-swap /usr/local/bin/llama-swap
 
 # Copy test entrypoint
 COPY tests/docker/integration-entrypoint.sh /integration-entrypoint.sh
@@ -59,5 +66,6 @@ RUN chmod +x /integration-entrypoint.sh
 
 ENV LITELLM_MASTER_KEY=sk-integration-test
 ENV INSTALL_DIR=/opt/AUDiaLLMGateway
+ENV LD_LIBRARY_PATH=/opt/llama-runtime
 
 ENTRYPOINT ["bash", "/integration-entrypoint.sh"]

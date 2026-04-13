@@ -11,7 +11,7 @@ from typing import Any
 import yaml
 
 
-ENV_PATTERN = re.compile(r"\$\{([A-Z0-9_]+)\}")
+ENV_PATTERN = re.compile(r"\$\{([A-Z0-9_]+)(?::-([^}]*))?\}")
 
 
 def _detect_local_ip() -> str:
@@ -37,6 +37,77 @@ def _detect_local_ip() -> str:
     if len(candidates) == 1:
         return next(iter(candidates))
     return "127.0.0.1"
+
+
+def _detect_local_gfx_version() -> str:
+    """Detect the local AMD GPU GFX version using vulkaninfo."""
+    import subprocess
+    import shutil
+
+    # AMD Device ID to GFX version mapping
+    # Reference: https://linux-gpu.org/index.php/AMD_GPU_Device_IDs
+    DEVICE_ID_MAP = {
+        "0x744c": "gfx1100", # Navi 31
+        "0x7440": "gfx1101", "0x7441": "gfx1101", # Navi 32
+        "0x7460": "gfx1102", "0x7461": "gfx1102", # Navi 33
+        "0x15bf": "gfx1103", # Phoenix/780M
+        "0x1586": "gfx1151", # Strix Halo
+        "0x75a3": "gfx950",  # CDNA 4 (Instinct MI350)
+        "0x73af": "gfx1030", "0x73bf": "gfx1030", # Navi 21
+        "0x73df": "gfx1031", # Navi 22
+        "0x73ff": "gfx1032", # Navi 23
+        "0x742f": "gfx1034", "0x743f": "gfx1034", # Navi 24
+    }
+
+    detected_gfx: set[str] = set()
+
+    # 1. Try vulkaninfo --summary
+    vulkaninfo_path = shutil.which("vulkaninfo")
+    if vulkaninfo_path:
+        try:
+            result = subprocess.run(
+                [vulkaninfo_path, "--summary"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if result.returncode == 0:
+                summary = result.stdout
+                # Look for vendorID = 0x1002 (AMD) and extract deviceID
+                parts = summary.split("GPU")
+                for part in parts[1:]:
+                    if "vendorID" in part and "0x1002" in part:
+                        match = re.search(r"deviceID\s*=\s*(0x[0-9a-fA-F]+)", part)
+                        if match:
+                            device_id = match.group(1).lower()
+                            if device_id in DEVICE_ID_MAP:
+                                detected_gfx.add(DEVICE_ID_MAP[device_id])
+        except Exception:
+            pass
+
+    # 2. Try rocm-smi --showproductname (Linux fallback)
+    if not detected_gfx and os.name != "nt":
+        rocm_smi_path = shutil.which("rocm-smi")
+        if rocm_smi_path:
+            try:
+                result = subprocess.run(
+                    [rocm_smi_path, "--showproductname"],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                if result.returncode == 0:
+                    output = result.stdout.lower()
+                    if "7900" in output: detected_gfx.add("gfx1100")
+                    if "7800" in output or "7700" in output: detected_gfx.add("gfx1101")
+                    if "6900" in output or "6800" in output: detected_gfx.add("gfx1030")
+                    if "6700" in output: detected_gfx.add("gfx1031")
+                    if "8060" in output: detected_gfx.add("gfx1151")
+                    if "mi350" in output: detected_gfx.add("gfx950")
+            except Exception:
+                pass
+
+    return ",".join(sorted(list(detected_gfx)))
 
 
 @dataclass(frozen=True)
@@ -99,6 +170,8 @@ class PublishedModel:
     mmproj_filename: str
     mmproj_url: str
     source_page_url: str
+    source_type: str
+    source_path: str
     load_groups: list[str]
     api_key_placeholder: str
     mode: str
@@ -192,7 +265,13 @@ def _normalize_base_path(value: Any) -> str:
 
 def _substitute_env(value: str) -> str:
     def replace(match: re.Match[str]) -> str:
-        return os.environ.get(match.group(1), match.group(0))
+        name = match.group(1)
+        default = match.group(2)
+        if name in os.environ:
+            return os.environ[name]
+        if default is not None:
+            return default
+        return match.group(0)
 
     return ENV_PATTERN.sub(replace, value)
 
@@ -219,6 +298,37 @@ def _load_yaml(path: Path) -> dict[str, Any]:
     if not isinstance(content, dict):
         return {}
     return _resolve_env(content)
+
+
+def _private_overlay_path(local_path: Path) -> Path | None:
+    name = local_path.name
+    if name == "env":
+        return local_path.with_name("env.private")
+    if name.endswith(".override.yaml"):
+        return local_path.with_name(name.replace(".override.yaml", ".private.yaml"))
+    if name.endswith(".override.yml"):
+        return local_path.with_name(name.replace(".override.yml", ".private.yml"))
+    if name.endswith(".yaml"):
+        return local_path.with_name(name.replace(".yaml", ".private.yaml"))
+    if name.endswith(".yml"):
+        return local_path.with_name(name.replace(".yml", ".private.yml"))
+    return None
+
+
+def _load_local_overlay(local_path: Path) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    local_data = _load_yaml(local_path) if local_path.exists() else {}
+    private_path = _private_overlay_path(local_path)
+    private_data = _load_yaml(private_path) if private_path and private_path.exists() else {}
+    merged = deep_merge(local_data, private_data)
+    return local_data, private_data, merged
+
+
+def _load_catalog_layer(project_path: Path, local_path: Path) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    if not project_path.exists():
+        return {}, {}, {}
+    project_data = _load_yaml(project_path)
+    _, _, local_merged = _load_local_overlay(local_path)
+    return project_data, local_merged, deep_merge(project_data, local_merged)
 
 
 def deep_merge(base: Any, override: Any) -> Any:
@@ -253,7 +363,7 @@ def load_layered_yaml(root: str | Path, project_rel: str, local_rel: str) -> tup
     project_path = root_path / project_rel
     local_path = root_path / local_rel
     project_data = _load_yaml(project_path)
-    local_data = _load_yaml(local_path) if local_path.exists() else {}
+    _, _, local_data = _load_local_overlay(local_path)
     merged = deep_merge(project_data, local_data)
     return project_data, local_data, merged
 
@@ -303,7 +413,10 @@ def load_stack_config(root: str | Path) -> StackConfig:
         restart=str(systemd_raw.get("restart", "always")),
     )
 
-    component_settings = project_raw.get("component_settings", {})
+    component_settings = deep_merge(
+        project_raw.get("component_settings", {}),
+        raw.get("component_settings", {}),
+    )
     vllm_raw = component_settings.get("vllm", {}) if isinstance(component_settings, dict) else {}
     models_raw = raw.get("models", {})
     backend_runtime_raw = raw.get("backend_runtime", {})
@@ -543,11 +656,7 @@ def load_model_catalog(root: str | Path) -> tuple[dict[str, Any], dict[str, Any]
         models_raw = {}
     project_path = root_path / str(models_raw.get("project_config_path", "config/project/models.base.yaml"))
     local_path = root_path / str(models_raw.get("local_override_path", "config/local/models.override.yaml"))
-    if not project_path.exists():
-        return {}, {}, {}
-    project_data = _load_yaml(project_path)
-    local_data = _load_yaml(local_path) if local_path.exists() else {}
-    return project_data, local_data, deep_merge(project_data, local_data)
+    return _load_catalog_layer(project_path, local_path)
 
 
 def load_backend_runtime_catalog(root: str | Path) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
@@ -563,7 +672,7 @@ def load_backend_runtime_catalog(root: str | Path) -> tuple[dict[str, Any], dict
         return {}, {}, {}
 
     project_data = _load_yaml(project_path)
-    local_data = _load_yaml(local_path) if local_path.exists() else {}
+    _, _, local_data = _load_local_overlay(local_path)
 
     merged = deep_merge(project_data, local_data)
     project_variants = project_data.get("variants")
@@ -590,7 +699,7 @@ def load_backend_support_matrix(root: str | Path) -> tuple[dict[str, Any], dict[
         return {}, {}, {}
 
     project_data = _load_yaml(project_path)
-    local_data = _load_yaml(local_path) if local_path.exists() else {}
+    _, _, local_data = _load_local_overlay(local_path)
     merged = deep_merge(project_data, local_data)
 
     project_rules = project_data.get("rules")
@@ -1030,6 +1139,11 @@ def _resolve_backend_runtime_profile(
 
 
 def _collect_backend_runtime_variants(stack: StackConfig) -> list[dict[str, Any]]:
+    if "AUDIA_DETECTED_GFX" not in os.environ:
+        gfx = _detect_local_gfx_version()
+        if gfx:
+            os.environ["AUDIA_DETECTED_GFX"] = gfx
+
     _, _, catalog = load_backend_runtime_catalog(stack.root)
     global_version = _resolve_env_token(os.environ.get("LLAMA_VERSION", "latest"), "latest")
     llama_cpp_settings = stack.component_settings.get("llama_cpp", {})
@@ -1053,6 +1167,13 @@ def _collect_backend_runtime_variants(stack: StackConfig) -> list[dict[str, Any]
         for name, value in _iter_backend_runtime_profiles(catalog.get("profiles"))
         if str(name).strip()
     }
+    # Support decoupled sources/builds
+    for section in ("sources", "builds"):
+        for name, value in _iter_backend_runtime_profiles(catalog.get(section)):
+            entry_name = str(name).strip()
+            if entry_name:
+                profile_entries[entry_name] = value
+
     resolved_profiles: dict[str, dict[str, Any]] = {}
 
     variants_config = catalog.get("variants")
@@ -1073,6 +1194,10 @@ def _collect_backend_runtime_variants(stack: StackConfig) -> list[dict[str, Any]
 
     for entry_name, raw_variant in _iter_backend_runtime_variants(variants_config):
         profile_names: list[str] = []
+        # Support new decoupled source/build keys
+        profile_names.extend(_as_named_list(raw_variant.get("source")))
+        profile_names.extend(_as_named_list(raw_variant.get("build")))
+        # Maintain backward compatibility for 'profile'/'profiles'
         profile_names.extend(_as_named_list(raw_variant.get("profile")))
         profile_names.extend(_as_named_list(raw_variant.get("profiles")))
         deduped_profile_names: list[str] = []
@@ -1365,12 +1490,32 @@ def _catalog_deployment_map(catalog: dict[str, Any]) -> dict[tuple[str, str], di
 
 def _resolve_deployment_profile(catalog: dict[str, Any], deployment: dict[str, Any]) -> dict[str, Any]:
     profile_name = str(deployment.get("profile", deployment.get("deployment_profile", ""))).strip()
-    if not profile_name:
+    template_name = str(deployment.get("template", deployment.get("deployment_template", ""))).strip()
+    presets = catalog.get("presets", {})
+    template_profiles = presets.get("deployment_templates", {}) if isinstance(presets, dict) else {}
+    concrete_profiles = presets.get("deployment_profiles", {}) if isinstance(presets, dict) else {}
+    resolved: dict[str, Any] = {}
+
+    def _require_named(mapping: Any, kind: str, name: str) -> dict[str, Any]:
+        if not isinstance(mapping, dict):
+            raise ValueError(f"Model catalog {kind} collection is not a mapping")
+        item = mapping.get(name, {})
+        if not isinstance(item, dict) or not item:
+            raise ValueError(f"Model catalog deployment {kind} '{name}' is not defined")
+        return item
+
+    if template_name:
+        resolved_template = _require_named(template_profiles, "template", template_name)
+        resolved = deep_merge(resolved, resolved_template)
+        nested_profile_name = str(
+            resolved_template.get("profile", resolved_template.get("deployment_profile", ""))
+        ).strip()
+        if nested_profile_name:
+            resolved = deep_merge(resolved, _require_named(concrete_profiles, "profile", nested_profile_name))
+    if profile_name:
+        resolved = deep_merge(resolved, _require_named(concrete_profiles, "profile", profile_name))
+    if not resolved:
         return {}
-    profiles = catalog.get("presets", {}).get("deployment_profiles", {})
-    resolved = profiles.get(profile_name, {})
-    if not isinstance(resolved, dict) or not resolved:
-        raise ValueError(f"Model catalog deployment profile '{profile_name}' is not defined")
     return resolved
 
 
@@ -1583,6 +1728,8 @@ def _catalog_published_models(stack: StackConfig) -> list[PublishedModel]:
                     mmproj_filename=str(deployment.get("mmproj_filename", artifacts.get("mmproj_filename", ""))),
                     mmproj_url=str(deployment.get("mmproj_url", artifacts.get("mmproj_url", ""))),
                     source_page_url=str(deployment.get("source_page_url", artifacts.get("source_page_url", ""))),
+                    source_type=str(deployment.get("source_type", artifacts.get("source_type", "download"))),
+                    source_path=str(deployment.get("source_path", artifacts.get("source_path", ""))),
                     load_groups=model_load_groups,
                     api_key_placeholder=str(deployment.get("api_key_placeholder", "not-required-for-local-backends")),
                     mode=mode,
@@ -1665,6 +1812,37 @@ def build_llama_swap_config(stack: StackConfig) -> dict[str, Any]:
             if not macro_name or macro_name in local_macros:
                 continue
             macros[macro_name] = _runtime_variant_macro_command(variant)
+
+        # Multi-GPU GFX targeting: generate unified llama-server-rocm-native macro
+        all_gfx = os.environ.get("AUDIA_DETECTED_GFX", "").split(",")
+        if len(all_gfx) > 0 and all_gfx[0].strip(): # Even for single GPU, provide the -native macro
+            # Unified macro for detected architectures
+            arch_macro = "llama-server-rocm-native"
+            if arch_macro not in local_macros:
+                # Point to the 'native' subdirectory where the fat binary lives
+                macros[arch_macro] = _runtime_variant_macro_command(
+                    {
+                        "backend": "rocm",
+                        "runtime_subdir": "rocm/native",
+                    }
+                )
+            # Re-alias the standard macro to the native one by default
+            if "llama-server-rocm" not in local_macros:
+                macros["llama-server-rocm"] = macros[arch_macro]
+
+        # Similar for Vulkan native builds
+        vulkan_native_macro = "llama-server-vulkan-native"
+        if vulkan_native_macro not in local_macros:
+            macros[vulkan_native_macro] = _runtime_variant_macro_command(
+                {
+                    "backend": "vulkan",
+                    "runtime_subdir": "vulkan/native",
+                }
+            )
+            # Re-alias the standard macro to the native one by default
+            if "llama-server-vulkan" not in local_macros:
+                macros["llama-server-vulkan"] = macros[vulkan_native_macro]
+
         if "llama-server" not in local_macros:
             # Keep legacy fallback macro stable for pre-existing deployments.
             macros["llama-server"] = _runtime_variant_macro_command(
@@ -1715,6 +1893,8 @@ def build_litellm_config(stack: StackConfig) -> dict[str, Any]:
                     "mmproj_filename": model.mmproj_filename,
                     "mmproj_url": model.mmproj_url,
                     "source_page_url": model.source_page_url,
+                    "source_type": model.source_type,
+                    "source_path": model.source_path,
                     "load_groups": model.load_groups,
                 },
             }
@@ -2106,14 +2286,18 @@ def build_nginx_landing_page(stack: StackConfig) -> str:
 
 
 def _read_local_env_var(stack: StackConfig, var_name: str) -> str:
-    """Read a variable from config/local/env (KEY=value format). Returns empty string if not found."""
-    env_path = stack.root / "config" / "local" / "env"
-    if not env_path.exists():
-        return ""
-    for line in env_path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if line.startswith(f"{var_name}="):
-            return line[len(var_name) + 1:].strip()
+    """Read a variable from config/local/env.private then env (KEY=value format)."""
+    env_paths = [
+        stack.root / "config" / "local" / "env.private",
+        stack.root / "config" / "local" / "env",
+    ]
+    for env_path in env_paths:
+        if not env_path.exists():
+            continue
+        for line in env_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line.startswith(f"{var_name}="):
+                return line[len(var_name) + 1:].strip()
     return ""
 
 

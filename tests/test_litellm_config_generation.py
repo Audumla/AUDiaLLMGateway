@@ -19,15 +19,25 @@ def test_build_litellm_config_contains_expected_models() -> None:
     config = build_litellm_config(stack)
 
     model_names = [entry["model_name"] for entry in config["model_list"]]
-    assert model_names[:2] == ["local/qwen27_fast", "local/qwen122_smart"]
+    assert model_names[0] == "local/qwen27_fast"
+    assert "local/qwen122_smart" in model_names
+    assert "local/qwen2b_validation_vulkan" in model_names
+    assert "local/qwen2b_validation_cpu" in model_names
+    assert "local/qwen2b_validation_rocm" in model_names
+    assert "local/qwen4b_validation_vulkan" in model_names
+    assert "local/qwen4b_validation_cpu" in model_names
+    assert "local/qwen4b_validation_rocm" in model_names
     assert config["model_list"][0]["litellm_params"]["api_base"] == "http://127.0.0.1:41080/v1"
     assert config["model_list"][0]["litellm_params"]["extra_headers"]["X-LLAMA-SWAP-MODEL"] == "qwen3.5-27b-(96k-Q6)"
     assert "model_url" in config["model_list"][0]["model_info"]
     assert "source_page_url" in config["model_list"][0]["model_info"]
+    assert "source_type" in config["model_list"][0]["model_info"]
+    assert "source_path" in config["model_list"][0]["model_info"]
     assert config["model_list"][0]["model_info"]["revision"] == "main"
     assert config["model_list"][0]["model_info"]["model_filename"] == "Qwen3.5-27B.Q6_K.gguf"
     assert "coding_active" in config["model_list"][0]["model_info"]["load_groups"]
-    assert len(config["model_list"][1]["model_info"]["additional_model_urls"]) == 2
+    qwen122_entry = next(item for item in config["model_list"] if item["model_name"] == "local/qwen122_smart")
+    assert len(qwen122_entry["model_info"]["additional_model_urls"]) == 2
 
 
 def test_build_litellm_config_adds_vllm_routes_when_enabled(monkeypatch) -> None:
@@ -227,6 +237,10 @@ def test_build_llama_swap_config_contains_generated_catalog_models() -> None:
 
     assert "InternVL3-5-GPT-OSS-20B@gpu2" not in config["models"]
     assert config["macros"]["cache-q8-args"] == "--cache-type-k q8_0 --cache-type-v q8_0"
+    assert config["macros"]["batch-16k-args"] == "--threads 8 --threads-batch 24 --batch-size 768 --ubatch-size 768 --flash-attn on"
+    assert config["macros"]["batch-cache-q8-args"] == "--threads 8 --threads-batch 24 --batch-size 512 --ubatch-size 512 --flash-attn on --cache-type-k q8_0 --cache-type-v q8_0"
+    assert config["macros"]["cpu-throughput-args"] == "--threads 12 --threads-batch 12 --batch-size 512 --ubatch-size 128 --flash-attn off"
+    assert config["macros"]["gpu-throughput-args"] == "--threads 8 --threads-batch 24 --batch-size 1024 --ubatch-size 256 --flash-attn on --cache-type-k q8_0 --cache-type-v q8_0"
     assert config["macros"]["qwen-nothink-args"] == '--reasoning-budget 0 --reasoning-format none --chat-template-kwargs {"enable_thinking":false}'
     generated_qwen = config["models"]["qwen3.5-27b-(96k-Q6)"]["cmd"]
     generated_qwen_vision = config["models"]["qwen3-5-4b-ud-q5-k-xl-vision"]["cmd"]
@@ -446,6 +460,42 @@ def test_context_alias_can_generate_macro_without_explicit_llama_swap_macro(tmp_
     assert "${context-40k-args}" in config["models"]["alias-test-model"]["cmd"]
 
 
+def test_deployment_templates_can_be_reused_without_copying_backend_shape(tmp_path: Path) -> None:
+    source_root = Path(__file__).resolve().parents[1]
+    for rel_path in [
+        "config/project/stack.base.yaml",
+        "config/project/llama-swap.base.yaml",
+        "config/project/models.base.yaml",
+        "config/project/backend-runtime.base.yaml",
+        "config/project/mcp.base.yaml",
+        "config/local/stack.override.yaml",
+        "config/local/llama-swap.override.yaml",
+        "config/local/models.override.yaml",
+        "config/local/backend-runtime.override.yaml",
+        "config/local/mcp.override.yaml",
+    ]:
+        source = source_root / rel_path
+        target = tmp_path / rel_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+
+    models_override = tmp_path / "config" / "local" / "models.override.yaml"
+    data = yaml.safe_load(models_override.read_text(encoding="utf-8"))
+    data["model_profiles"]["tiny_qwen25_test"]["deployments"]["llamacpp_rocm"] = {
+        "template": "llamacpp_rocm_single_validation",
+        "label": "local/tiny_qwen25_test",
+        "llama_swap_model": "tiny-qwen25-test",
+        "backend_model_name": "tiny-qwen25-test",
+    }
+    models_override.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+
+    stack = load_stack_config(tmp_path)
+    config = build_llama_swap_config(stack)
+
+    assert config["models"]["tiny-qwen25-test"]["cmd"].startswith("${llama-server-rocm} ")
+    assert "--device ROCm0" in config["models"]["tiny-qwen25-test"]["cmd"]
+
+
 def test_backend_runtime_variants_generate_versioned_macros_and_catalog(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("AUDIA_DOCKER", "true")
     source_root = Path(__file__).resolve().parents[1]
@@ -629,6 +679,115 @@ def test_backend_runtime_catalog_supports_reusable_profiles(tmp_path: Path, monk
     assert entry["build_root_subdir"] == "rocm/gfx1100/main"
     assert entry["build_env"]["CMAKE_BUILD_PARALLEL_LEVEL"] == "2"
     assert entry["pre_configure_command"] == "cmake --version"
+
+
+def test_private_overlays_can_change_generated_runtime_and_network(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("AUDIA_DOCKER", "true")
+    source_root = Path(__file__).resolve().parents[1]
+    for rel_path in [
+        "config/project/stack.base.yaml",
+        "config/project/llama-swap.base.yaml",
+        "config/project/models.base.yaml",
+        "config/project/backend-runtime.base.yaml",
+        "config/project/mcp.base.yaml",
+        "config/local/stack.override.yaml",
+        "config/local/llama-swap.override.yaml",
+        "config/local/models.override.yaml",
+        "config/local/backend-runtime.override.yaml",
+        "config/local/mcp.override.yaml",
+    ]:
+        source = source_root / rel_path
+        target = tmp_path / rel_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+
+    (tmp_path / "config" / "local" / "stack.private.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "network": {
+                    "services": {
+                        "llama_swap": {"host": "10.1.2.3", "port": 42123},
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "config" / "local" / "backend-runtime.private.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "variants": {
+                    "vulkan-private": {
+                        "backend": "vulkan",
+                        "macro": "llama-server-vulkan-private",
+                        "runtime_subdir": "vulkan/private",
+                    }
+                }
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "config" / "local" / "models.private.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "model_profiles": {
+                    "qwen27_fast": {
+                        "deployments": {
+                            "llamacpp_vulkan": {
+                                "executable_macro": "llama-server-vulkan-private",
+                            }
+                        }
+                    }
+                }
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    write_generated_configs(tmp_path)
+    litellm_data = yaml.safe_load((tmp_path / "config" / "generated" / "litellm" / "litellm.config.yaml").read_text(encoding="utf-8").split("\n", 3)[3])
+    llama_swap_text = (tmp_path / "config" / "generated" / "llama-swap" / "llama-swap.generated.yaml").read_text(encoding="utf-8")
+    backend_catalog = json.loads(
+        (tmp_path / "config" / "generated" / "llama-swap" / "backend-runtime.catalog.json").read_text(encoding="utf-8")
+    )
+    variants = backend_catalog["variants"]
+
+    assert litellm_data["model_list"][0]["litellm_params"]["api_base"] == "http://llm-server-llamacpp:42123/v1"
+    assert variants
+    assert any(item["macro"] == "llama-server-vulkan-private" for item in variants)
+    assert any(item["runtime_subdir"] == "vulkan/private" for item in variants)
+    assert "llama-server-vulkan-private" in llama_swap_text
+
+
+def test_build_nginx_config_prefers_env_private_key(tmp_path: Path) -> None:
+    source_root = Path(__file__).resolve().parents[1]
+    for rel_path in [
+        "config/project/stack.base.yaml",
+        "config/project/llama-swap.base.yaml",
+        "config/project/models.base.yaml",
+        "config/project/backend-runtime.base.yaml",
+        "config/project/mcp.base.yaml",
+        "config/local/stack.override.yaml",
+        "config/local/llama-swap.override.yaml",
+        "config/local/models.override.yaml",
+        "config/local/backend-runtime.override.yaml",
+        "config/local/mcp.override.yaml",
+    ]:
+        source = source_root / rel_path
+        target = tmp_path / rel_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+
+    (tmp_path / "config" / "local" / "env").write_text("LITELLM_MASTER_KEY=sk-public\n", encoding="utf-8")
+    (tmp_path / "config" / "local" / "env.private").write_text("LITELLM_MASTER_KEY=sk-private\n", encoding="utf-8")
+
+    stack = load_stack_config(tmp_path)
+    nginx_text = build_nginx_config(stack)
+
+    assert 'proxy_set_header Authorization "Bearer sk-private";' in nginx_text
+    assert 'proxy_set_header Authorization "Bearer sk-public";' not in nginx_text
 
 
 # ---------------------------------------------------------------------------

@@ -8,6 +8,7 @@ def test_watcher_detects_expected_config_files() -> None:
     assert watcher._is_watched_config_path("/app/config/local/stack.override.yaml")
     assert watcher._is_watched_config_path("/app/config/local/models.override.yml")
     assert watcher._is_watched_config_path("/app/config/local/env")
+    assert watcher._is_watched_config_path("/app/config/local/env.private")
     assert not watcher._is_watched_config_path("/app/config/generated/nginx/nginx.conf.bak")
 
 
@@ -68,5 +69,19 @@ def test_regenerate_and_reload_restarts_gateway_and_vllm_on_env_change(monkeypat
     monkeypatch.setattr(handler, "_safe_action", lambda label, _action: actions.append(label))
 
     handler._regenerate_and_reload(["/app/config/local/env"])
+
+    assert actions == ["restart gateway", "restart llama-cpp", "restart vllm"]
+
+
+def test_regenerate_and_reload_restarts_gateway_and_vllm_on_env_private_change(monkeypatch) -> None:
+    handler = watcher.ConfigChangeHandler(root=Path.cwd())
+    actions: list[str] = []
+
+    monkeypatch.setattr(watcher.subprocess, "run", lambda *_args, **_kwargs: None)
+    snapshot = {"nginx": "a", "nginx_index": "a", "litellm": "a", "vllm": "a", "llama_swap": "a", "mcp_client": "a", "systemd": "a"}
+    monkeypatch.setattr(watcher, "_snapshot_generated", lambda _root: snapshot)
+    monkeypatch.setattr(handler, "_safe_action", lambda label, _action: actions.append(label))
+
+    handler._regenerate_and_reload(["/app/config/local/env.private"])
 
     assert actions == ["restart gateway", "restart llama-cpp", "restart vllm"]

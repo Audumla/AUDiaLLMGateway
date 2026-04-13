@@ -84,6 +84,26 @@ project:
             - vulkan
             - x64
           sidecar_files: []
+        windows-vulkan-turboquant:
+          platform: windows
+          support_tier: experimental
+          backend: vulkan
+          source_type: git
+          required_toolchains:
+            - vulkan_sdk
+          requires_vulkan_sdk: true
+          vulkan_sdk_root: toolchains/vulkan-sdk/windows
+          git_url: https://github.com/TheTom/llama-cpp-turboquant.git
+          git_ref: feature/turboquant-kv-cache
+          git_commit: 8590cbff961dbaf1d3a9793fd11d402e248869b9
+          version: 8590cbff961dbaf1d3a9793fd11d402e248869b9
+          configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_VULKAN=ON -DCMAKE_BUILD_TYPE=Release
+          build_command: cmake --build build --config Release --parallel
+          binary_glob: build/**/llama-server.exe
+          library_glob:
+            - build/**/*.dll
+            - build/**/vulkan-*.json
+          sidecar_files: []
         windows-hip:
           platform: windows
           support_tier: first
@@ -92,6 +112,36 @@ project:
           asset_match_tokens:
             - win
             - hip
+            - x64
+          sidecar_files: []
+        windows-cuda:
+          platform: windows
+          support_tier: first
+          backend: cuda
+          version: latest
+          asset_match_tokens:
+            - win
+            - cuda
+            - x64
+          sidecar_files: []
+        windows-sycl:
+          platform: windows
+          support_tier: second
+          backend: sycl
+          version: latest
+          asset_match_tokens:
+            - win
+            - sycl
+            - x64
+          sidecar_files: []
+        windows-rpc:
+          platform: windows
+          support_tier: second
+          backend: rpc
+          version: latest
+          asset_match_tokens:
+            - win
+            - rpc
             - x64
           sidecar_files: []
         windows-cpu:
@@ -112,6 +162,97 @@ project:
             # ggml-org names Linux builds as ubuntu-*-x64 regardless of distro
             - ubuntu-vulkan-x64
           sidecar_files: []
+        linux-vulkan-turboquant:
+          platform: linux
+          support_tier: experimental
+          backend: vulkan
+          source_type: git
+          required_toolchains:
+            - vulkan_sdk
+          requires_vulkan_sdk: true
+          vulkan_sdk_root: toolchains/vulkan-sdk/linux
+          git_url: https://github.com/TheTom/llama-cpp-turboquant.git
+          git_ref: feature/turboquant-kv-cache
+          git_commit: 8590cbff961dbaf1d3a9793fd11d402e248869b9
+          version: 8590cbff961dbaf1d3a9793fd11d402e248869b9
+          configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_VULKAN=ON -DCMAKE_BUILD_TYPE=Release
+          build_command: cmake --build build --config Release --parallel
+          binary_glob: build/**/llama-server
+          library_glob:
+            - build/**/*.so*
+          sidecar_files: []
+        windows-hip-turboquant:
+          platform: windows
+          support_tier: experimental
+          backend: hip
+          source_type: git
+          required_toolchains:
+            - rocm_sdk
+          rocm_sdk_root: toolchains/rocm-sdk/windows
+          git_url: https://github.com/TheTom/llama-cpp-turboquant.git
+          git_ref: feature/turboquant-kv-cache
+          git_commit: 8590cbff961dbaf1d3a9793fd11d402e248869b9
+          version: 8590cbff961dbaf1d3a9793fd11d402e248869b9
+          configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_HIP=ON -DAMDGPU_TARGETS="gfx1030;gfx1100" -DCMAKE_HIP_ARCHITECTURES="gfx1030;gfx1100" -DCMAKE_BUILD_TYPE=Release
+          build_command: cmake --build build --config Release --parallel
+          binary_glob: build/**/llama-server.exe
+          library_glob:
+            - build/**/*.dll
+          sidecar_files: []
+        linux-rocm-turboquant:
+          platform: linux
+          support_tier: experimental
+          backend: rocm
+          source_type: git
+          required_toolchains:
+            - rocm_sdk
+          rocm_sdk_root: toolchains/rocm-sdk/linux
+          git_url: https://github.com/TheTom/llama-cpp-turboquant.git
+          git_ref: feature/turboquant-kv-cache
+          git_commit: 8590cbff961dbaf1d3a9793fd11d402e248869b9
+          version: 8590cbff961dbaf1d3a9793fd11d402e248869b9
+          configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_HIP=ON -DAMDGPU_TARGETS="gfx1030;gfx1100" -DCMAKE_HIP_ARCHITECTURES="gfx1030;gfx1100" -DCMAKE_BUILD_TYPE=Release
+          build_command: cmake --build build --config Release --parallel
+          binary_glob: build/**/llama-server
+          library_glob:
+            - build/**/*.so*
+          sidecar_files: []
+        windows-hip-official:
+          platform: windows
+          support_tier: experimental
+          backend: hip
+          source_type: git
+          required_toolchains:
+            - rocm_sdk
+          rocm_sdk_root: toolchains/rocm-sdk/windows
+          git_url: https://github.com/ggml-org/llama.cpp.git
+          git_ref: master
+          git_commit: ff5ef8278615a2462b79b50abdf3cc95cfb31c6f
+          version: ff5ef8278615a2462b79b50abdf3cc95cfb31c6f
+          configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_HIP=ON -DAMDGPU_TARGETS="gfx1030;gfx1100" -DCMAKE_HIP_ARCHITECTURES="gfx1030;gfx1100" -DCMAKE_BUILD_TYPE=Release
+          build_command: cmake --build build --config Release --parallel
+          binary_glob: build/**/llama-server.exe
+          library_glob:
+            - build/**/*.dll
+          sidecar_files: []
+        linux-rocm-official:
+          platform: linux
+          support_tier: experimental
+          backend: rocm
+          source_type: git
+          required_toolchains:
+            - rocm_sdk
+          rocm_sdk_root: toolchains/rocm-sdk/linux
+          git_url: https://github.com/ggml-org/llama.cpp.git
+          git_ref: master
+          git_commit: ff5ef8278615a2462b79b50abdf3cc95cfb31c6f
+          version: ff5ef8278615a2462b79b50abdf3cc95cfb31c6f
+          configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_HIP=ON -DAMDGPU_TARGETS="gfx1030;gfx1100" -DCMAKE_HIP_ARCHITECTURES="gfx1030;gfx1100" -DCMAKE_BUILD_TYPE=Release
+          build_command: cmake --build build --config Release --parallel
+          binary_glob: build/**/llama-server
+          library_glob:
+            - build/**/*.so*
+          sidecar_files: []
         linux-rocm:
           platform: linux
           support_tier: first
@@ -119,6 +260,309 @@ project:
           version: latest
           asset_match_tokens:
             - ubuntu-rocm
+            - x64
+          sidecar_files: []
+        windows-vulkan-upstream-head:
+          platform: windows
+          support_tier: experimental
+          backend: vulkan
+          source_type: git
+          required_toolchains:
+            - vulkan_sdk
+          requires_vulkan_sdk: true
+          vulkan_sdk_root: toolchains/vulkan-sdk/windows
+          git_url: https://github.com/ggml-org/llama.cpp.git
+          git_ref: master
+          git_commit: ff5ef8278615a2462b79b50abdf3cc95cfb31c6f
+          version: ff5ef8278615a2462b79b50abdf3cc95cfb31c6f
+          configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_VULKAN=ON -DCMAKE_BUILD_TYPE=Release
+          build_command: cmake --build build --config Release --parallel
+          binary_glob: build/**/llama-server.exe
+          library_glob:
+            - build/**/*.dll
+          sidecar_files: []
+        linux-vulkan-upstream-head:
+          platform: linux
+          support_tier: experimental
+          backend: vulkan
+          source_type: git
+          required_toolchains:
+            - vulkan_sdk
+          requires_vulkan_sdk: true
+          vulkan_sdk_root: toolchains/vulkan-sdk/linux
+          git_url: https://github.com/ggml-org/llama.cpp.git
+          git_ref: master
+          git_commit: ff5ef8278615a2462b79b50abdf3cc95cfb31c6f
+          version: ff5ef8278615a2462b79b50abdf3cc95cfb31c6f
+          configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_VULKAN=ON -DCMAKE_BUILD_TYPE=Release
+          build_command: cmake --build build --config Release --parallel
+          binary_glob: build/**/llama-server
+          library_glob:
+            - build/**/*.so*
+          sidecar_files: []
+        windows-hip-amd-validated-binary:
+          platform: windows
+          support_tier: experimental
+          backend: hip
+          source_type: direct_url
+          version: llama-b8407-windows-rocm-7.2.1-gfx110X-gfx115X-gfx120X-x64
+          download_url: https://repo.radeon.com/rocm/llama.cpp/windows/rocm-rel-7.2.1/llama-b8407-windows-rocm-7.2.1-gfx110X-gfx115X-gfx120X-x64.zip
+          sidecar_files: []
+        linux-rocm-amd-validated-binary:
+          platform: linux
+          support_tier: experimental
+          backend: rocm
+          source_type: direct_url
+          version: llama-b7146-ubuntu-24.04-rocm-7.1.1-gfx110X-gfx120X-x64
+          download_url: https://repo.radeon.com/rocm/llama.cpp/linux/rocm-rel-7.1.1/llama-b7146-ubuntu-24.04-rocm-7.1.1-gfx110X-gfx120X-x64.zip
+          sidecar_files: []
+        windows-hip-lemonade-release:
+          platform: windows
+          support_tier: experimental
+          backend: hip
+          version: b1237
+          repo_owner: lemonade-sdk
+          repo_name: llamacpp-rocm
+          asset_match_tokens:
+            - windows-rocm-gfx110x-x64
+          sidecar_files: []
+        linux-rocm-lemonade-release:
+          platform: linux
+          support_tier: experimental
+          backend: rocm
+          version: b1237
+          repo_owner: lemonade-sdk
+          repo_name: llamacpp-rocm
+          asset_match_tokens:
+            - ubuntu-rocm-gfx110x-x64
+          sidecar_files: []
+        windows-hip-lemonade-head:
+          platform: windows
+          support_tier: experimental
+          backend: hip
+          source_type: git
+          required_toolchains:
+            - rocm_sdk
+          rocm_sdk_root: toolchains/rocm-sdk/windows
+          git_url: https://github.com/lemonade-sdk/llamacpp-rocm.git
+          git_ref: main
+          git_commit: a3f3b81f29863e521b7ba60b4929ca03cfa4ef91
+          version: a3f3b81f29863e521b7ba60b4929ca03cfa4ef91
+          configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_HIP=ON -DAMDGPU_TARGETS="gfx1030;gfx1100;gfx1150;gfx1151;gfx1200;gfx1201" -DCMAKE_HIP_ARCHITECTURES="gfx1030;gfx1100;gfx1150;gfx1151;gfx1200;gfx1201" -DCMAKE_BUILD_TYPE=Release
+          build_command: cmake --build build --config Release --parallel
+          binary_glob: build/**/llama-server.exe
+          library_glob:
+            - build/**/*.dll
+          sidecar_files: []
+        linux-rocm-lemonade-head:
+          platform: linux
+          support_tier: experimental
+          backend: rocm
+          source_type: git
+          required_toolchains:
+            - rocm_sdk
+          rocm_sdk_root: toolchains/rocm-sdk/linux
+          git_url: https://github.com/lemonade-sdk/llamacpp-rocm.git
+          git_ref: main
+          git_commit: a3f3b81f29863e521b7ba60b4929ca03cfa4ef91
+          version: a3f3b81f29863e521b7ba60b4929ca03cfa4ef91
+          configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_HIP=ON -DAMDGPU_TARGETS="gfx1030;gfx1100;gfx1150;gfx1151;gfx1200;gfx1201" -DCMAKE_HIP_ARCHITECTURES="gfx1030;gfx1100;gfx1150;gfx1151;gfx1200;gfx1201" -DCMAKE_BUILD_TYPE=Release
+          build_command: cmake --build build --config Release --parallel
+          binary_glob: build/**/llama-server
+          library_glob:
+            - build/**/*.so*
+          sidecar_files: []
+        windows-hip-thetom-master:
+          platform: windows
+          support_tier: experimental
+          backend: hip
+          source_type: git
+          required_toolchains:
+            - rocm_sdk
+          rocm_sdk_root: toolchains/rocm-sdk/windows
+          git_url: https://github.com/TheTom/llama-cpp-turboquant.git
+          git_ref: master
+          git_commit: e43970099269b5b6da36b8977ad47697602e4e54
+          version: e43970099269b5b6da36b8977ad47697602e4e54
+          configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_HIP=ON -DAMDGPU_TARGETS="gfx1030;gfx1100" -DCMAKE_HIP_ARCHITECTURES="gfx1030;gfx1100" -DCMAKE_BUILD_TYPE=Release
+          build_command: cmake --build build --config Release --parallel
+          binary_glob: build/**/llama-server.exe
+          library_glob:
+            - build/**/*.dll
+          sidecar_files: []
+        linux-rocm-domvox-integrated:
+          platform: linux
+          support_tier: experimental
+          backend: rocm
+          source_type: git
+          required_toolchains:
+            - rocm_sdk
+          rocm_sdk_root: toolchains/rocm-sdk/linux
+          git_url: https://github.com/domvox/llama.cpp-turboquant-hip.git
+          git_ref: 6a8df6c
+          version: 6a8df6c
+          configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_HIP=ON -DAMDGPU_TARGETS="gfx1100" -DCMAKE_HIP_ARCHITECTURES="gfx1100" -DCMAKE_BUILD_TYPE=Release
+          build_command: cmake --build build --config Release --parallel
+          binary_glob: build/**/llama-server
+          library_glob:
+            - build/**/*.so*
+          sidecar_files: []
+        linux-rocm-unixsysdev-head:
+          platform: linux
+          support_tier: experimental
+          backend: rocm
+          source_type: git
+          required_toolchains:
+            - rocm_sdk
+          rocm_sdk_root: toolchains/rocm-sdk/linux
+          git_url: https://github.com/unixsysdev/llama-turboquant.git
+          git_ref: 03fa8ab
+          version: 03fa8ab
+          configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_HIP=ON -DAMDGPU_TARGETS="gfx1030;gfx1100" -DCMAKE_HIP_ARCHITECTURES="gfx1030;gfx1100" -DCMAKE_BUILD_TYPE=Release
+          build_command: cmake --build build --config Release --parallel
+          binary_glob: build/**/llama-server
+          library_glob:
+            - build/**/*.so*
+          sidecar_files: []
+        linux-rocm-unixsysdev-tq3:
+          platform: linux
+          support_tier: experimental
+          backend: rocm
+          source_type: git
+          required_toolchains:
+            - rocm_sdk
+          rocm_sdk_root: toolchains/rocm-sdk/linux
+          git_url: https://github.com/unixsysdev/llama-turboquant.git
+          git_ref: 16e93d5
+          version: 16e93d5
+          configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_HIP=ON -DAMDGPU_TARGETS="gfx1030;gfx1100" -DCMAKE_HIP_ARCHITECTURES="gfx1030;gfx1100" -DCMAKE_BUILD_TYPE=Release
+          build_command: cmake --build build --config Release --parallel
+          binary_glob: build/**/llama-server
+          library_glob:
+            - build/**/*.so*
+          sidecar_files: []
+        windows-hip-carlosfundora-head:
+          platform: windows
+          support_tier: experimental
+          backend: hip
+          source_type: git
+          required_toolchains:
+            - rocm_sdk
+          rocm_sdk_root: toolchains/rocm-sdk/windows
+          git_url: https://github.com/carlosfundora/llama.cpp-1-bit-turbo.git
+          git_ref: master
+          git_commit: 83c772e906d27ed9b4bd3ac3032a3ea15dab0d88
+          version: 83c772e906d27ed9b4bd3ac3032a3ea15dab0d88
+          configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_HIP=ON -DAMDGPU_TARGETS="gfx1030;gfx1100" -DCMAKE_HIP_ARCHITECTURES="gfx1030;gfx1100" -DCMAKE_BUILD_TYPE=Release
+          build_command: cmake --build build --config Release --parallel
+          binary_glob: build/**/llama-server.exe
+          library_glob:
+            - build/**/*.dll
+          sidecar_files: []
+        linux-vulkan-ik-release:
+          platform: linux
+          support_tier: experimental
+          backend: vulkan
+          source_type: git
+          required_toolchains:
+            - vulkan_sdk
+          git_url: https://github.com/ikawrakow/ik_llama.cpp.git
+          git_ref: 9513222
+          version: 9513222
+          configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_VULKAN=ON -DCMAKE_BUILD_TYPE=Release
+          build_command: cmake --build build --config Release --parallel
+          binary_glob: build/**/llama-server
+          library_glob:
+            - build/**/*.so*
+          sidecar_files: []
+        linux-vulkan-ik-head:
+          platform: linux
+          support_tier: experimental
+          backend: vulkan
+          source_type: git
+          required_toolchains:
+            - vulkan_sdk
+          git_url: https://github.com/ikawrakow/ik_llama.cpp.git
+          git_ref: b0750b5
+          version: b0750b5
+          configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_VULKAN=ON -DCMAKE_BUILD_TYPE=Release
+          build_command: cmake --build build --config Release --parallel
+          binary_glob: build/**/llama-server
+          library_glob:
+            - build/**/*.so*
+          sidecar_files: []
+        linux-rocm-sirmo-head:
+          platform: linux
+          support_tier: experimental
+          backend: rocm
+          source_type: git
+          required_toolchains:
+            - rocm_sdk
+          rocm_sdk_root: toolchains/rocm-sdk/linux
+          git_url: https://github.com/sirmo/llamacpp_rocm_minimal.git
+          git_ref: d1dc936
+          version: d1dc936
+          configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_HIP=ON -DCMAKE_BUILD_TYPE=Release
+          build_command: cmake --build build --config Release --parallel
+          binary_glob: build/**/llama-server
+          library_glob:
+            - build/**/*.so*
+          sidecar_files: []
+        linux-rocm-gfx1151:
+          platform: linux
+          support_tier: second
+          backend: rocm
+          version: latest
+          asset_match_tokens:
+            - ubuntu-rocm
+            - gfx1151
+            - x64
+          sidecar_files: []
+        linux-rocm-gfx950:
+          platform: linux
+          support_tier: second
+          backend: rocm
+          version: latest
+          asset_match_tokens:
+            - ubuntu-rocm
+            - gfx950
+            - x64
+          sidecar_files: []
+        linux-rocm-uma-apu:
+          platform: linux
+          support_tier: experimental
+          backend: rocm
+          source_type: git
+          required_toolchains:
+            - rocm_sdk
+          rocm_sdk_root: toolchains/rocm-sdk/linux
+          git_url: https://github.com/ggml-org/llama.cpp.git
+          git_ref: master
+          # UMA optimization for Ryzen AI / Strix Halo
+          configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_HIP=ON -DGGML_HIP_UMA=ON -DCMAKE_BUILD_TYPE=Release
+          build_command: cmake --build build --config Release --parallel
+          binary_glob: build/**/llama-server
+          library_glob:
+            - build/**/*.so*
+          sidecar_files: []
+        linux-openvino:
+          platform: linux
+          support_tier: second
+          backend: openvino
+          version: latest
+          asset_match_tokens:
+            - ubuntu
+            - openvino
+            - x64
+          sidecar_files: []
+        linux-rpc:
+          platform: linux
+          support_tier: second
+          backend: rpc
+          version: latest
+          asset_match_tokens:
+            - ubuntu
+            - rpc
             - x64
           sidecar_files: []
         linux-cuda:

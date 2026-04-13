@@ -63,6 +63,24 @@ variants:
 #     git_url: https://github.com/lemonade-sdk/llamacpp-rocm.git
 #     git_ref: main
 #
+#   source-turboquant-git:
+#     source_type: git
+#     git_url: https://github.com/TheTom/llama-cpp-turboquant.git
+#     git_ref: tqp-v0.1.0
+#     version: tqp-v0.1.0
+#
+#   build-vulkan-git:
+#     backend: vulkan
+#     configure_command: cmake -S . -B build -DLLAMA_BUILD_SERVER=ON -DGGML_VULKAN=ON -DCMAKE_BUILD_TYPE=Release
+#     build_command: cmake --build build --config Release --parallel
+#     binary_glob: build/bin/llama-server
+#     library_glob: build/bin/*.so*
+#     apt_packages:
+#       - git
+#       - cmake
+#       - build-essential
+#       - pkg-config
+#
 # variants:
 #   rocm-gfx1100-rocm-preview:
 #     profiles:
@@ -79,3 +97,11 @@ variants:
 #     macro: llama-server-rocm-gfx1030-lemonade
 #     runtime_subdir: rocm/gfx1030/lemonade
 #     enabled: true
+#
+#   vulkan-turboquant:
+#     profiles:
+#       - source-turboquant-git
+#       - build-vulkan-git
+#     macro: llama-server-vulkan-turboquant
+#     runtime_subdir: vulkan/turboquant
+#     enabled: false
